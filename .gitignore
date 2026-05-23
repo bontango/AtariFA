@@ -1,0 +1,25 @@
+# Quartus build artifacts
+db/
+incremental_db/
+output_files/
+atom_netlists/
+simulation/
+
+# Backup files
+*.bak
+*.qws
+
+# Quartus generated reports / logs
+*.rpt
+*.summary
+*.smsg
+*.pin
+*.jdi
+*.sld
+*.done
+*.qdf
+*.sopcinfo
+
+# Quartus internal
+c5_pin_model_dump.txt
+PLLJ_PLLSPE_INFO.txt
