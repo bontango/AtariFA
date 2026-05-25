@@ -28,12 +28,16 @@ Aktuell ROM: Middle Earth 608/609 + 82s130 Sound-ROM.
 
 ## Noch nicht implementiert (Roadmap)
 - **Phase B**: Switch-Matrix real (0x2010–0x204F), Solenoid-Latches (0x1080/84/88/8C), Lamp-Matrix (RAM 0x30–0x3F)
+  - ✓ Lamp-Driver gebaut: `lamp_driver.vhd` (84 Lampen → 11× TPIC6B595N, statisch gelatcht, Double-Buffer + Shift-FSM @ clk_50, ersetzt 9334+ULN2003A). RAM-0x30–0x3F-Sniffer analog Display-Shadow-Buffer.
+  - In `AtariFA.vhd` noch **komplett auskommentiert** (Ports, `lamp_state`-Signal, Sniffer-Prozess, `LD`-Instanz) — erst Display-Zwischenziel abschließen, dann alle 4 Blöcke gemeinsam aktivieren + Pins in `.qsf`.
 - **Phase C**: Audio (0x3000/0x6000), generische Spiel-Konfiguration per Generic
 - **Phase D**: Cleanup, SDC weiter vervollständigen (async Inputs B4, IO-Delays), Test-Module hinter Generic
   - ✓ Hold-Violations behoben (`set_false_path` cpu_clk_d1), SDC → `AtariFA.sdc` umbenannt
 
 ## Bekannte HW-Feintuning-Stellen
 - Ziffernreihenfolge im Shadow-Buffer-Demux (case-Zweige in `AtariFA.vhd`) — PinMAME-Segment-Indizes sind absteigend, physische Verdrahtung muss auf Hardware geprüft werden
+- Lampennummer↔Bit-Mapping im Lamp-Sniffer (`AtariFA.vhd`, derzeit linear) — PinMAME `col=(offset%4)*2+offset/8`, physische Zuordnung auf Hardware prüfen
+- TPIC6B595N nur ~150 mA Dauer/Ausgang — bei #44/#47-Glühlampen schwächer als ULN2003A (Paketverlustleistung prüfen), mit LEDs unkritisch
 
 ## Referenz
 - PinMAME `src/wpc/atari.c`: maßgeblich für Speicher-Map, Display-Mapping, Switch/DIP-Handler

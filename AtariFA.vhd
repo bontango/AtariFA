@@ -126,9 +126,15 @@ entity AtariFA is
 		disp_Load			: 	out 	std_logic;
 		disp_Cathode_blank			: 	out 	std_logic;
 		disp_Anode_blank			: 	out 	std_logic;
-		
-		
-		--switches		
+
+		-- lamps (Phase B) - cascade of 11x TPIC6B595N, see lamp_driver.vhd
+		-- TODO: enable together with lamp_driver instance below; assign real pins in .qsf
+		--lamp_ser			: 	out 	std_logic;   -- serial data to chain
+		--lamp_srck			: 	out 	std_logic;   -- shift register clock
+		--lamp_rck			: 	out 	std_logic;   -- storage/latch clock
+		--lamp_g_n			: 	out 	std_logic;   -- output enable, active low
+
+		--switches
 		switch: in 	std_logic_vector(16 downto 1);			
 		
 		--dips 		
@@ -203,6 +209,10 @@ signal	display3			: DISPLAY_T;
 signal	display4			: DISPLAY_T;
 signal	status_d			: DISPLAY_TS;
 
+-- lamp shadow buffer (Phase B) - filled by RAM 0x30-0x3F write-sniffer
+-- 84 lamps used, 88 bits = 11x TPIC6B595N. Enable together with sniffer + instance below.
+--signal	lamp_state			: std_logic_vector(87 downto 0) := (others => '0');
+
 begin
 
 --debug
@@ -257,6 +267,19 @@ port map(
 	status_d	=> status_d
 	);
 	
+-- lamp driver (Phase B): shift lamp_state out to 11x TPIC6B595N cascade
+-- enable together with lamp_state signal, sniffer process and lamp_* ports above
+--LD: entity work.lamp_driver
+--port map(
+--	clk_50     => clk_50,
+--	reset      => reset_h,
+--	lamp_state => lamp_state,
+--	ser        => lamp_ser,
+--	srck       => lamp_srck,
+--	rck        => lamp_rck,
+--	g_n        => lamp_g_n
+--	);
+
 --DT: entity work.disp_test
 --port map(
 --	clk		=> cpu_clk,
@@ -386,6 +409,32 @@ begin
 		end if;
 	end if;
 end process;
+
+-- lamp shadow buffer (Phase B): sniff CPU writes to lamp RAM 0x30-0x3F
+-- 16 bytes x 8 bit = 128 possible lamps, 84 used. Linear byte->bit mapping here;
+-- physical lamp# <-> bit assignment is HW fine-tuning (cf. PinMAME col formula
+-- col = (offset%4)*2 + offset/8). Enable together with lamp_state signal + instance.
+--process(clk_50)
+--begin
+--	if rising_edge(clk_50) then
+--		if ram_wren = '1' and cpu_addr(8 downto 4) = "00011" then  -- 0x30..0x3F
+--			case cpu_addr(3 downto 0) is
+--				when "0000" => lamp_state(7   downto 0)  <= cpu_dout;  -- 0x30
+--				when "0001" => lamp_state(15  downto 8)  <= cpu_dout;  -- 0x31
+--				when "0010" => lamp_state(23  downto 16) <= cpu_dout;  -- 0x32
+--				when "0011" => lamp_state(31  downto 24) <= cpu_dout;  -- 0x33
+--				when "0100" => lamp_state(39  downto 32) <= cpu_dout;  -- 0x34
+--				when "0101" => lamp_state(47  downto 40) <= cpu_dout;  -- 0x35
+--				when "0110" => lamp_state(55  downto 48) <= cpu_dout;  -- 0x36
+--				when "0111" => lamp_state(63  downto 56) <= cpu_dout;  -- 0x37
+--				when "1000" => lamp_state(71  downto 64) <= cpu_dout;  -- 0x38
+--				when "1001" => lamp_state(79  downto 72) <= cpu_dout;  -- 0x39
+--				when "1010" => lamp_state(87  downto 80) <= cpu_dout;  -- 0x3A (last used: bit 83)
+--				when others => null;                                   -- 0x3B..0x3F unused (>84 lamps)
+--			end case;
+--		end if;
+--	end if;
+--end process;
 
 -- RAM -- 0x0000, 0x0200
 RAM: entity work.RAM --512byte
