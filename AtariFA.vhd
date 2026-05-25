@@ -167,12 +167,6 @@ signal rom1_cs			: std_logic;
 signal rom2_dout		: std_logic_vector(7 downto 0);
 signal rom2_cs			: std_logic;
 
-signal latch1080		: std_logic;  --solenoids
-signal latch1084		: std_logic;  --solenoids
-signal latch1088		: std_logic;  --solenoids
-signal latch108C		: std_logic;  --solenoids
-signal solenoid_latch		: std_logic;  --solenoids
-
 signal dma_clk		: std_logic;
 signal audio_clk		: std_logic;
 signal dma_int		: std_logic;
@@ -242,7 +236,7 @@ disp_Anode_blank <= not i_disp_Anode_blank;
 BM: entity work.boot_message
 port map(
 	clk		=> cpu_clk, 	
-	show => reset_l,
+	show => reset_l_stable,
 	-- Control/Data Signals,
 	disp_Data => i_disp_Data,
 	disp_Adr => i_disp_Adr,
@@ -261,7 +255,7 @@ port map(
 DT: entity work.disp_test
 port map(
 	clk		=> cpu_clk, 	
-	show => reset_l,
+	show => reset_l_stable,
 	display1	=> display1,
 	display2	=> display2,
 	display3	=> display3,
@@ -316,16 +310,11 @@ port map(
 ----------------------
 
 wd_cs     <= '1' when cpu_addr = x"4000" else '0';
-latch1080 <= '1' when cpu_addr = x"1080" else '0';
-latch1084 <= '1' when cpu_addr = x"1084" else '0';
-latch1088 <= '1' when cpu_addr = x"1088" else '0';
-latch108C <= '1' when cpu_addr = x"108C" else '0';
 
--- RAM -- 0x0000, 0x0200 -- Mirror at 0x1000, 0x0200 except solenoid latches
-solenoid_latch <= latch1080 or latch1084 or latch1088 or latch108C;
+-- RAM -- 0x0000, 0x01FF and mirror at 0x1000-0x11FF
 ram_cs_normal <= '1' when cpu_addr(15 downto 9) = "0000000" and cpu_vma='1' else '0';
 ram_cs_mirror <= '1' when cpu_addr(15 downto 9) = "0001000" and cpu_vma='1' else '0';
-ram_cs <= (ram_cs_normal or ram_cs_mirror) and not solenoid_latch;
+ram_cs <= ram_cs_normal or ram_cs_mirror;
 
 --E0_ROM: entity work.ROM1 --2K 0x7800, 0x0800 & 0xf800, 0x0800
 rom1_cs <= '1' when ( cpu_addr(15 downto 11) = "01111" or cpu_addr(15 downto 11) = "11111") and cpu_vma='1' else '0';
@@ -337,8 +326,7 @@ cpu_din <=
    ram_dout when ram_cs = '1' else
 	rom1_dout when rom1_cs = '1' else
 	rom2_dout when rom2_cs = '1' else
-	--x"FF";
-	x"00";
+	x"FF";
 	
 -- B2: synchroner RAM-Write-Strobe (clk_50-Domain)
 -- cpu_clk (PLL) wird in clk_50 einsynchronisiert; fallende Flanke = ein Puls
