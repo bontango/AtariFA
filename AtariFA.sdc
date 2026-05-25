@@ -26,7 +26,12 @@
     
 	derive_pll_clocks -create_base_clocks
    derive_clock_uncertainty
-	
+
+	# cpu_clk (PLL clk[0]) wird in clk_50-Domain als Datensignal gesampled
+	# (Edge-Detect fuer RAM-Write-Strobe, AtariFA.vhd cpu_clk_d1/d2).
+	# cpu_clk ist aus clk_50 (/50) per PLL abgeleitet -> synchron, Hold-Check sinnlos.
+	set_false_path -from [get_clocks {clock_gen|altpll_component|auto_generated|pll1|clk[0]}] -to [get_registers {cpu_clk_d1}]
+
 	# Constrain IOs (don't care...)
 	set_input_delay -clock clk_50 0 [all_inputs]
 	set_output_delay -clock clk_50 0 [all_outputs]

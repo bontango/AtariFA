@@ -180,6 +180,14 @@ signal wd_kick		: std_logic := '0';
 signal wd_reset		: std_logic;
 
 signal dma_counter		: std_logic_vector(8 downto 0) := (others => '0');
+signal nmi_level		: std_logic := '0';
+signal nmi_level_d		: std_logic := '0';
+signal dma_count2		: std_logic := '0';
+signal dma_toggle		: std_logic := '0';
+
+signal sw_cs			: std_logic;
+signal dip_cs			: std_logic;
+signal dip_value		: std_logic_vector(7 downto 0);
 
 --display testboard
 signal i_disp_Data: std_logic_vector(3 downto 0);
@@ -249,16 +257,16 @@ port map(
 	status_d	=> status_d
 	);
 	
-DT: entity work.disp_test
-port map(
-	clk		=> cpu_clk, 	
-	show => reset_l_stable,
-	display1	=> display1,
-	display2	=> display2,
-	display3	=> display3,
-	display4	=> display4,
-	status_d	=> status_d
-	);
+--DT: entity work.disp_test
+--port map(
+--	clk		=> cpu_clk,
+--	show => reset_l_stable,
+--	display1	=> display1,
+--	display2	=> display2,
+--	display3	=> display3,
+--	display4	=> display4,
+--	status_d	=> status_d
+--	);
 
 	
 ------------------------------
@@ -268,6 +276,10 @@ port map(
 dma_clk   <= dma_counter(0);  -- reserved
 audio_clk <= dma_counter(2);  -- reserved for Phase C audio
 dma_int   <= not (dma_counter(7) and dma_counter(8));
+nmi_level <= dma_counter(7) and dma_counter(8);
+
+-- DIP read: 0x2000 bit6 = dma_toggle (game code checks this to proceed); all other DIPs = 0x00
+dip_value <= "0" & dma_toggle & "000000" when cpu_addr = x"2000" else x"00";
 
 ------------------------------
 -- Watchdog (0x4000 write)
@@ -285,6 +297,8 @@ port map(
 ----------------------
 
 wd_cs     <= '1' when cpu_addr = x"4000" else '0';
+sw_cs     <= '1' when cpu_addr >= x"2010" and cpu_addr <= x"204F" and cpu_vma='1' else '0';
+dip_cs    <= '1' when cpu_addr(15 downto 4) = x"200" and cpu_vma='1' else '0';  -- 0x2000-0x200F
 
 -- RAM -- 0x0000, 0x01FF and mirror at 0x1000-0x11FF
 ram_cs_normal <= '1' when cpu_addr(15 downto 9) = "0000000" and cpu_vma='1' else '0';
@@ -297,10 +311,12 @@ rom1_cs <= '1' when ( cpu_addr(15 downto 11) = "01111" or cpu_addr(15 downto 11)
 rom2_cs <= '1' when cpu_addr(15 downto 11) = "01110" and cpu_vma='1' else '0';
 
 -- Bus control
-cpu_din <= 
-   ram_dout when ram_cs = '1' else
+cpu_din <=
+	ram_dout  when ram_cs  = '1' else
 	rom1_dout when rom1_cs = '1' else
 	rom2_dout when rom2_cs = '1' else
+	x"00"     when sw_cs   = '1' else  -- all switches open
+	dip_value when dip_cs  = '1' else  -- DIPs + DMA toggle bit at 0x2000
 	x"FF";
 	
 -- B2: synchroner RAM-Write-Strobe (clk_50-Domain)
@@ -315,8 +331,58 @@ begin
 		wd_kick  <= wd_cs  and (not cpu_rw) and (cpu_clk_d2 and not cpu_clk_d1);
 		if reset_l_stable = '0' then
 			dma_counter <= (others => '0');
-		elsif (cpu_clk_d1 = '1' and cpu_clk_d2 = '0') then
-			dma_counter <= dma_counter + 1;
+			dma_count2  <= '0';
+			dma_toggle  <= '0';
+			nmi_level_d <= '0';
+		else
+			if cpu_clk_d1 = '1' and cpu_clk_d2 = '0' then
+				dma_counter <= dma_counter + 1;
+			end if;
+			nmi_level_d <= nmi_level;
+			if nmi_level = '1' and nmi_level_d = '0' then
+				if dma_count2 = '1' then
+					dma_count2 <= '0';
+					dma_toggle <= not dma_toggle;
+				else
+					dma_count2 <= '1';
+				end if;
+			end if;
+		end if;
+	end if;
+end process;
+
+-- display shadow buffer: sniff CPU writes to display RAM (0x00-0x1F)
+-- captures BCD nibbles written by the game ROM into display1..4 and status_d
+process(clk_50)
+begin
+	if rising_edge(clk_50) then
+		if ram_wren = '1' and cpu_addr(8 downto 5) = "0000" then
+			case cpu_addr(4 downto 0) is
+				-- Player 1 score: RAM 0x00, 0x01, 0x02
+				when "00000" => display1(0) <= cpu_dout(7 downto 4); display1(1) <= cpu_dout(3 downto 0);
+				when "00001" => display1(2) <= cpu_dout(7 downto 4); display1(3) <= cpu_dout(3 downto 0);
+				when "00010" => display1(4) <= cpu_dout(7 downto 4); display1(5) <= cpu_dout(3 downto 0);
+				when "00011" => display1(6) <= cpu_dout(3 downto 0);  -- Player 1 up LED (8=on,0=off)
+				-- Player 2 score: RAM 0x04, 0x05, 0x06
+				when "00100" => display2(0) <= cpu_dout(7 downto 4); display2(1) <= cpu_dout(3 downto 0);
+				when "00101" => display2(2) <= cpu_dout(7 downto 4); display2(3) <= cpu_dout(3 downto 0);
+				when "00110" => display2(4) <= cpu_dout(7 downto 4); display2(5) <= cpu_dout(3 downto 0);
+				when "00111" => display2(6) <= cpu_dout(3 downto 0);  -- Player 2 up LED
+				-- Player 3 score: RAM 0x08, 0x09, 0x0A
+				when "01000" => display3(0) <= cpu_dout(7 downto 4); display3(1) <= cpu_dout(3 downto 0);
+				when "01001" => display3(2) <= cpu_dout(7 downto 4); display3(3) <= cpu_dout(3 downto 0);
+				when "01010" => display3(4) <= cpu_dout(7 downto 4); display3(5) <= cpu_dout(3 downto 0);
+				when "01011" => display3(6) <= cpu_dout(3 downto 0);  -- Player 3 up LED
+				-- Player 4 score: RAM 0x0C, 0x0D, 0x0E
+				when "01100" => display4(0) <= cpu_dout(7 downto 4); display4(1) <= cpu_dout(3 downto 0);
+				when "01101" => display4(2) <= cpu_dout(7 downto 4); display4(3) <= cpu_dout(3 downto 0);
+				when "01110" => display4(4) <= cpu_dout(7 downto 4); display4(5) <= cpu_dout(3 downto 0);
+				when "01111" => display4(6) <= cpu_dout(3 downto 0);  -- Player 4 up LED
+				-- Match/Credit: RAM 0x1C, 0x1D
+				when "11100" => status_d(0) <= cpu_dout(7 downto 4); status_d(1) <= cpu_dout(3 downto 0);
+				when "11101" => status_d(2) <= cpu_dout(7 downto 4); status_d(3) <= cpu_dout(3 downto 0);
+				when others => null;
+			end case;
 		end if;
 	end if;
 end process;
