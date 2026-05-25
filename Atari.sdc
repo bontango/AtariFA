@@ -15,7 +15,7 @@
 	#The clock name doesn't have to match the port name, but I find it useful to do so.
 	#
 	# generated clocks
-	create_generated_clock -name clk_out -divide_by 100 -source clk_50 cpu_clk_gen:clock_gen|clk_out	
+	#create_generated_clock -name clk_out -divide_by 100 -source clk_50 cpu_clk_gen:clock_gen|clk_out	
 	#create_generated_clock -name clk_out_1 -divide_by 125 -source clk_50 cpu_400KHz_gen:clock_gen_1|clk_out_1	
 	#create_generated_clock -name clk_out_2 -divide_by 100 -source clk_50 cpu_500KHz_gen:clock_gen_2|clk_out_2	
 	
@@ -26,6 +26,10 @@
     
 	derive_pll_clocks -create_base_clocks
    derive_clock_uncertainty
+	
+	# Constrain IOs (don't care...)
+	set_input_delay -clock clk_50 0 [all_inputs]
+	set_output_delay -clock clk_50 0 [all_outputs]
 	
 	#
 	# example second clock

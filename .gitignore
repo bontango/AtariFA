@@ -23,3 +23,6 @@ simulation/
 # Quartus internal
 c5_pin_model_dump.txt
 PLLJ_PLLSPE_INFO.txt
+greybox_tmp/
+*.cmp
+*.ppf

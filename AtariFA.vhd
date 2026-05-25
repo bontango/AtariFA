@@ -156,7 +156,6 @@ signal cpu_dout	: 	std_logic_vector(7 downto 0);
 signal cpu_rw		: 	std_logic;
 signal cpu_vma		: 	std_logic;  --valid memory address
 signal cpu_irq		: 	std_logic;
-signal cpu_nmi		:	std_logic;
 
 signal ram_dout		: std_logic_vector(7 downto 0);
 signal ram_cs			: std_logic;
@@ -174,9 +173,17 @@ signal latch1088		: std_logic;  --solenoids
 signal latch108C		: std_logic;  --solenoids
 signal solenoid_latch		: std_logic;  --solenoids
 
-signal dma_clk		: std_logic;  
-signal audio_clk		: std_logic;  
-signal dma_int		: std_logic;  
+signal dma_clk		: std_logic;
+signal audio_clk		: std_logic;
+signal dma_int		: std_logic;
+
+signal cpu_clk_d1	: std_logic := '0';
+signal cpu_clk_d2	: std_logic := '0';
+signal ram_wren		: std_logic := '0';
+
+signal wd_cs		: std_logic;
+signal wd_kick		: std_logic := '0';
+signal wd_reset		: std_logic;
 
 signal counter1_Qd		: std_logic;  
 signal counter2_Qd		: std_logic;  
@@ -218,7 +225,7 @@ debug_signal(2) <= i_disp_Anode_blank;
 
 -------------------------------
 
-reset_h <= (not reset_l_stable); 
+reset_h <= (not reset_l_stable) or wd_reset;
 
 -- LEDs
 LED1 <= '0';
@@ -231,6 +238,7 @@ disp_Adr <= not i_disp_Adr;
 disp_Load <= not i_disp_Load;
 disp_Cathode_blank <= not i_disp_Cathode_blank;
 disp_Anode_blank <= not i_disp_Anode_blank;
+
 BM: entity work.boot_message
 port map(
 	clk		=> cpu_clk, 	
@@ -239,7 +247,7 @@ port map(
 	disp_Data => i_disp_Data,
 	disp_Adr => i_disp_Adr,
 	disp_Load => i_disp_Load,
-	disp_Cathode_blank => i_disp_Cathode_blank,
+	disp_Cathode_blank => i_disp_Cathode_blank, --C11 -> DSTB Pin1 on K4
 	disp_Anode_blank => i_disp_Anode_blank,
 	-- input (display data)
 	-- digit #6 is Player up LEDS 8==ON 0==OFF
@@ -249,6 +257,7 @@ port map(
 	display4	=> display4,
 	status_d	=> status_d
 	);
+	
 DT: entity work.disp_test
 port map(
 	clk		=> cpu_clk, 	
@@ -291,11 +300,22 @@ port map(
 
 dma_int <= not (counter2_Qd and counter3_Qa);
 
+------------------------------
+-- Watchdog (0x4000 write)
+------------------------------
+WD: entity work.watchdog
+port map(
+	clk      => clk_50,
+	rst_l    => reset_l_stable,
+	kick     => wd_kick,
+	wd_reset => wd_reset
+);
 
 ----------------------
 -- address decoding
 ----------------------
 
+wd_cs     <= '1' when cpu_addr = x"4000" else '0';
 latch1080 <= '1' when cpu_addr = x"1080" else '0';
 latch1084 <= '1' when cpu_addr = x"1084" else '0';
 latch1088 <= '1' when cpu_addr = x"1088" else '0';
@@ -320,18 +340,26 @@ cpu_din <=
 	--x"FF";
 	x"00";
 	
--- IRQ
---cpu_irq <= '0';
---cpu_nmi <= '1';
-
+-- B2: synchroner RAM-Write-Strobe (clk_50-Domain)
+-- cpu_clk (PLL) wird in clk_50 einsynchronisiert; fallende Flanke = ein Puls
+-- wenn cpu_addr/cpu_dout nach der cpu68-Taktflanke stabil sind.
+process(clk_50)
+begin
+	if rising_edge(clk_50) then
+		cpu_clk_d1 <= cpu_clk;
+		cpu_clk_d2 <= cpu_clk_d1;
+		ram_wren <= ram_cs and (not cpu_rw) and (cpu_clk_d2 and not cpu_clk_d1);
+		wd_kick  <= wd_cs  and (not cpu_rw) and (cpu_clk_d2 and not cpu_clk_d1);
+	end if;
+end process;
 
 -- RAM -- 0x0000, 0x0200
 RAM: entity work.RAM --512byte
 port map(
 	address	=> cpu_addr(8 downto 0),
-	clock		=> clk_50, 
+	clock		=> clk_50,
 	data		=>  cpu_dout (7 DOWNTO 0),
-	wren 		=> ram_cs and not cpu_rw and not cpu_clk,
+	wren 		=> ram_wren,
 	q			=> ram_dout
 );
 
@@ -363,19 +391,23 @@ port map(
 	data_out => cpu_dout,
 	hold => '0',
 	halt => '0',
-	--irq => cpu_irq,
 	irq => '0',
-	nmi => '0'
-	--nmi => not cpu_nmi
+	nmi => not dma_int
 );
 
 	 
 -- cpu clock
-clock_gen: entity work.cpu_clk_gen
+clock_gen: entity work.cpu_clock
 port map(   
-	clk_in => clk_50,
-	clk_out	=> cpu_clk
+	inclk0 => clk_50,
+	c0	=> cpu_clk
 );
+
+--clock_gen: entity work.cpu_clk_gen
+--port map(   
+--	clk_in => clk_50,
+--	clk_out	=> cpu_clk
+--);
 
 META1: entity work.Cross_Slow_To_Fast_Clock
 port map(
