@@ -210,7 +210,6 @@ set_global_assignment -name VHDL_FILE cpu_clk_gen.vhd
 set_global_assignment -name QIP_FILE ROM2.qip
 set_global_assignment -name QIP_FILE ROM1.qip
 set_global_assignment -name QIP_FILE RAM.qip
-set_global_assignment -name VHDL_FILE SN7493.vhd
 set_global_assignment -name VHDL_FILE boot_message.vhd
 set_global_assignment -name VHDL_FILE watchdog.vhd
 set_global_assignment -name VHDL_FILE AtariFA.vhd

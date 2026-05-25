@@ -179,10 +179,7 @@ signal wd_cs		: std_logic;
 signal wd_kick		: std_logic := '0';
 signal wd_reset		: std_logic;
 
-signal counter1_Qd		: std_logic;  
-signal counter2_Qd		: std_logic;  
-signal counter3_Qa		: std_logic;  
-signal counter3_Qd		: std_logic;  
+signal dma_counter		: std_logic_vector(8 downto 0) := (others => '0');
 
 --display testboard
 signal i_disp_Data: std_logic_vector(3 downto 0);
@@ -265,34 +262,12 @@ port map(
 
 	
 ------------------------------
--- DMA interrupt counters
+-- DMA interrupt counter (9-bit synchronous, replaces 3x SN7493 ripple chain)
+-- counts cpu_clk rising edges in clk_50 domain; NMI period = 512 cpu_clk = 512 us
 ------------------------------
-COUNTER_1: entity work.SN7493
-port map(
-	Clock =>clk_50,
-	Clk_in => cpu_clk,	
-	rst_l => reset_l_stable,
-	Q_out(0) => dma_clk,
-	Q_out(2) => audio_clk,
-	Q_out(3) => counter1_Qd
-);
-COUNTER_2: entity work.SN7493
-port map(
-	Clock =>clk_50,
-	Clk_in => counter1_Qd, --Qd of counter1 feeds counter2
-	rst_l => reset_l_stable,	
-	Q_out(3) => counter2_Qd
-);
-COUNTER_3: entity work.SN7493
-port map(
-	Clock =>clk_50,
-	Clk_in => counter2_Qd,--Qd of counter2 feeds counter3
-	rst_l => reset_l_stable,	
-	Q_out(0) => counter3_Qa,
-	Q_out(3) => counter3_Qd
-);
-
-dma_int <= not (counter2_Qd and counter3_Qa);
+dma_clk   <= dma_counter(0);  -- reserved
+audio_clk <= dma_counter(2);  -- reserved for Phase C audio
+dma_int   <= not (dma_counter(7) and dma_counter(8));
 
 ------------------------------
 -- Watchdog (0x4000 write)
@@ -338,6 +313,11 @@ begin
 		cpu_clk_d2 <= cpu_clk_d1;
 		ram_wren <= ram_cs and (not cpu_rw) and (cpu_clk_d2 and not cpu_clk_d1);
 		wd_kick  <= wd_cs  and (not cpu_rw) and (cpu_clk_d2 and not cpu_clk_d1);
+		if reset_l_stable = '0' then
+			dma_counter <= (others => '0');
+		elsif (cpu_clk_d1 = '1' and cpu_clk_d2 = '0') then
+			dma_counter <= dma_counter + 1;
+		end if;
 	end if;
 end process;
 
