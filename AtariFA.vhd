@@ -464,7 +464,7 @@ cpu_din <=
 	ram_dout  when ram_cs   = '1' else
 	rom1_dout when rom1_cs  = '1' else
 	rom2_dout when rom2_cs  = '1' else
-	x"FF"     when sw_cs    = '1' else  -- all switches open (active-low pull-ups; 0xFF = no key pressed)
+	x"00"     when sw_cs    = '1' else  -- Gen1 swg1_r: idle (no switch pressed) = 0x00, pressed = 0xFF (non-inverted, PinMAME atari.c)
 	dip_value when dip_cs   = '1' else  -- DIPs + DMA toggle bit at 0x2000
 	nvram_dout when nvram_cs = '1' else  -- fake NVRAM byte 0x0200
 	x"FF";
