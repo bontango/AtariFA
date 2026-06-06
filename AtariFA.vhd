@@ -235,11 +235,22 @@ constant DISPLAY_TEST : boolean := false;
 --   1 = display1(0):     erstes Score-Nibble (8=Game schreibt 8; ≠8=Daten laufen/Display frei)
 --   2 = status_d(0):     Credit/Match-Nibble (in Attract typisch ≠8)
 --   3 = nvram_dout(3:0): NVRAM-Low-Nibble (zeigt ob Game 0x0200 beschreibt)
-constant DIAG_SEL : integer range 0 to 3 := 3;
+constant DIAG_SEL : integer range 0 to 3 := 1;
+-- DBG_MODE: wählt Belegung debug_signal[7:0] am LA-Header
+--   0 = Standard-Mix (cpu_clk/vma/rw/ram_wren/NMI/wd_reset/dma_toggle/rom_cs)
+--   1 = cpu_addr(7:0)  — PC-Low-Byte; steht → hängt an diesem Offset in der Page
+--   2 = cpu_addr(15:8) — PC-High-Byte; steht → hängt in dieser ROM/RAM-Page
+constant DBG_MODE : integer range 0 to 2 := 0;
 signal heartbeat_div  : std_logic_vector(24 downto 0) := (others => '0');
-   -- Bit 24 toggelt alle 2^24/50e6 ≈ 0.67s → ~0.75 Hz Heartbeat auf LED_D2
+   -- Bit 24 toggelt alle 2^24/50e6 ≈ 0.67s → ~0.75 Hz Heartbeat; nur als FPGA-Takt-Fallback genutzt
+signal cpu_fetch_cnt  : std_logic_vector(20 downto 0) := (others => '0');
+   -- Zählt ROM-CS-Steigeflanken in clk_50; Bit 20 → ~0.6 Hz auf LED_D2 wenn CPU fetcht
+   -- (1 MHz cpu_clk, ~1 Fetch/Zyklus → 2^20/50e6 ≈ 0.021s per Bit; Bit20=~21ms*2≈42ms Wait)
+   -- Steht LED_D2 dauerhaft: CPU macht keine ROM-Fetches (halted/hängt in RAM/Busy-Loop ohne ROM)
+signal rom_cs_d       : std_logic := '0';
+   -- Edge-Detect für cpu_fetch_cnt
 signal nmi_blink_cnt  : std_logic_vector(11 downto 0) := (others => '0');
-   -- Zählt NMI-Flanken; Bit 11 ≈ 0.48 Hz auf LED_D3 (2048×512µs≈1.05s/Toggle → langsamer als D2)
+   -- Zählt NMI-Generator-Flanken; Bit 11 ≈ 0.48 Hz auf LED_D3 (HW-NMI-Takt, unabhängig von CPU)
 signal wd_seen        : std_logic := '0';
    -- Sticky-Latch: '1' wenn Watchdog mind. einmal resettet hat (LED_D1)
 signal por_count      : integer range 0 to 50001 := 0;
@@ -288,7 +299,8 @@ begin
 --debug_addr  <= cpu_addr;
 --debug_data  <= cpu_din when cpu_rw = '1' else cpu_dout;
 
--- 8-Kanal-LA auf debug_signal[7:0]:
+-- 8-Kanal-LA auf debug_signal[7:0] — Belegung per DBG_MODE-Konstante wählbar:
+-- DBG_MODE=0 (Standard-Mix):
 --  [0] cpu_clk    1 MHz Dauertakt     — steht: PLL/Takt tot
 --  [1] cpu_vma    CPU-Buszugriffe     — dauerhaft 0: CPU halted/hängt
 --  [2] cpu_rw     Read(1)/Write(0)    — zeigt Lese-/Schreibphasen
@@ -297,24 +309,37 @@ begin
 --  [5] wd_reset   Watchdog-Reset      — pulst periodisch: Watchdog-Loop (Ursache 3)
 --  [6] dma_toggle DMA-Toggle-Bit      — steht: Game hängt am DMA-Toggle (Ursache 2)
 --  [7] ROM-CS     CPU in ROM          — wechselt mit RAM/IO: CPU läuft
-debug_signal(0) <= cpu_clk; 
-debug_signal(1) <= cpu_vma;
-debug_signal(2) <= cpu_rw;
-debug_signal(3) <= ram_wren;
-debug_signal(4) <= not dma_int;   -- NMI-Puls (aktiv-high für LA sichtbar)
-debug_signal(5) <= wd_reset;
-debug_signal(6) <= dma_toggle;
-debug_signal(7) <= rom1_cs or rom2_cs;
+-- DBG_MODE=1: cpu_addr(7:0)   → PC-Low-Byte stehend am LA ablesen
+-- DBG_MODE=2: cpu_addr(15:8)  → PC-High-Byte stehend am LA ablesen
+gen_dbg0: if DBG_MODE = 0 generate
+	debug_signal(0) <= cpu_clk;
+	debug_signal(1) <= cpu_vma;
+	debug_signal(2) <= cpu_rw;
+	debug_signal(3) <= ram_wren;
+	debug_signal(4) <= not dma_int;   -- NMI-Puls (aktiv-high für LA sichtbar)
+	debug_signal(5) <= wd_reset;
+	debug_signal(6) <= dma_toggle;
+	debug_signal(7) <= rom1_cs or rom2_cs;
+end generate gen_dbg0;
+gen_dbg1: if DBG_MODE = 1 generate
+	debug_signal <= cpu_addr(7 downto 0);
+end generate gen_dbg1;
+gen_dbg2: if DBG_MODE = 2 generate
+	debug_signal <= cpu_addr(15 downto 8);
+end generate gen_dbg2;
 
 -------------------------------
 
-reset_h <= (not reset_l_stable) or wd_reset or por_active;
-   -- por_active: deterministischer 1-ms-Power-on-Reset nach FPGA-Konfiguration
+reset_h <= (not reset_l_stable) or por_active;
+   -- WD deliberately disconnected: Game kickt 0x4000 nicht im Attract Mode → permanenter Reset-Loop.
+   -- Reaktivieren (or wd_reset) sobald Kick-Bedingung aus Schaltplan/ROM-Disassembly bekannt.
 
 -- LEDs (Schnell-Diagnose ohne LA) — Board-LEDs aktiv-LOW (gegen VCC, Pin nach GND => leuchten bei '0')
-LED_D1        <= not wd_seen;           -- Watchdog-Sticky: leuchtet wenn WD mind. 1x resettet hat
-LED_D2  <= not heartbeat_div(24); -- Heartbeat ~0.75 Hz: blinkt = cpu_clk/PLL lebt
-LED_D3  <= not nmi_blink_cnt(11); -- NMI-Blinker ~0.48 Hz: blinkt = NMI feuert korrekt (langsamer als D2)
+LED_D1   <= not wd_seen;           -- Watchdog-Sticky: leuchtet wenn WD mind. 1x resettet hat
+LED_D2   <= not cpu_fetch_cnt(20); -- CPU-Fetch-Blinker ~0.6 Hz: blinkt = cpu68 fetcht ROM-Befehle
+                                    -- (steht dauerhaft: CPU halted oder hängt ohne ROM-Zugriff)
+LED_D3   <= not nmi_blink_cnt(11); -- NMI-Generator-Blinker ~0.48 Hz: blinkt = HW-NMI-Takt läuft
+                                    -- (unabhängig von CPU; Freilauf aus dma_counter)
 LED_FPGA <= '1'; --OFF
 -- SEG7 (GottFA3-Board, 4-bit BCD-dekodiert): Diagnose-Anzeige, per DIAG_SEL umschaltbar
 -- DIAG_SEL=0: cpu_addr(15:12)   — flackert 0/1=RAM,2=I/O,7=ROM; steht=CPU hängt
@@ -405,7 +430,7 @@ dip_value <= "0" & dma_toggle & "111111" when cpu_addr = x"2000" else x"FF";
 ------------------------------
 WD: entity work.watchdog
 generic map (
-	RESET_WIDTH => 800    -- 16 µs @ 50 MHz = 16 cpu_clk-Zyklen, sicherer als 1 µs (1 Zyklus)
+	RESET_WIDTH => 800    -- 16 µs @ 50 MHz
 )
 port map(
 	clk      => clk_50,
@@ -617,12 +642,25 @@ port map(
 -- Diagnose-Prozesse
 ------------------------------
 
--- Heartbeat-Teiler: 25-Bit-Freilaufzähler auf clk_50
--- Bit 24 → ~0.75 Hz Blinken auf LED_D2; leuchtet dauerhaft / aus = Takt tot
+-- Heartbeat-Teiler: 25-Bit-Freilaufzähler auf clk_50 (nur noch als Reserve / FPGA-Takt-Nachweis)
 process(clk_50)
 begin
 	if rising_edge(clk_50) then
 		heartbeat_div <= heartbeat_div + 1;
+	end if;
+end process;
+
+-- CPU-Fetch-Zähler: zählt rising edges von (rom1_cs or rom2_cs) in clk_50
+-- Bit 20 → ~0.6 Hz auf LED_D2 solange die CPU ROM-Bytes fetcht.
+-- Steht LED_D2 dauerhaft (leuchtet oder dunkel): CPU macht keine ROM-Zugriffe →
+--   entweder halted, oder in RAM-Warteschleife ohne ROM-Fetch (dann DBG_MODE=1/2 für PC-Trace).
+process(clk_50)
+begin
+	if rising_edge(clk_50) then
+		rom_cs_d <= rom1_cs or rom2_cs;
+		if (rom1_cs or rom2_cs) = '1' and rom_cs_d = '0' then
+			cpu_fetch_cnt <= cpu_fetch_cnt + 1;
+		end if;
 	end if;
 end process;
 
