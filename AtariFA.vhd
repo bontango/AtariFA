@@ -257,6 +257,13 @@ signal por_count      : integer range 0 to 50001 := 0;
 signal por_active     : std_logic := '1';
    -- Power-on-Reset: hält CPU für 50 000 clk_50-Takte (1 ms) nach Konfiguration im Reset
 
+-- Taster-Synchronizer (2-FF, clk_50-Domäne) — adressiert B4 für die genutzten Eingänge
+-- switch[1]=Test, switch[2]=Coin1, switch[3]=Coin2, switch[4]=Start (aktiv-LOW, Pull-up idle='1')
+signal sw_meta        : std_logic_vector(16 downto 1) := (others => '1');
+signal sw_sync        : std_logic_vector(16 downto 1) := (others => '1');
+-- Dekodierter Switch-Matrix-Wert für cpu_din (gedrückt=0xFF, idle=0x00, non-inverted laut PinMAME swg1_r)
+signal sw_value       : std_logic_vector(7 downto 0);
+
 -- 4-bit Hex → 7-Segment-Decoder (bit0=a .. bit6=g, aktiv-HIGH)
 -- Falls Diag-Display mit Common-Anode: Ausgabe invertieren
 function hex7seg(nibble : std_logic_vector(3 downto 0)) return std_logic_vector is
@@ -422,8 +429,11 @@ nmi_level <= dma_counter(7) and dma_counter(8);
 
 -- DIP read: 0x2000 bit6 = dma_toggle (display-sync, polled at 0x78BE/0x78C9 in ROM1);
 --   bit7=0 (BPL check at 0x721C passes), bits5-0=1 (active-low pull-ups).
--- 0x2001-0x200F: all 1 = DIP switches open / switches not pressed (active-low).
-dip_value <= "0" & dma_toggle & "111111" when cpu_addr = x"2000" else x"FF";
+-- 0x200B = Atari Test switch: idle sw_sync(1)='1'→0xFF (normal boot), gedrückt '0'→0x00 (888888-Test, 7F9C in ROM1).
+-- 0x2001-0x200F (excl. 0x200B): all 1 = DIP switches open / switches not pressed (active-low).
+dip_value <= "0" & dma_toggle & "111111" when cpu_addr = x"2000" else
+             (others => sw_sync(1))      when cpu_addr = x"200B" else  -- Test-Taster: idle→FF, gedrückt→00
+             x"FF";
 
 ------------------------------
 -- Watchdog (0x4000 write)
@@ -459,13 +469,20 @@ rom1_cs <= '1' when ( cpu_addr(15 downto 11) = "01111" or cpu_addr(15 downto 11)
 --E00_ROM: entity work.ROM2 --2K 0x7000, 0x0800
 rom2_cs <= '1' when cpu_addr(15 downto 11) = "01110" and cpu_vma='1' else '0';
 
+-- sw_value: Switch-Matrix-Dekodierung (aktiv-low Taster invertiert auf PinMAME-Pegel gedrückt=0xFF/idle=0x00)
+-- switch[2]=Coin1→$2010, switch[3]=Coin2→$2011, switch[4]=Start→$2013; übrige Rows idle=0x00.
+sw_value <= (others => not sw_sync(2)) when cpu_addr = x"2010" else  -- Coin1
+            (others => not sw_sync(3)) when cpu_addr = x"2011" else  -- Coin2
+            (others => not sw_sync(4)) when cpu_addr = x"2013" else  -- Start
+            x"00";                                                    -- alle übrigen SW-Rows idle
+
 -- Bus control
 cpu_din <=
 	ram_dout  when ram_cs   = '1' else
 	rom1_dout when rom1_cs  = '1' else
 	rom2_dout when rom2_cs  = '1' else
-	x"00"     when sw_cs    = '1' else  -- Gen1 swg1_r: idle (no switch pressed) = 0x00, pressed = 0xFF (non-inverted, PinMAME atari.c)
-	dip_value when dip_cs   = '1' else  -- DIPs + DMA toggle bit at 0x2000
+	sw_value  when sw_cs    = '1' else  -- Gen1 swg1_r: idle=0x00, pressed=0xFF; Taster aktiv-low invertiert
+	dip_value when dip_cs   = '1' else  -- DIPs + DMA toggle bit at 0x2000; Test-Taster bei 0x200B
 	nvram_dout when nvram_cs = '1' else  -- fake NVRAM byte 0x0200
 	x"FF";
 	
@@ -637,6 +654,16 @@ port map(
 	o_Q => reset_l_stable,
    i_Fast_Clk => clk_50
 	);
+
+------------------------------
+-- Taster-Synchronizer (2-FF, clk_50-Domäne, B4 für switch[1..4])
+------------------------------
+process(clk_50) begin
+  if rising_edge(clk_50) then
+    sw_meta <= switch;   -- 1. FF: metastability capture
+    sw_sync <= sw_meta;  -- 2. FF: stable in clk_50
+  end if;
+end process;
 
 ------------------------------
 -- Diagnose-Prozesse
