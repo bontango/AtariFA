@@ -1,0 +1,2318 @@
+==============================================================================
+AtariFA — Middle Earth 608/609 — 6800 Disassembly
+==============================================================================
+  ROM2 (609): 0x7000–0x77FF   ROM1 (608): 0x7800–0x7FFF
+  RESET=7000  NMI=7EC6  IRQ=26F8  SWI=394E
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BOOT PATH TRACE  (from RESET=7000, call depth ≤ 6, max 8000 insn)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  7000: 8E 00 60   ROM2_START:  LDS    #$0060
+  7003: CE 11 FF                LDX    #$11FF
+  7006: 6F 00 09                CLR    $00,X
+  7008: 09 8C 10                DEX    
+  7009: 8C 10 0F                CPX    #$100F
+  700C: 26 F8 7A                BNE    $7006
+  700E: 7A 00 C4                DEC    $00C4
+  7011: 4F CE 20                CLRA   
+  7012: CE 20 4F                LDX    #$204F
+  7015: E6 00 2A                LDAB   $00,X
+  7017: 2A 01 4C                BPL    $701A
+  7019: 4C 49 09                INCA   
+  701A: 49 09 8C                ROLA   
+  701B: 09 8C 20                DEX    
+  701C: 8C 20 4B                CPX    #$204B
+  701F: 26 F4 CE                BNE    $7015
+  7021: CE 7E 08                LDX    #$7E08
+  7024: F6 20 0D                LDAB   $200D   ; DIP_STROBE13  *** IO: DIP_STROBE13
+  7027: 2B 03 CE                BMI    $702C
+  7029: CE 7E 28                LDX    #$7E28
+  702C: BD 78 19                JSR    $7819
+  7819: 5F DF 13                CLRB   
+  781A: DF 13 9B                STX    $13   ; DISP_RAM+$13
+  781C: 9B 14 D9                ADDA   $14   ; DISP_RAM+$14
+  781E: D9 13 D7                ADCB   $13   ; DISP_RAM+$13
+  7820: D7 13 97                STAB   $13   ; DISP_RAM+$13
+  7822: 97 14 DE                STAA   $14   ; DISP_RAM+$14
+  7824: DE 13 39                LDX    $13   ; DISP_RAM+$13
+  7826: 39 B7 40                RTS    
+          ; return → 702F
+  702F: A6 00 97                LDAA   $00,X
+  7031: 97 DF A6                STAA   $DF
+  7033: A6 01 97                LDAA   $01,X
+  7035: 97 E0 BD                STAA   $E0
+  7037: BD 7F E9                JSR    $7FE9
+  7FE9: 86 88 97                LDAA   #$88
+  7FEB: 97 1C 97                STAA   $1C   ; DISP_RAM+$1C
+  7FED: 97 1D CE                STAA   $1D   ; DISP_RAM+$1D
+  7FEF: CE 00 10                LDX    #$0010
+  7FF2: 09 A7 00                DEX    
+  7FF3: A7 00 8C                STAA   $00,X
+  7FF5: 8C FF FF                CPX    #$FFFF
+  7FF8: 26 F8 39   VECTORS:     BNE    $7FF2
+  7FFA: 39 4E 7E                RTS    
+          ; return → 703A
+  703A: C6 04 B6                LDAB   #$04
+  703C: B6 20 03                LDAA   $2003   ; DIP_STROBE3  *** IO: DIP_STROBE3
+  703F: 2A 02 C6                BPL    $7043
+  7041: C6 06 D7                LDAB   #$06
+  7043: D7 22 CE                STAB   $22   ; LAMP_RAM+$22
+  7045: CE 7D F0                LDX    #$7DF0
+  7048: 4F F6 20                CLRA   
+  7049: F6 20 0F                LDAB   $200F   ; DIP_STROBE15  *** IO: DIP_STROBE15
+  704C: 2A 01 4C                BPL    $704F
+  704E: 4C 48 F6                INCA   
+  704F: 48 F6 20                ASLA   
+  7050: F6 20 0E                LDAB   $200E   ; DIP_STROBE14  *** IO: DIP_STROBE14
+  7053: 2A 01 4C                BPL    $7056
+  7055: 4C BD 78                INCA   
+  7056: BD 78 19                JSR    $7819
+  7819: 5F DF 13                CLRB     <<<
+  781A: DF 13 9B                STX    $13   ; DISP_RAM+$13  <<<
+  781C: 9B 14 D9                ADDA   $14   ; DISP_RAM+$14  <<<
+  781E: D9 13 D7                ADCB   $13   ; DISP_RAM+$13  <<<
+  7820: D7 13 97                STAB   $13   ; DISP_RAM+$13  <<<
+  7822: 97 14 DE                STAA   $14   ; DISP_RAM+$14  <<<
+  7824: DE 13 39                LDX    $13   ; DISP_RAM+$13  <<<
+  7826: 39 B7 40                RTS      <<<
+          ; return → 7059
+  7059: A6 00 97                LDAA   $00,X
+  705B: 97 1A 86                STAA   $1A   ; DISP_RAM+$1A
+  705D: 86 11 97                LDAA   #$11
+  705F: 97 6C BD                STAA   $6C
+  7061: BD 7F 9C                JSR    $7F9C
+  7F9C: B6 20 0B                LDAA   $200B   ; DIP_STROBE11  *** IO: DIP_STROBE11
+  7F9F: D6 C4 97                LDAB   $C4
+  7FA1: 97 C4 5D                STAA   $C4
+  7FA3: 5D 2B 04                TSTB   
+  7FA4: 2B 04 4D                BMI    $7FAA
+  7FA6: 4D 2A 01                TSTA   
+  7FA7: 2A 01 4F                BPL    $7FAA
+  7FA9: 4F 39 DF                CLRA   
+  7FAA: 39 DF DD                RTS    
+          ; return → 7064
+  7064: 26 05 BD                BNE    $706B
+  7066: BD 7E C7                JSR    $7EC7
+  7EC7: 4F B7 60                CLRA   
+  7EC8: B7 60 00                STAA   $6000   ; AUDIO_OUT_6000  *** IO: AUDIO_OUT_6000
+  7ECB: B7 10 80                STAA   $1080   ; SOL_LATCH1  *** IO: SOL_LATCH1
+  7ECE: B7 10 84                STAA   $1084   ; SOL_LATCH2  *** IO: SOL_LATCH2
+  7ED1: B7 10 84                STAA   $1084   ; SOL_LATCH2  *** IO: SOL_LATCH2
+  7ED4: B7 10 88                STAA   $1088   ; SOL_LATCH3  *** IO: SOL_LATCH3
+  7ED7: B7 10 8C                STAA   $108C   ; SOL_LATCH4  *** IO: SOL_LATCH4
+  7EDA: 97 18 97                STAA   $18   ; DISP_RAM+$18
+  7EDC: 97 83 BD                STAA   $83
+  7EDE: BD 7F EF                JSR    $7FEF
+  7FEF: CE 00 10                LDX    #$0010  <<<
+  7FF2: 09 A7 00                DEX      <<<
+  7FF3: A7 00 8C                STAA   $00,X  <<<
+  7FF5: 8C FF FF                CPX    #$FFFF  <<<
+  7FF8: 26 F8 39   VECTORS:     BNE    $7FF2  <<<
+  7FFA: 39 4E 7E                RTS      <<<
+          ; return → 7EE1
+  7EE1: CE 00 08                LDX    #$0008
+  7EE4: 86 FF 97                LDAA   #$FF
+  7EE6: 97 6C BD                STAA   $6C
+  7EE8: BD 7F F2                JSR    $7FF2
+  7FF2: 09 A7 00                DEX      <<<
+  7FF3: A7 00 8C                STAA   $00,X  <<<
+  7FF5: 8C FF FF                CPX    #$FFFF  <<<
+  7FF8: 26 F8 39   VECTORS:     BNE    $7FF2  <<<
+  7FFA: 39 4E 7E                RTS      <<<
+          ; return → 7EEB
+  7EEB: D6 DF D7                LDAB   $DF
+  7EED: D7 0E F6                STAB   $0E   ; DISP_RAM+$0E
+  7EEF: F6 20 09                LDAB   $2009   ; DIP_STROBE9  *** IO: DIP_STROBE9
+  7EF2: 2B 08 CE                BMI    $7EFC
+  7EF4: CE 00 0C                LDX    #$000C
+  7EF7: BD 7F F2                JSR    $7FF2
+  7FF2: [loop ×4 — stop tracing this path]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IO ACCESSES IN BOOT PATH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  7024: LDAB  $200D  [DIP_STROBE13]
+  703C: LDAA  $2003  [DIP_STROBE3]
+  7049: LDAB  $200F  [DIP_STROBE15]
+  7050: LDAB  $200E  [DIP_STROBE14]
+  7F9C: LDAA  $200B  [DIP_STROBE11]
+  7EEF: LDAB  $2009  [DIP_STROBE9]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DETECTED TIGHT LOOPS (potential wait conditions)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Loop back to 7FF2
+  Loop back to 7FF3
+  Loop back to 7FF5
+  Loop back to 7FF8
+  Loop back to 7FFA
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FULL DISASSEMBLY — ROM2 (609)  0x7000–0x77FF
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ROM2_START:
+  7000:  8E 00 60   LDS    #$0060
+  7003:  CE 11 FF   LDX    #$11FF
+  7006:  6F 00 09   CLR    $00,X
+  7008:  09 8C 10   DEX    
+  7009:  8C 10 0F   CPX    #$100F
+  700C:  26 F8 7A   BNE    $7006
+  700E:  7A 00 C4   DEC    $00C4
+  7011:  4F CE 20   CLRA   
+  7012:  CE 20 4F   LDX    #$204F
+  7015:  E6 00 2A   LDAB   $00,X
+  7017:  2A 01 4C   BPL    $701A
+  7019:  4C 49 09   INCA   
+  701A:  49 09 8C   ROLA   
+  701B:  09 8C 20   DEX    
+  701C:  8C 20 4B   CPX    #$204B
+  701F:  26 F4 CE   BNE    $7015
+  7021:  CE 7E 08   LDX    #$7E08
+  7024:  F6 20 0D   LDAB   $200D   ; DIP_STROBE13
+  7027:  2B 03 CE   BMI    $702C
+  7029:  CE 7E 28   LDX    #$7E28
+  702C:  BD 78 19   JSR    $7819
+  702F:  A6 00 97   LDAA   $00,X
+  7031:  97 DF A6   STAA   $DF
+  7033:  A6 01 97   LDAA   $01,X
+  7035:  97 E0 BD   STAA   $E0
+  7037:  BD 7F E9   JSR    $7FE9
+  703A:  C6 04 B6   LDAB   #$04
+  703C:  B6 20 03   LDAA   $2003   ; DIP_STROBE3
+  703F:  2A 02 C6   BPL    $7043
+  7041:  C6 06 D7   LDAB   #$06
+  7043:  D7 22 CE   STAB   $22   ; LAMP_RAM+$22
+  7045:  CE 7D F0   LDX    #$7DF0
+  7048:  4F F6 20   CLRA   
+  7049:  F6 20 0F   LDAB   $200F   ; DIP_STROBE15
+  704C:  2A 01 4C   BPL    $704F
+  704E:  4C 48 F6   INCA   
+  704F:  48 F6 20   ASLA   
+  7050:  F6 20 0E   LDAB   $200E   ; DIP_STROBE14
+  7053:  2A 01 4C   BPL    $7056
+  7055:  4C BD 78   INCA   
+  7056:  BD 78 19   JSR    $7819
+  7059:  A6 00 97   LDAA   $00,X
+  705B:  97 1A 86   STAA   $1A   ; DISP_RAM+$1A
+  705D:  86 11 97   LDAA   #$11
+  705F:  97 6C BD   STAA   $6C
+  7061:  BD 7F 9C   JSR    $7F9C
+  7064:  26 05 BD   BNE    $706B
+  7066:  BD 7E C7   JSR    $7EC7
+  7069:  20 95 86   BRA    $7000
+  706B:  86 0F 97   LDAA   #$0F
+  706D:  97 18 86   STAA   $18   ; DISP_RAM+$18
+  706F:  86 01 97   LDAA   #$01
+  7071:  97 83 9B   STAA   $83
+  7073:  9B 9D 97   ADDA   $9D
+  7075:  97 9D 84   STAA   $9D
+  7077:  84 0F 81   ANDA   #$0F
+  7079:  81 0F 26   CMPA   #$0F
+  707B:  26 6B 7C   BNE    $70E8
+  707D:  7C 00 B3   INC    $00B3
+  7080:  26 1B 86   BNE    $709D
+  7082:  86 FF BD   LDAA   #$FF
+  7084:  BD 7F EF   JSR    $7FEF
+  7087:  86 FB 97   LDAA   #$FB
+  7089:  97 B3 D6   STAA   $B3
+  708B:  D6 29 27   LDAB   $29   ; LAMP_RAM+$29
+  708D:  27 0E D1   BEQ    $709D
+  708F:  D1 E1 26   CMPB   $E1
+  7091:  26 01 5F   BNE    $7094
+  7093:  5F 5C D7   CLRB   
+  7094:  5C D7 29   INCB   
+  7095:  D7 29 5F   STAB   $29   ; LAMP_RAM+$29
+  7097:  5F D7 17   CLRB   
+  7098:  D7 17 BD   STAB   $17   ; DISP_RAM+$17
+  709A:  BD 7A 1D   JSR    $7A1D
+  709D:  96 C5 81   LDAA   $C5
+  709F:  81 1B 26   CMPA   #$1B
+  70A1:  26 02 86   BNE    $70A5
+  70A3:  86 FA 8B   LDAA   #$FA
+  70A5:  8B 06 97   ADDA   #$06
+  70A7:  97 C5 CE   STAA   $C5
+  70A9:  CE 7D BE   LDX    #$7DBE
+  70AC:  BD 78 19   JSR    $7819
+  70AF:  A6 00 BD   LDAA   $00,X
+  70B1:  BD 7C 09   JSR    $7C09
+  70B4:  A6 01 BD   LDAA   $01,X
+  70B6:  BD 7C 09   JSR    $7C09
+  70B9:  A6 02 BD   LDAA   $02,X
+  70BB:  BD 7C 09   JSR    $7C09
+  70BE:  8C 7D D6   CPX    #$7DD6
+  70C1:  26 07 86   BNE    $70CA
+  70C3:  86 FD 97   LDAA   #$FD
+  70C5:  97 C5 CE   STAA   $C5
+  70C7:  CE 7D BB   LDX    #$7DBB
+  70CA:  A6 03 BD   LDAA   $03,X
+  70CC:  BD 7C 2A   JSR    $7C2A
+  70CF:  A6 04 BD   LDAA   $04,X
+  70D1:  BD 7C 2A   JSR    $7C2A
+  70D4:  A6 05 BD   LDAA   $05,X
+  70D6:  BD 7C 2A   JSR    $7C2A
+  70D9:  96 82 81   LDAA   $82
+  70DB:  81 1E 26   CMPA   #$1E
+  70DD:  26 04 86   BNE    $70E3
+  70DF:  86 FF 97   LDAA   #$FF
+  70E1:  97 82 C6   STAA   $82
+  70E3:  C6 01 BD   LDAB   #$01
+  70E5:  BD 7B 31   JSR    $7B31
+  70E8:  7F 00 6D   CLR    $006D
+  70EB:  BD 79 3A   JSR    $793A
+  70EE:  BD 78 27   JSR    $7827
+  70F1:  7F 00 19   CLR    $0019   ; DISP_RAM+$19
+  70F4:  B6 20 20   LDAA   $2020   ; SW_ROW+$10
+  70F7:  BA 20 21   ORAA   $2021   ; SW_ROW+$11
+  70FA:  BA 20 13   ORAA   $2013   ; SW_ROW+$03
+  70FD:  2A 16 96   BPL    $7115
+  70FF:  96 80 84   LDAA   $80
+  7101:  84 DF B7   ANDA   #$DF
+  7103:  B7 10 80   STAA   $1080   ; SOL_LATCH1
+  7106:  86 FF 97   LDAA   #$FF
+  7108:  97 BD 86   STAA   $BD
+  710A:  86 0A 97   LDAA   #$0A
+  710C:  97 BC 20   STAA   $BC
+  710E:  20 D8 7A   BRA    $70E8
+  7110:  7A 00 BD   DEC    $00BD
+  7113:  20 D3 96   BRA    $70E8
+  7115:  96 BC 26   LDAA   $BC
+  7117:  26 F7 96   BNE    $7110
+  7119:  96 19 26   LDAA   $19   ; DISP_RAM+$19
+  711B:  26 72 96   BNE    $718F
+  711D:  96 1A 91   LDAA   $1A   ; DISP_RAM+$1A
+  711F:  91 1D 27   CMPA   $1D   ; DISP_RAM+$1D
+  7121:  27 56 96   BEQ    $7179
+  7123:  96 80 8A   LDAA   $80
+  7125:  8A 20 B7   ORAA   #$20
+  7127:  B7 10 80   STAA   $1080   ; SOL_LATCH1
+  712A:  96 65 26   LDAA   $65
+  712C:  26 0A 8D   BNE    $7138
+  712E:  8D 17 17   BSR    $7147
+  7130:  17 BD 78   TBA    
+  7131:  BD 78 19   JSR    $7819
+  7134:  A6 00 97   LDAA   $00,X
+  7136:  97 65 96   STAA   $65
+  7138:  96 87 26   LDAA   $87
+  713A:  26 19 8D   BNE    $7155
+  713C:  8D 09 BD   BSR    $7147
+  713E:  BD 78 19   JSR    $7819
+  7141:  A6 00 97   LDAA   $00,X
+  7143:  97 87 20   STAA   $87
+  7145:  20 0E BD   BRA    $7155
+  7147:  BD 72 0D   JSR    $720D
+  714A:  BD 7C 14   JSR    $7C14
+  714D:  D6 24 C0   LDAB   $24   ; LAMP_RAM+$24
+  714F:  C0 30 CE   SUBB   #$30
+  7151:  CE 7D B2   LDX    #$7DB2
+  7154:  39 96 89   RTS    
+  7155:  96 89 84   LDAA   $89
+  7157:  84 10 27   ANDA   #$10
+  7159:  27 1E D6   BEQ    $7179
+  715B:  D6 63 B6   LDAB   $63
+  715D:  B6 20 10   LDAA   $2010   ; SW_ROW+$00
+  7160:  97 63 5D   STAA   $63
+  7162:  5D 2B 05   TSTB   
+  7163:  2B 05 4D   BMI    $716A
+  7165:  4D 2A 02   TSTA   
+  7166:  2A 02 8D   BPL    $716A
+  7168:  8D 42 D6   BSR    $71AC
+  716A:  D6 64 B6   LDAB   $64
+  716C:  B6 20 11   LDAA   $2011   ; SW_ROW+$01
+  716F:  97 64 5D   STAA   $64
+  7171:  5D 2B 05   TSTB   
+  7172:  2B 05 4D   BMI    $7179
+  7174:  4D 2A 02   TSTA   
+  7175:  2A 02 8D   BPL    $7179
+  7177:  8D 38 D6   BSR    $71B1
+  7179:  D6 69 B6   LDAB   $69
+  717B:  B6 20 12   LDAA   $2012   ; SW_ROW+$02
+  717E:  97 69 5D   STAA   $69
+  7180:  5D 2B 03   TSTB   
+  7181:  2B 03 4D   BMI    $7186
+  7183:  4D 2B 15   TSTA   
+  7184:  2B 15 96   BMI    $719B
+  7186:  96 6C 81   LDAA   $6C
+  7188:  81 10 27   CMPA   #$10
+  718A:  27 12 7E   BEQ    $719E
+  718C:  7E 70 61   JMP    $7061
+  718F:  7F 00 6C   CLR    $006C
+  7192:  96 80 84   LDAA   $80
+  7194:  84 DF B7   ANDA   #$DF
+  7196:  B7 10 80   STAA   $1080   ; SOL_LATCH1
+  7199:  20 06 BD   BRA    $71A1
+  719B:  BD 72 5B   JSR    $725B
+  719E:  BD 72 EC   JSR    $72EC
+  71A1:  96 6C 27   LDAA   $6C
+  71A3:  27 F9 81   BEQ    $719E
+  71A5:  81 10 26   CMPA   #$10
+  71A7:  26 DF 7E   BNE    $7188
+  71A9:  7E 71 19   JMP    $7119
+  71AC:  CE 00 65   LDX    #$0065
+  71AF:  20 03 CE   BRA    $71B4
+  71B1:  CE 00 87   LDX    #$0087
+  71B4:  86 04 97   LDAA   #$04
+  71B6:  97 1F 86   STAA   $1F   ; DISP_RAM+$1F
+  71B8:  86 10 9A   LDAA   #$10
+  71BA:  9A 80 B7   ORAA   $80
+  71BC:  B7 10 80   STAA   $1080   ; SOL_LATCH1
+  71BF:  DF DB 96   STX    $DB
+  71C1:  96 1D 81   LDAA   $1D   ; DISP_RAM+$1D
+  71C3:  81 88 26   CMPA   #$88
+  71C5:  26 03 4F   BNE    $71CA
+  71C7:  4F 97 1D   CLRA   
+  71C8:  97 1D A6   STAA   $1D   ; DISP_RAM+$1D
+  71CA:  A6 00 85   LDAA   $00,X
+  71CC:  85 F0 27   BITA   #$F0
+  71CE:  27 24 16   BEQ    $71F4
+  71D0:  16 80 10   TAB    
+  71D1:  80 10 C4   SUBA   #$10
+  71D3:  C4 0F 36   ANDB   #$0F
+  71D5:  36 0C 56   PSHA   
+  71D6:  0C 56 37   CLC    
+  71D7:  56 37 27   RORB   
+  71D8:  37 27 05   PSHB   
+  71D9:  27 05 8D   BEQ    $71E0
+  71DB:  8D 55 5A   BSR    $7232
+  71DD:  5A 20 F9   DECB   
+  71DE:  20 F9 33   BRA    $71D9
+  71E0:  33 32 10   PULB   
+  71E1:  32 10 36   PULA   
+  71E2:  10 36 8D   SBA    
+  71E3:  36 8D 1D   PSHA   
+  71E4:  8D 1D 27   BSR    $7203
+  71E6:  27 06 32   BEQ    $71EE
+  71E8:  32 DE DB   PULA   
+  71E9:  DE DB A7   LDX    $DB
+  71EB:  A7 00 39   STAA   $00,X
+  71ED:  39 32 97   RTS    
+  71EE:  32 97 65   PULA   
+  71EF:  97 65 97   STAA   $65
+  71F1:  97 87 39   STAA   $87
+  71F3:  39 16 27   RTS    
+  71F4:  16 27 05   TAB    
+  71F5:  27 05 8D   BEQ    $71FC
+  71F7:  8D 39 5A   BSR    $7232
+  71F9:  5A 20 F9   DECB   
+  71FA:  20 F9 8D   BRA    $71F5
+  71FC:  8D 05 27   BSR    $7203
+  71FE:  27 EF 4F   BEQ    $71EF
+  7200:  4F 20 E6   CLRA   
+  7201:  20 E6 8D   BRA    $71E9
+  7203:  8D 08 BD   BSR    $720D
+  7205:  BD 7C 14   JSR    $7C14
+  7208:  8B 30 90   ADDA   #$30
+  720A:  90 24 39   SUBA   $24   ; LAMP_RAM+$24
+  720C:  39 4F F6   RTS    
+  720D:  4F F6 20   CLRA   
+  720E:  F6 20 06   LDAB   $2006   ; DIP_STROBE6
+  7211:  2A 01 4C   BPL    $7214
+  7213:  4C 49 F6   INCA   
+  7214:  49 F6 20   ROLA   
+  7215:  F6 20 07   LDAB   $2007   ; DIP_STROBE7
+  7218:  2A 01 4C   BPL    $721B
+  721A:  4C 49 F6   INCA   
+  721B:  49 F6 20   ROLA   
+  721C:  F6 20 00   LDAB   $2000   ; DIP_STROBE0
+  721F:  2A 01 4C   BPL    $7222
+  7221:  4C 49 F6   INCA   
+  7222:  49 F6 20   ROLA   
+  7223:  F6 20 01   LDAB   $2001   ; DIP_STROBE1
+  7226:  2A 01 4C   BPL    $7229
+  7228:  4C CE 7D   INCA   
+  7229:  CE 7D A2   LDX    #$7DA2
+  722C:  BD 78 19   JSR    $7819
+  722F:  A6 00 39   LDAA   $00,X
+  7231:  39 7C 00   RTS    
+  7232:  7C 00 6B   INC    $006B
+  7235:  96 1D 8B   LDAA   $1D   ; DISP_RAM+$1D
+  7237:  8B 01 19   ADDA   #$01
+  7239:  19 91 1A   DAA    
+  723A:  91 1A 2E   CMPA   $1A   ; DISP_RAM+$1A
+  723C:  2E 06 97   BGT    $7244
+  723E:  97 1D 91   STAA   $1D   ; DISP_RAM+$1D
+  7240:  91 1A 26   CMPA   $1A   ; DISP_RAM+$1A
+  7242:  26 16 96   BNE    $725A
+  7244:  96 80 84   LDAA   $80
+  7246:  84 DF B7   ANDA   #$DF
+  7248:  B7 10 80   STAA   $1080   ; SOL_LATCH1
+  724B:  39 7F 00   RTS    
+  724C:  7F 00 68   CLR    $0068
+  724F:  96 62 27   LDAA   $62
+  7251:  27 07 7A   BEQ    $725A
+  7253:  7A 00 62   DEC    $0062
+  7256:  8D DA 20   BSR    $7232
+  7258:  20 F2 39   BRA    $724C
+  725A:  39 D6 6D   RTS    
+  725B:  D6 6D C1   LDAB   $6D
+  725D:  C1 04 26   CMPB   #$04
+  725F:  26 05 31   BNE    $7266
+  7261:  31 31 7E   INS    
+  7262:  31 7E 71   INS    
+  7263:  7E 71 A1   JMP    $71A1
+  7266:  96 1D 27   LDAA   $1D   ; DISP_RAM+$1D
+  7268:  27 F7 81   BEQ    $7261
+  726A:  81 88 27   CMPA   #$88
+  726C:  27 F3 5C   BEQ    $7261
+  726E:  5C D7 6D   INCB   
+  726F:  D7 6D 4A   STAB   $6D
+  7271:  4A 16 C4   DECA   
+  7272:  16 C4 0F   TAB    
+  7273:  C4 0F C1   ANDB   #$0F
+  7275:  C1 0F 26   CMPB   #$0F
+  7277:  26 04 84   BNE    $727D
+  7279:  84 F0 8A   ANDA   #$F0
+  727B:  8A 09 8B   ORAA   #$09
+  727D:  8B 00 19   ADDA   #$00
+  727F:  19 97 1D   DAA    
+  7280:  97 1D 96   STAA   $1D   ; DISP_RAM+$1D
+  7282:  96 6C 81   LDAA   $6C
+  7284:  81 10 27   CMPA   #$10
+  7286:  27 40 CE   BEQ    $72C8
+  7288:  CE 00 98   LDX    #$0098
+  728B:  6F 00 09   CLR    $00,X
+  728D:  09 8C 00   DEX    
+  728E:  8C 00 8C   CPX    #$008C
+  7291:  26 F8 86   BNE    $728B
+  7293:  86 FF BD   LDAA   #$FF
+  7295:  BD 7F EF   JSR    $7FEF
+  7298:  86 10 97   LDAA   #$10
+  729A:  97 6C CE   STAA   $6C
+  729C:  CE 00 9E   LDX    #$009E
+  729F:  A7 00 08   STAA   $00,X
+  72A1:  08 8C 00   INX    
+  72A2:  8C 00 B3   CPX    #$00B3
+  72A5:  26 F8 4F   BNE    $729F
+  72A7:  4F 97 B3   CLRA   
+  72A8:  97 B3 97   STAA   $B3
+  72AA:  97 8B 97   STAA   $8B
+  72AC:  97 29 97   STAA   $29   ; LAMP_RAM+$29
+  72AE:  97 C0 97   STAA   $C0
+  72B0:  97 C1 97   STAA   $C1
+  72B2:  97 C2 97   STAA   $C2
+  72B4:  97 C3 D6   STAA   $C3
+  72B6:  D6 DF 26   LDAB   $DF
+  72B8:  26 02 86   BNE    $72BC
+  72BA:  86 03 97   LDAA   #$03
+  72BC:  97 79 97   STAA   $79
+  72BE:  97 7A 97   STAA   $7A
+  72C0:  97 7B 97   STAA   $7B
+  72C2:  97 7C 86   STAA   $7C
+  72C4:  86 FE 97   LDAA   #$FE
+  72C6:  97 99 96   STAA   $99
+  72C8:  96 8C 8A   LDAA   $8C
+  72CA:  8A 02 B7   ORAA   #$02
+  72CC:  B7 10 8C   STAA   $108C   ; SOL_LATCH4
+  72CF:  86 04 97   LDAA   #$04
+  72D1:  97 1F 96   STAA   $1F   ; DISP_RAM+$1F
+  72D3:  96 6D 4A   LDAA   $6D
+  72D5:  4A 48 CE   DECA   
+  72D6:  48 CE 7D   ASLA   
+  72D7:  CE 7D E8   LDX    #$7DE8
+  72DA:  BD 78 19   JSR    $7819
+  72DD:  EE 00 09   LDX    $00,X
+  72DF:  09 09 09   DEX    
+  72E0:  09 09 4F   DEX    
+  72E1:  09 4F A7   DEX    
+  72E2:  4F A7 00   CLRA   
+  72E3:  A7 00 4C   STAA   $00,X
+  72E5:  4C 97 1C   INCA   
+  72E6:  97 1C 7A   STAA   $1C   ; DISP_RAM+$1C
+  72E8:  7A 00 28   DEC    $0028   ; LAMP_RAM+$28
+  72EB:  39 CE 7E   RTS    
+  72EC:  CE 7E 48   LDX    #$7E48
+  72EF:  DF 10 BD   STX    $10   ; DISP_RAM+$10
+  72F1:  BD 7F 9C   JSR    $7F9C
+  72F4:  D6 E3 58   LDAB   $E3
+  72F6:  58 96 C4   ASLB   
+  72F7:  96 C4 2B   LDAA   $C4
+  72F9:  2B 01 5C   BMI    $72FC
+  72FB:  5C D7 E3   INCB   
+  72FC:  D7 E3 26   STAB   $E3
+  72FE:  26 03 7E   BNE    $7303
+  7300:  7E 70 66   JMP    $7066
+  7303:  96 2A 2B   LDAA   $2A   ; LAMP_RAM+$2A
+  7305:  2B 29 96   BMI    $7330
+  7307:  96 9C 48   LDAA   $9C
+  7309:  48 F6 20   ASLA   
+  730A:  F6 20 21   LDAB   $2021   ; SW_ROW+$11
+  730D:  FA 20 13   ORAB   $2013   ; SW_ROW+$03
+  7310:  FA 20 20   ORAB   $2020   ; SW_ROW+$10
+  7313:  2B 01 4C   BMI    $7316
+  7315:  4C 97 9C   INCA   
+  7316:  97 9C 27   STAA   $9C
+  7318:  27 06 84   BEQ    $7320
+  731A:  84 07 81   ANDA   #$07
+  731C:  81 04 26   CMPA   #$04
+  731E:  26 10 D7   BNE    $7330
+  7320:  D7 2A 97   STAB   $2A   ; LAMP_RAM+$2A
+  7322:  97 BC 86   STAA   $BC
+  7324:  86 41 BD   LDAA   #$41
+  7326:  BD 7C 09   JSR    $7C09
+  7329:  4F 97 2C   CLRA   
+  732A:  97 2C 97   STAA   $2C   ; LAMP_RAM+$2C
+  732C:  97 26 97   STAA   $26   ; LAMP_RAM+$26
+  732E:  97 28 96   STAA   $28   ; LAMP_RAM+$28
+  7330:  96 1B 81   LDAA   $1B   ; DISP_RAM+$1B
+  7332:  81 1F 26   CMPA   #$1F
+  7334:  26 0B 79   BNE    $7341
+  7336:  79 00 1B   ROL    $001B   ; DISP_RAM+$1B
+  7339:  86 0F 97   LDAA   #$0F
+  733B:  97 18 86   STAA   $18   ; DISP_RAM+$18
+  733D:  86 0A 97   LDAA   #$0A
+  733F:  97 B8 96   STAA   $B8
+  7341:  96 2A 2B   LDAA   $2A   ; LAMP_RAM+$2A
+  7343:  2B 09 96   BMI    $734E
+  7345:  96 88 8A   LDAA   $88
+  7347:  8A 40 B7   ORAA   #$40
+  7349:  B7 10 88   STAA   $1088   ; SOL_LATCH3
+  734C:  20 06 96   BRA    $7354
+  734E:  96 88 84   LDAA   $88
+  7350:  84 BF 20   ANDA   #$BF
+  7352:  20 F5 CE   BRA    $7349
+  7354:  CE 00 71   LDX    #$0071
+  7357:  8D 08 CE   BSR    $7361
+  7359:  CE 00 75   LDX    #$0075
+  735C:  8D 03 7E   BSR    $7361
+  735E:  7E 76 DF   JMP    $76DF
+  7361:  DF 7D A6   STX    $7D
+  7363:  A6 03 26   LDAA   $03,X
+  7365:  26 1E A6   BNE    $7385
+  7367:  A6 02 26   LDAA   $02,X
+  7369:  26 1D 8C   BNE    $7388
+  736B:  8C 00 75   CPX    #$0075
+  736E:  27 0C 96   BEQ    $737C
+  7370:  96 8C 84   LDAA   $8C
+  7372:  84 BF B7   ANDA   #$BF
+  7374:  B7 10 8C   STAA   $108C   ; SOL_LATCH4
+  7377:  96 2A 2A   LDAA   $2A   ; LAMP_RAM+$2A
+  7379:  2A 24 39   BPL    $739F
+  737B:  39 96 8C   RTS    
+  737C:  96 8C 84   LDAA   $8C
+  737E:  84 7F B7   ANDA   #$7F
+  7380:  B7 10 8C   STAA   $108C   ; SOL_LATCH4
+  7383:  20 F2 6A   BRA    $7377
+  7385:  6A 03 39   DEC    $03,X
+  7387:  39 6A 02   RTS    
+  7388:  6A 02 8C   DEC    $02,X
+  738A:  8C 00 75   CPX    #$0075
+  738D:  27 08 96   BEQ    $7397
+  738F:  96 8C 8A   LDAA   $8C
+  7391:  8A 40 B7   ORAA   #$40
+  7393:  B7 10 8C   STAA   $108C   ; SOL_LATCH4
+  7396:  39 96 8C   RTS    
+  7397:  96 8C 8A   LDAA   $8C
+  7399:  8A 80 B7   ORAA   #$80
+  739B:  B7 10 8C   STAA   $108C   ; SOL_LATCH4
+  739E:  39 96 29   RTS    
+  739F:  96 29 27   LDAA   $29   ; LAMP_RAM+$29
+  73A1:  27 FB 8C   BEQ    $739E
+  73A3:  8C 00 75   CPX    #$0075
+  73A6:  27 22 CE   BEQ    $73CA
+  73A8:  CE 7D FE   LDX    #$7DFE
+  73AB:  DF 20 CE   STX    $20   ; LAMP_RAM+$20
+  73AD:  CE 7D F4   LDX    #$7DF4
+  73B0:  4F DF 23   CLRA   
+  73B1:  DF 23 EE   STX    $23   ; LAMP_RAM+$23
+  73B3:  EE 00 E6   LDX    $00,X
+  73B5:  E6 00 2A   LDAB   $00,X
+  73B7:  2A 01 4C   BPL    $73BA
+  73B9:  4C DE 23   INCA   
+  73BA:  DE 23 08   LDX    $23   ; LAMP_RAM+$23
+  73BC:  08 08 9C   INX    
+  73BD:  08 9C 20   INX    
+  73BE:  9C 20 26   CPX    $20   ; LAMP_RAM+$20
+  73C0:  26 EF DE   BNE    $73B1
+  73C2:  DE 7D E6   LDX    $7D
+  73C4:  E6 01 11   LDAB   $01,X
+  73C6:  11 2E 0B   CBA    
+  73C7:  2E 0B 39   BGT    $73D4
+  73C9:  39 CE 7E   RTS    
+  73CA:  CE 7E 08   LDX    #$7E08
+  73CD:  DF 20 CE   STX    $20   ; LAMP_RAM+$20
+  73CF:  CE 7D FE   LDX    #$7DFE
+  73D2:  20 DC A7   BRA    $73B0
+  73D4:  A7 01 11   STAA   $01,X
+  73D6:  11 27 16   CBA    
+  73D7:  27 16 37   BEQ    $73EF
+  73D9:  37 36 86   PSHB   
+  73DA:  36 86 06   PSHA   
+  73DB:  86 06 E6   LDAA   #$06
+  73DD:  E6 00 26   LDAB   $00,X
+  73DF:  26 01 4A   BNE    $73E2
+  73E1:  4A BD 78   DECA   
+  73E2:  BD 78 F1   JSR    $78F1
+  73E5:  BD 7B 31   JSR    $7B31
+  73E8:  32 33 DE   PULA   
+  73E9:  33 DE 7D   PULB   
+  73EA:  DE 7D 4A   LDX    $7D
+  73EC:  4A 20 E7   DECA   
+  73ED:  20 E7 A6   BRA    $73D6
+  73EF:  A6 01 81   LDAA   $01,X
+  73F1:  81 05 27   CMPA   #$05
+  73F3:  27 01 39   BEQ    $73F6
+  73F5:  39 6F 01   RTS    
+  73F6:  6F 01 86   CLR    $01,X
+  73F8:  86 3C A7   LDAA   #$3C
+  73FA:  A7 03 86   STAA   $03,X
+  73FC:  86 16 A7   LDAA   #$16
+  73FE:  A7 02 6C   STAA   $02,X
+  7400:  6C 00 8C   INC    $00,X
+  7402:  8C 00 71   CPX    #$0071
+  7405:  27 23 86   BEQ    $742A
+  7407:  86 84 8D   LDAA   #$84
+  7409:  8D 35 96   BSR    $7440
+  740B:  96 2D 84   LDAA   $2D   ; LAMP_RAM+$2D
+  740D:  84 01 26   ANDA   #$01
+  740F:  26 15 86   BNE    $7426
+  7411:  86 A1 8D   LDAA   #$A1
+  7413:  8D 2B 96   BSR    $7440
+  7415:  96 2D 8A   LDAA   $2D   ; LAMP_RAM+$2D
+  7417:  8A 01 97   ORAA   #$01
+  7419:  97 2D 84   STAA   $2D   ; LAMP_RAM+$2D
+  741B:  84 03 81   ANDA   #$03
+  741D:  81 03 27   CMPA   #$03
+  741F:  27 01 39   BEQ    $7422
+  7421:  39 86 22   RTS    
+  7422:  86 22 20   LDAA   #$22
+  7424:  20 1A 86   BRA    $7440
+  7426:  86 44 20   LDAA   #$44
+  7428:  20 16 86   BRA    $7440
+  742A:  86 18 8D   LDAA   #$18
+  742C:  8D 12 96   BSR    $7440
+  742E:  96 2D 84   LDAA   $2D   ; LAMP_RAM+$2D
+  7430:  84 02 26   ANDA   #$02
+  7432:  26 0A 86   BNE    $743E
+  7434:  86 A1 8D   LDAA   #$A1
+  7436:  8D 08 96   BSR    $7440
+  7438:  96 2D 8A   LDAA   $2D   ; LAMP_RAM+$2D
+  743A:  8A 02 20   ORAA   #$02
+  743C:  20 DB 86   BRA    $7419
+  743E:  86 62 7E   LDAA   #$62
+  7440:  7E 7C 09   JMP    $7C09
+  7443:  DE 10 86   LDX    $10   ; DISP_RAM+$10
+  7445:  86 06 BD   LDAA   #$06
+  7447:  BD 78 19   JSR    $7819
+  744A:  8C 7E C6   CPX    #$7EC6
+  744D:  27 04 DF   BEQ    $7453
+  744F:  DF 10 20   STX    $10   ; DISP_RAM+$10
+  7451:  20 35 BD   BRA    $7488
+  7453:  BD 79 3A   JSR    $793A
+  7456:  BD 78 27   JSR    $7827
+  7459:  96 19 27   LDAA   $19   ; DISP_RAM+$19
+  745B:  27 1A DE   BEQ    $7477
+  745D:  DE B5 08   LDX    $B5
+  745F:  08 DF B5   INX    
+  7460:  DF B5 8C   STX    $B5
+  7462:  8C 1C 5C   CPX    #$1C5C
+  7465:  26 10 CE   BNE    $7477
+  7467:  CE 00 00   LDX    #$0000
+  746A:  DF B5 96   STX    $B5
+  746C:  96 8C 8A   LDAA   $8C
+  746E:  8A 08 B7   ORAA   #$08
+  7470:  B7 10 8C   STAA   $108C   ; SOL_LATCH4
+  7473:  86 04 97   LDAA   #$04
+  7475:  97 1F 86   STAA   $1F   ; DISP_RAM+$1F
+  7477:  86 FE 97   LDAA   #$FE
+  7479:  97 99 CE   STAA   $99
+  747B:  CE 7E 48   LDX    #$7E48
+  747E:  DF 10 96   STX    $10   ; DISP_RAM+$10
+  7480:  96 6C 26   LDAA   $6C
+  7482:  26 03 7E   BNE    $7487
+  7484:  7E 72 F1   JMP    $72F1
+  7487:  39 7C 00   RTS    
+  7488:  7C 00 99   INC    $0099
+  748B:  7C 00 99   INC    $0099
+  748E:  BD 75 45   JSR    $7545
+  7491:  A6 00 27   LDAA   $00,X
+  7493:  27 05 6A   BEQ    $749A
+  7495:  6A 00 7E   DEC    $00,X
+  7497:  7E 75 24   JMP    $7524
+  749A:  DE 10 EE   LDX    $10   ; DISP_RAM+$10
+  749C:  EE 00 A6   LDX    $00,X
+  749E:  A6 00 DE   LDAA   $00,X
+  74A0:  DE 10 A4   LDX    $10   ; DISP_RAM+$10
+  74A2:  A4 02 26   ANDA   $02,X
+  74A4:  26 4E 96   BNE    $74F4
+  74A6:  96 2A 2B   LDAA   $2A   ; LAMP_RAM+$2A
+  74A8:  2B 99 EE   BMI    $7443
+  74AA:  EE 03 A6   LDX    $03,X
+  74AC:  A6 00 2A   LDAA   $00,X
+  74AE:  2A 93 BD   BPL    $7443
+  74B0:  BD 75 45   JSR    $7545
+  74B3:  A6 00 26   LDAA   $00,X
+  74B5:  26 3A CE   BNE    $74F1
+  74B7:  CE 00 C6   LDX    #$00C6
+  74BA:  BD 75 48   JSR    $7548
+  74BD:  D6 99 86   LDAB   $99
+  74BF:  86 03 C1   LDAA   #$03
+  74C1:  C1 02 2E   CMPB   #$02
+  74C3:  2E 02 86   BGT    $74C7
+  74C5:  86 06 A7   LDAA   #$06
+  74C7:  A7 00 DE   STAA   $00,X
+  74C9:  DE 10 A6   LDX    $10   ; DISP_RAM+$10
+  74CB:  A6 02 EE   LDAA   $02,X
+  74CD:  EE 00 AA   LDX    $00,X
+  74CF:  AA 00 A7   ORAA   $00,X
+  74D1:  A7 00 96   STAA   $00,X
+  74D3:  96 99 CE   LDAA   $99
+  74D5:  CE 75 4F   LDX    #$754F
+  74D8:  BD 78 19   JSR    $7819
+  74DB:  EE 00 AD   LDX    $00,X
+  74DD:  AD 00 DE   JSR    $00,X
+  74DF:  DE 10 A6   LDX    $10   ; DISP_RAM+$10
+  74E1:  A6 05 84   LDAA   $05,X
+  74E3:  84 07 BD   ANDA   #$07
+  74E5:  BD 78 F1   JSR    $78F1
+  74E8:  DE 10 E6   LDX    $10   ; DISP_RAM+$10
+  74EA:  E6 05 2A   LDAB   $05,X
+  74EC:  2A 03 BD   BPL    $74F1
+  74EE:  BD 7B 31   JSR    $7B31
+  74F1:  7E 74 43   JMP    $7443
+  74F4:  CE 00 C6   LDX    #$00C6
+  74F7:  8D 4F 6A   BSR    $7548
+  74F9:  6A 00 A6   DEC    $00,X
+  74FB:  A6 00 81   LDAA   $00,X
+  74FD:  81 01 27   CMPA   #$01
+  74FF:  27 16 96   BEQ    $7517
+  7501:  96 99 81   LDAA   $99
+  7503:  81 02 2E   CMPA   #$02
+  7505:  2E 08 8D   BGT    $750F
+  7507:  8D 3C 86   BSR    $7545
+  7509:  86 0C A7   LDAA   #$0C
+  750B:  A7 00 20   STAA   $00,X
+  750D:  20 E2 8D   BRA    $74F1
+  750F:  8D 34 86   BSR    $7545
+  7511:  86 03 A7   LDAA   #$03
+  7513:  A7 00 20   STAA   $00,X
+  7515:  20 DA DE   BRA    $74F1
+  7517:  DE 10 A6   LDX    $10   ; DISP_RAM+$10
+  7519:  A6 02 43   LDAA   $02,X
+  751B:  43 EE 00   COMA   
+  751C:  EE 00 A4   LDX    $00,X
+  751E:  A4 00 A7   ANDA   $00,X
+  7520:  A7 00 20   STAA   $00,X
+  7522:  20 CD DE   BRA    $74F1
+  7524:  DE 10 EE   LDX    $10   ; DISP_RAM+$10
+  7526:  EE 03 A6   LDX    $03,X
+  7528:  A6 00 2B   LDAA   $00,X
+  752A:  2B 03 7E   BMI    $752F
+  752C:  7E 74 9A   JMP    $749A
+  752F:  96 99 81   LDAA   $99
+  7531:  81 02 2E   CMPA   #$02
+  7533:  2E 08 8D   BGT    $753D
+  7535:  8D 0E 86   BSR    $7545
+  7537:  86 0C A7   LDAA   #$0C
+  7539:  A7 00 20   STAA   $00,X
+  753B:  20 EF 8D   BRA    $752C
+  753D:  8D 06 86   BSR    $7545
+  753F:  86 01 A7   LDAA   #$01
+  7541:  A7 00 20   STAA   $00,X
+  7543:  20 E7 CE   BRA    $752C
+  7545:  CE 00 9E   LDX    #$009E
+  7548:  0C 96 99   CLC    
+  7549:  96 99 46   LDAA   $99
+  754B:  46 7E 78   RORA   
+  754C:  7E 78 19   JMP    $7819
+  754F:  75 79 75   ???  $75
+  7550:  79 75 79   ROL    $7579
+  7553:  76 81 76   ROR    $8176
+  7556:  8A 76 D5   ORAA   #$76
+  7558:  D5 76 12   BITB   $76
+  755A:  12 76 2F   ???  $12
+  755B:  76 2F 76   ROR    $2F76
+  755E:  48 76 D1   ASLA   
+  755F:  76 D1 76   ROR    $D176
+  7562:  92 75 79   SBCA   $75
+  7564:  79 76 92   ROL    $7692
+  7567:  76 37 76   ROR    $3776
+  756A:  40 75 9E   NEGA   
+  756B:  75 9E 75   ???  $75
+  756C:  9E 75 AB   LDS    $75
+  756E:  AB 75 C6   ADDA   $75,X
+  7570:  C6 75 7A   LDAB   #$75
+  7572:  7A 75 B4   DEC    $75B4
+  7575:  75 BD 75   ???  $75
+  7576:  BD 75 79   JSR    $7579
+  7579:  39 D6 81   RTS    
+  757A:  D6 81 C1   LDAB   $81
+  757C:  C1 02 27   CMPB   #$02
+  757E:  27 17 C1   BEQ    $7597
+  7580:  C1 01 27   CMPB   #$01
+  7582:  27 08 7C   BEQ    $758C
+  7584:  7C 00 81   INC    $0081
+  7587:  86 12 7E   LDAA   #$12
+  7589:  7E 7C 09   JMP    $7C09
+  758C:  BD 7B 31   JSR    $7B31
+  758F:  7C 00 81   INC    $0081
+  7592:  86 92 7E   LDAA   #$92
+  7594:  7E 7C 09   JMP    $7C09
+  7597:  BD 7B 31   JSR    $7B31
+  759A:  BD 7B 31   JSR    $7B31
+  759D:  39 86 91   RTS    
+  759E:  86 91 BD   LDAA   #$91
+  75A0:  BD 7C 09   JSR    $7C09
+  75A3:  86 01 9A   LDAA   #$01
+  75A5:  9A 2F 97   ORAA   $2F   ; LAMP_RAM+$2F
+  75A7:  97 2F 20   STAA   $2F   ; LAMP_RAM+$2F
+  75A9:  20 24 86   BRA    $75CF
+  75AB:  86 D1 BD   LDAA   #$D1
+  75AD:  BD 7C 09   JSR    $7C09
+  75B0:  86 02 20   LDAA   #$02
+  75B2:  20 F1 86   BRA    $75A5
+  75B4:  86 D2 BD   LDAA   #$D2
+  75B6:  BD 7C 09   JSR    $7C09
+  75B9:  86 04 20   LDAA   #$04
+  75BB:  20 E8 86   BRA    $75A5
+  75BD:  86 D4 BD   LDAA   #$D4
+  75BF:  BD 7C 09   JSR    $7C09
+  75C2:  86 08 20   LDAA   #$08
+  75C4:  20 DF 86   BRA    $75A5
+  75C6:  86 52 BD   LDAA   #$52
+  75C8:  BD 7C 09   JSR    $7C09
+  75CB:  86 10 20   LDAA   #$10
+  75CD:  20 D6 96   BRA    $75A5
+  75CF:  96 2F 84   LDAA   $2F   ; LAMP_RAM+$2F
+  75D1:  84 03 81   ANDA   #$03
+  75D3:  81 03 27   CMPA   #$03
+  75D5:  27 17 96   BEQ    $75EE
+  75D7:  96 2F 84   LDAA   $2F   ; LAMP_RAM+$2F
+  75D9:  84 0C 81   ANDA   #$0C
+  75DB:  81 0C 27   CMPA   #$0C
+  75DD:  27 16 96   BEQ    $75F5
+  75DF:  96 2F 81   LDAA   $2F   ; LAMP_RAM+$2F
+  75E1:  81 1F 27   CMPA   #$1F
+  75E3:  27 21 96   BEQ    $7606
+  75E5:  96 2F 84   LDAA   $2F   ; LAMP_RAM+$2F
+  75E7:  84 10 81   ANDA   #$10
+  75E9:  81 10 27   CMPA   #$10
+  75EB:  27 0F 39   BEQ    $75FC
+  75ED:  39 86 51   RTS    
+  75EE:  86 51 BD   LDAA   #$51
+  75F0:  BD 7C 09   JSR    $7C09
+  75F3:  20 E2 86   BRA    $75D7
+  75F5:  86 14 BD   LDAA   #$14
+  75F7:  BD 7C 09   JSR    $7C09
+  75FA:  20 E3 86   BRA    $75DF
+  75FC:  86 C4 BD   LDAA   #$C4
+  75FE:  BD 7C 09   JSR    $7C09
+  7601:  86 38 7E   LDAA   #$38
+  7603:  7E 7C 09   JMP    $7C09
+  7606:  86 82 BD   LDAA   #$82
+  7608:  BD 7C 09   JSR    $7C09
+  760B:  86 54 BD   LDAA   #$54
+  760D:  BD 7C 09   JSR    $7C09
+  7610:  20 D3 86   BRA    $75E5
+  7612:  86 01 8D   LDAA   #$01
+  7614:  8D 66 86   BSR    $767C
+  7616:  86 C2 BD   LDAA   #$C2
+  7618:  BD 7C 09   JSR    $7C09
+  761B:  96 2F 81   LDAA   $2F   ; LAMP_RAM+$2F
+  761D:  81 1F 27   CMPA   #$1F
+  761F:  27 01 39   BEQ    $7622
+  7621:  39 DE 10   RTS    
+  7622:  DE 10 A6   LDX    $10   ; DISP_RAM+$10
+  7624:  A6 05 BD   LDAA   $05,X
+  7626:  BD 7C 22   JSR    $7C22
+  7629:  17 31 31   TBA    
+  762A:  31 31 7E   INS    
+  762B:  31 7E 74   INS    
+  762C:  7E 74 E3   JMP    $74E3
+  762F:  86 02 8D   LDAA   #$02
+  7631:  8D 49 86   BSR    $767C
+  7633:  86 21 20   LDAA   #$21
+  7635:  20 E1 86   BRA    $7618
+  7637:  86 04 8D   LDAA   #$04
+  7639:  8D 41 B6   BSR    $767C
+  763B:  B6 7D CC   LDAA   $7DCC
+  763E:  20 D8 86   BRA    $7618
+  7640:  86 08 8D   LDAA   #$08
+  7642:  8D 38 86   BSR    $767C
+  7644:  86 61 20   LDAA   #$61
+  7646:  20 D0 86   BRA    $7618
+  7648:  86 10 8D   LDAA   #$10
+  764A:  8D 30 96   BSR    $767C
+  764C:  96 2D 84   LDAA   $2D   ; LAMP_RAM+$2D
+  764E:  84 03 81   ANDA   #$03
+  7650:  81 03 26   CMPA   #$03
+  7652:  26 02 8D   BNE    $7656
+  7654:  8D 47 96   BSR    $769D
+  7656:  96 2D 27   LDAA   $2D   ; LAMP_RAM+$2D
+  7658:  27 16 B6   BEQ    $7670
+  765A:  B6 20 0A   LDAA   $200A   ; DIP_STROBE10
+  765D:  2A 15 86   BPL    $7674
+  765F:  86 02 97   LDAA   #$02
+  7661:  97 83 96   STAA   $83
+  7663:  96 84 8A   LDAA   $84
+  7665:  8A 40 B7   ORAA   #$40
+  7667:  B7 10 84   STAA   $1084   ; SOL_LATCH2
+  766A:  86 0A 97   LDAA   #$0A
+  766C:  97 1F 97   STAA   $1F   ; DISP_RAM+$1F
+  766E:  97 BA 86   STAA   $BA
+  7670:  86 E1 20   LDAA   #$E1
+  7672:  20 A4 86   BRA    $7618
+  7674:  86 0A 9B   LDAA   #$0A
+  7676:  9B 28 97   ADDA   $28   ; LAMP_RAM+$28
+  7678:  97 28 20   STAA   $28   ; LAMP_RAM+$28
+  767A:  20 F4 9A   BRA    $7670
+  767C:  9A 1B 97   ORAA   $1B   ; DISP_RAM+$1B
+  767E:  97 1B 39   STAA   $1B   ; DISP_RAM+$1B
+  7680:  39 96 2F   RTS    
+  7681:  96 2F 84   LDAA   $2F   ; LAMP_RAM+$2F
+  7683:  84 03 81   ANDA   #$03
+  7685:  81 03 27   CMPA   #$03
+  7687:  27 99 39   BEQ    $7622
+  7689:  39 96 2F   RTS    
+  768A:  96 2F 84   LDAA   $2F   ; LAMP_RAM+$2F
+  768C:  84 0C 81   ANDA   #$0C
+  768E:  81 0C 20   CMPA   #$0C
+  7690:  20 F5 7C   BRA    $7687
+  7692:  7C 00 85   INC    $0085
+  7695:  96 2F 84   LDAA   $2F   ; LAMP_RAM+$2F
+  7697:  84 10 81   ANDA   #$10
+  7699:  81 10 20   CMPA   #$10
+  769B:  20 EA 96   BRA    $7687
+  769D:  96 8C 8A   LDAA   $8C
+  769F:  8A 04 B7   ORAA   #$04
+  76A1:  B7 10 8C   STAA   $108C   ; SOL_LATCH4
+  76A4:  86 04 97   LDAA   #$04
+  76A6:  97 1F B6   STAA   $1F   ; DISP_RAM+$1F
+  76A8:  B6 20 05   LDAA   $2005   ; DIP_STROBE5
+  76AB:  2A 12 B6   BPL    $76BF
+  76AD:  B6 20 04   LDAA   $2004   ; DIP_STROBE4
+  76B0:  2A 07 86   BPL    $76B9
+  76B2:  86 04 97   LDAA   #$04
+  76B4:  97 6B 7E   STAA   $6B
+  76B6:  7E 72 32   JMP    $7232
+  76B9:  86 02 97   LDAA   #$02
+  76BB:  97 83 20   STAA   $83
+  76BD:  20 0D 86   BRA    $76CC
+  76BF:  86 0A 9B   LDAA   #$0A
+  76C1:  9B 28 F6   ADDA   $28   ; LAMP_RAM+$28
+  76C3:  F6 20 04   LDAB   $2004   ; DIP_STROBE4
+  76C6:  2B 02 8B   BMI    $76CA
+  76C8:  8B 0A 97   ADDA   #$0A
+  76CA:  97 28 86   STAA   $28   ; LAMP_RAM+$28
+  76CC:  86 04 97   LDAA   #$04
+  76CE:  97 6B 39   STAA   $6B
+  76D0:  39 86 62   RTS    
+  76D1:  86 62 20   LDAA   #$62
+  76D3:  20 02 86   BRA    $76D7
+  76D5:  86 44 BD   LDAA   #$44
+  76D7:  BD 7C 14   JSR    $7C14
+  76DA:  A5 00 26   BITA   $00,X
+  76DC:  26 BF 39   BNE    $769D
+  76DE:  39 96 29   RTS    
+  76DF:  96 29 27   LDAA   $29   ; LAMP_RAM+$29
+  76E1:  27 33 96   BEQ    $7716
+  76E3:  96 6D 36   LDAA   $6D
+  76E5:  36 CE 7D   PSHA   
+  76E6:  CE 7D E3   LDX    #$7DE3
+  76E9:  BD 78 19   JSR    $7819
+  76EC:  A6 00 BD   LDAA   $00,X
+  76EE:  BD 7C 09   JSR    $7C09
+  76F1:  32 4A 26   PULA   
+  76F2:  4A 26 F0   DECA   
+  76F3:  26 F0 96   BNE    $76E5
+  76F5:  96 6F 27   LDAA   $6F
+  76F7:  27 0C 81   BEQ    $7705
+  76F9:  81 01 26   CMPA   #$01
+  76FB:  26 03 7E   BNE    $7700
+  76FD:  7E 77 8F   JMP    $778F
+  7700:  4A 97 6F   DECA   
+  7701:  97 6F 20   STAA   $6F
+  7703:  20 59 96   BRA    $775E
+  7705:  96 70 27   LDAA   $70
+  7707:  27 0F 7E   BEQ    $7718
+  7709:  7E 77 FE   JMP    $77FE
+  770C:  4F B7 60   CLRA   
+  770D:  B7 60 00   STAA   $6000   ; AUDIO_OUT_6000
+  7710:  97 2C 97   STAA   $2C   ; LAMP_RAM+$2C
+  7712:  97 26 97   STAA   $26   ; LAMP_RAM+$26
+  7714:  97 28 20   STAA   $28   ; LAMP_RAM+$28
+  7716:  20 49 86   BRA    $7761
+  7718:  86 7F 94   LDAA   #$7F
+  771A:  94 84 B7   ANDA   $84
+  771C:  B7 10 84   STAA   $1084   ; SOL_LATCH2
+  771F:  B6 20 38   LDAA   $2038   ; SW_ROW+$28
+  7722:  2A 3A 96   BPL    $775E
+  7724:  96 2A 2B   LDAA   $2A   ; LAMP_RAM+$2A
+  7726:  2B E4 96   BMI    $770C
+  7728:  96 19 26   LDAA   $19   ; DISP_RAM+$19
+  772A:  26 03 7E   BNE    $772F
+  772C:  7E 77 CC   JMP    $77CC
+  772F:  96 2B 9A   LDAA   $2B   ; LAMP_RAM+$2B
+  7731:  9A 25 9A   ORAA   $25   ; LAMP_RAM+$25
+  7733:  9A 2C 9A   ORAA   $2C   ; LAMP_RAM+$2C
+  7735:  9A 26 9A   ORAA   $26   ; LAMP_RAM+$26
+  7737:  9A 6A 9A   ORAA   $6A
+  7739:  9A 6B 26   ORAA   $6B
+  773B:  26 21 96   BNE    $775E
+  773D:  96 27 9A   LDAA   $27   ; LAMP_RAM+$27
+  773F:  9A 28 26   ORAA   $28   ; LAMP_RAM+$28
+  7741:  26 1B 96   BNE    $775E
+  7743:  96 18 85   LDAA   $18   ; DISP_RAM+$18
+  7745:  85 F0 26   BITA   #$F0
+  7747:  26 04 8A   BNE    $774D
+  7749:  8A F0 97   ORAA   #$F0
+  774B:  97 18 D6   STAA   $18   ; DISP_RAM+$18
+  774D:  D6 82 27   LDAB   $82
+  774F:  27 10 7C   BEQ    $7761
+  7751:  7C 00 28   INC    $0028   ; LAMP_RAM+$28
+  7754:  84 0F 27   ANDA   #$0F
+  7756:  27 03 7C   BEQ    $775B
+  7758:  7C 00 28   INC    $0028   ; LAMP_RAM+$28
+  775B:  BD 7B 4F   JSR    $7B4F
+  775E:  7E 74 88   JMP    $7488
+  7761:  BD 7B D2   JSR    $7BD2
+  7764:  4F 97 82   CLRA   
+  7765:  97 82 97   STAA   $82
+  7767:  97 18 97   STAA   $18   ; DISP_RAM+$18
+  7769:  97 1B 97   STAA   $1B   ; DISP_RAM+$1B
+  776B:  97 20 97   STAA   $20   ; LAMP_RAM+$20
+  776D:  97 71 97   STAA   $71
+  776F:  97 75 97   STAA   $75
+  7771:  97 72 97   STAA   $72
+  7773:  97 76 97   STAA   $76
+  7775:  97 78 86   STAA   $78
+  7777:  86 16 97   LDAA   #$16
+  7779:  97 77 97   STAA   $77
+  777B:  97 73 86   STAA   $73
+  777D:  86 16 97   LDAA   #$16
+  777F:  97 74 86   STAA   $74
+  7781:  86 3C 97   LDAA   #$3C
+  7783:  97 6F 96   STAA   $6F
+  7785:  96 29 26   LDAA   $29   ; LAMP_RAM+$29
+  7787:  26 04 86   BNE    $778D
+  7789:  86 01 97   LDAA   #$01
+  778B:  97 29 20   STAA   $29   ; LAMP_RAM+$29
+  778D:  20 CF 4A   BRA    $775E
+  778F:  4A 97 6F   DECA   
+  7790:  97 6F 96   STAA   $6F
+  7792:  96 83 27   LDAA   $83
+  7794:  27 05 4A   BEQ    $779B
+  7796:  4A 97 83   DECA   
+  7797:  97 83 20   STAA   $83
+  7799:  20 31 96   BRA    $77CC
+  779B:  96 29 4A   LDAA   $29   ; LAMP_RAM+$29
+  779D:  4A 49 CE   DECA   
+  779E:  49 CE 7D   ROLA   
+  779F:  CE 7D E8   LDX    #$7DE8
+  77A2:  8D 75 EE   BSR    $7819
+  77A4:  EE 00 86   LDX    $00,X
+  77A6:  86 FF A7   LDAA   #$FF
+  77A8:  A7 00 96   STAA   $00,X
+  77AA:  96 29 4C   LDAA   $29   ; LAMP_RAM+$29
+  77AC:  4C 91 6D   INCA   
+  77AD:  91 6D 2E   CMPA   $6D
+  77AF:  2E 04 97   BGT    $77B5
+  77B1:  97 29 20   STAA   $29   ; LAMP_RAM+$29
+  77B3:  20 17 96   BRA    $77CC
+  77B5:  96 1C 4C   LDAA   $1C   ; DISP_RAM+$1C
+  77B7:  4C 91 22   INCA   
+  77B8:  91 22 26   CMPA   $22   ; LAMP_RAM+$22
+  77BA:  26 0A 7F   BNE    $77C6
+  77BC:  7F 10 88   CLR    $1088   ; SOL_LATCH3
+  77BF:  86 11 97   LDAA   #$11
+  77C1:  97 6C 7E   STAA   $6C
+  77C3:  7E 7C 33   JMP    $7C33
+  77C6:  97 1C 86   STAA   $1C   ; DISP_RAM+$1C
+  77C8:  86 01 20   LDAA   #$01
+  77CA:  20 E5 CE   BRA    $77B1
+  77CC:  CE 00 30   LDX    #$0030
+  77CF:  6F 00 08   CLR    $00,X
+  77D1:  08 8C 00   INX    
+  77D2:  8C 00 40   CPX    #$0040
+  77D5:  26 F8 4F   BNE    $77CF
+  77D7:  4F 97 2D   CLRA   
+  77D8:  97 2D 97   STAA   $2D   ; LAMP_RAM+$2D
+  77DA:  97 2F 97   STAA   $2F   ; LAMP_RAM+$2F
+  77DC:  97 81 97   STAA   $81
+  77DE:  97 19 97   STAA   $19   ; DISP_RAM+$19
+  77E0:  97 66 97   STAA   $66
+  77E2:  97 2A 97   STAA   $2A   ; LAMP_RAM+$2A
+  77E4:  97 65 97   STAA   $65
+  77E6:  97 87 86   STAA   $87
+  77E8:  86 A2 BD   LDAA   #$A2
+  77EA:  BD 7C 09   JSR    $7C09
+  77ED:  86 04 BD   LDAA   #$04
+  77EF:  BD 7C 09   JSR    $7C09
+  77F2:  86 11 BD   LDAA   #$11
+  77F4:  BD 7C 09   JSR    $7C09
+  77F7:  86 C1 BD   LDAA   #$C1
+  77F9:  BD 7C 09   JSR    $7C09
+  77FC:  86 09 4A   LDAA   #$09
+  77FE:  4A 97      DECA   
+  77FF:  97         STAA   $70
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FULL DISASSEMBLY — ROM1 (608)  0x7800–0x7FFF
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ROM1_START:
+  7800:  70 4D 27   NEG    $4D27
+  7803:  0A 86 80   CLV    
+  7804:  86 80 9A   LDAA   #$80
+  7806:  9A 84 B7   ORAA   $84
+  7808:  B7 10 84   STAA   $1084   ; SOL_LATCH2
+  780B:  7E 74 88   JMP    $7488
+  780E:  7F 00 82   CLR    $0082
+  7811:  C6 01 BD   LDAB   #$01
+  7813:  BD 7B 31   JSR    $7B31
+  7816:  7E 74 88   JMP    $7488
+  7819:  5F DF 13   CLRB   
+  781A:  DF 13 9B   STX    $13   ; DISP_RAM+$13
+  781C:  9B 14 D9   ADDA   $14   ; DISP_RAM+$14
+  781E:  D9 13 D7   ADCB   $13   ; DISP_RAM+$13
+  7820:  D7 13 97   STAB   $13   ; DISP_RAM+$13
+  7822:  97 14 DE   STAA   $14   ; DISP_RAM+$14
+  7824:  DE 13 39   LDX    $13   ; DISP_RAM+$13
+  7826:  39 B7 40   RTS    
+  7827:  B7 40 00   STAA   $4000
+  782A:  96 18 84   LDAA   $18   ; DISP_RAM+$18
+  782C:  84 0F 81   ANDA   #$0F
+  782E:  81 0F 26   CMPA   #$0F
+  7830:  26 1E 96   BNE    $7850
+  7832:  96 1E 4C   LDAA   $1E   ; DISP_RAM+$1E
+  7834:  4C 97 1E   INCA   
+  7835:  97 1E 81   STAA   $1E   ; DISP_RAM+$1E
+  7837:  81 1E 27   CMPA   #$1E
+  7839:  27 06 81   BEQ    $7841
+  783B:  81 3C 27   CMPA   #$3C
+  783D:  27 09 20   BEQ    $7848
+  783F:  20 0F 86   BRA    $7850
+  7841:  86 F4 BD   LDAA   #$F4
+  7843:  BD 7C 09   JSR    $7C09
+  7846:  20 08 86   BRA    $7850
+  7848:  86 F4 BD   LDAA   #$F4
+  784A:  BD 7C 2A   JSR    $7C2A
+  784D:  7F 00 1E   CLR    $001E   ; DISP_RAM+$1E
+  7850:  96 83 27   LDAA   $83
+  7852:  27 26 96   BEQ    $787A
+  7854:  96 2E 4C   LDAA   $2E   ; LAMP_RAM+$2E
+  7856:  4C 97 2E   INCA   
+  7857:  97 2E 81   STAA   $2E   ; LAMP_RAM+$2E
+  7859:  81 1E 2E   CMPA   #$1E
+  785B:  2E 0C 86   BGT    $7869
+  785D:  86 02 BD   LDAA   #$02
+  785F:  BD 7C 09   JSR    $7C09
+  7862:  86 42 BD   LDAA   #$42
+  7864:  BD 7C 2A   JSR    $7C2A
+  7867:  20 11 81   BRA    $787A
+  7869:  81 3C 26   CMPA   #$3C
+  786B:  26 03 7F   BNE    $7870
+  786D:  7F 00 2E   CLR    $002E   ; LAMP_RAM+$2E
+  7870:  86 02 BD   LDAA   #$02
+  7872:  BD 7C 2A   JSR    $7C2A
+  7875:  86 42 BD   LDAA   #$42
+  7877:  BD 7C 09   JSR    $7C09
+  787A:  96 6C 81   LDAA   $6C
+  787C:  81 11 27   CMPA   #$11
+  787E:  27 30 81   BEQ    $78B0
+  7880:  81 FF 27   CMPA   #$FF
+  7882:  27 2C 0C   BEQ    $78B0
+  7884:  0C CE 7D   CLC    
+  7885:  CE 7D E8   LDX    #$7DE8
+  7888:  96 29 27   LDAA   $29   ; LAMP_RAM+$29
+  788A:  27 04 4A   BEQ    $7890
+  788C:  4A 48 8D   DECA   
+  788D:  48 8D 89   ASLA   
+  788E:  8D 89 EE   BSR    $7819
+  7890:  EE 00 96   LDX    $00,X
+  7892:  96 19 26   LDAA   $19   ; DISP_RAM+$19
+  7894:  26 16 96   BNE    $78AC
+  7896:  96 66 4C   LDAA   $66
+  7898:  4C 97 66   INCA   
+  7899:  97 66 81   STAA   $66
+  789B:  81 1E 2E   CMPA   #$1E
+  789D:  2E 06 86   BGT    $78A5
+  789F:  86 FF A7   LDAA   #$FF
+  78A1:  A7 00 20   STAA   $00,X
+  78A3:  20 0B 81   BRA    $78B0
+  78A5:  81 3C 26   CMPA   #$3C
+  78A7:  26 03 7F   BNE    $78AC
+  78A9:  7F 00 66   CLR    $0066
+  78AC:  86 88 A7   LDAA   #$88
+  78AE:  A7 00 7F   STAA   $00,X
+  78B0:  7F 00 85   CLR    $0085
+  78B3:  96 89 8B   LDAA   $89
+  78B5:  8B 10 19   ADDA   #$10
+  78B7:  19 97 89   DAA    
+  78B8:  97 89 96   STAA   $89
+  78BA:  96 12 27   LDAA   $12   ; DISP_RAM+$12
+  78BC:  27 0B B6   BEQ    $78C9
+  78BE:  B6 20 00   LDAA   $2000   ; DIP_STROBE0
+  78C1:  84 40 27   ANDA   #$40
+  78C3:  27 F9 7F   BEQ    $78BE
+  78C5:  7F 00 12   CLR    $0012   ; DISP_RAM+$12
+  78C8:  39 B6 20   RTS    
+  78C9:  B6 20 00   LDAA   $2000   ; DIP_STROBE0
+  78CC:  84 40 26   ANDA   #$40
+  78CE:  26 F9 7C   BNE    $78C9
+  78D0:  7C 00 12   INC    $0012   ; DISP_RAM+$12
+  78D3:  96 1F 26   LDAA   $1F   ; DISP_RAM+$1F
+  78D5:  26 16 86   BNE    $78ED
+  78D7:  86 F0 94   LDAA   #$F0
+  78D9:  94 8C B7   ANDA   $8C
+  78DB:  B7 10 8C   STAA   $108C   ; SOL_LATCH4
+  78DE:  86 BF 94   LDAA   #$BF
+  78E0:  94 84 B7   ANDA   $84
+  78E2:  B7 10 84   STAA   $1084   ; SOL_LATCH2
+  78E5:  86 EF 94   LDAA   #$EF
+  78E7:  94 80 B7   ANDA   $80
+  78E9:  B7 10 80   STAA   $1080   ; SOL_LATCH1
+  78EC:  39 7A 00   RTS    
+  78ED:  7A 00 1F   DEC    $001F   ; DISP_RAM+$1F
+  78F0:  39 27 43   RTS    
+  78F1:  27 43 81   BEQ    $7936
+  78F3:  81 01 27   CMPA   #$01
+  78F5:  27 19 81   BEQ    $7910
+  78F7:  81 02 27   CMPA   #$02
+  78F9:  27 19 81   BEQ    $7914
+  78FB:  81 03 27   CMPA   #$03
+  78FD:  27 19 81   BEQ    $7918
+  78FF:  81 04 27   CMPA   #$04
+  7901:  27 19 81   BEQ    $791C
+  7903:  81 05 27   CMPA   #$05
+  7905:  27 1C 81   BEQ    $7923
+  7907:  81 06 27   CMPA   #$06
+  7909:  27 1F 81   BEQ    $792A
+  790B:  81 07 27   CMPA   #$07
+  790D:  27 1F 39   BEQ    $792E
+  790F:  39 7C 00   RTS    
+  7910:  7C 00 26   INC    $0026   ; LAMP_RAM+$26
+  7913:  39 C6 02   RTS    
+  7914:  C6 02 20   LDAB   #$02
+  7916:  20 06 C6   BRA    $791E
+  7918:  C6 05 20   LDAB   #$05
+  791A:  20 02 C6   BRA    $791E
+  791C:  C6 0A DB   LDAB   #$0A
+  791E:  DB 26 D7   ADDB   $26   ; LAMP_RAM+$26
+  7920:  D7 26 39   STAB   $26   ; LAMP_RAM+$26
+  7922:  39 C6 05   RTS    
+  7923:  C6 05 DB   LDAB   #$05
+  7925:  DB 2C D7   ADDB   $2C   ; LAMP_RAM+$2C
+  7927:  D7 2C 39   STAB   $2C   ; LAMP_RAM+$2C
+  7929:  39 8D F7   RTS    
+  792A:  8D F7 20   BSR    $7923
+  792C:  20 F5 7C   BRA    $7923
+  792E:  7C 00 2C   INC    $002C   ; LAMP_RAM+$2C
+  7931:  39 7C 00   RTS    
+  7932:  7C 00 28   INC    $0028   ; LAMP_RAM+$28
+  7935:  39 C6 02   RTS    
+  7936:  C6 02 20   LDAB   #$02
+  7938:  20 EB B7   BRA    $7925
+  793A:  B7 60 00   STAA   $6000   ; AUDIO_OUT_6000
+  793D:  CE 7D 35   LDX    #$7D35
+  7940:  8D 3E CE   BSR    $7980
+  7942:  CE 7D 54   LDX    #$7D54
+  7945:  8D 39 CE   BSR    $7980
+  7947:  CE 7D 8E   LDX    #$7D8E
+  794A:  8D 34 CE   BSR    $7980
+  794C:  CE 7D 7A   LDX    #$7D7A
+  794F:  8D 2F CE   BSR    $7980
+  7951:  CE 7D 1F   LDX    #$7D1F
+  7954:  8D 2A 96   BSR    $7980
+  7956:  96 85 27   LDAA   $85
+  7958:  27 16 96   BEQ    $7970
+  795A:  96 2F 84   LDAA   $2F   ; LAMP_RAM+$2F
+  795C:  84 10 81   ANDA   #$10
+  795E:  81 10 26   CMPA   #$10
+  7960:  26 09 CE   BNE    $796B
+  7962:  CE 7C DB   LDX    #$7CDB
+  7965:  EE 01 6F   LDX    $01,X
+  7967:  6F 00 20   CLR    $00,X
+  7969:  20 05 CE   BRA    $7970
+  796B:  CE 7C C5   LDX    #$7CC5
+  796E:  20 F5 CE   BRA    $7965
+  7970:  CE 7C F9   LDX    #$7CF9
+  7973:  8D 0B CE   BSR    $7980
+  7975:  CE 7C DB   LDX    #$7CDB
+  7978:  8D 06 CE   BSR    $7980
+  797A:  CE 7C C5   LDX    #$7CC5
+  797D:  8D 01 39   BSR    $7980
+  797F:  39 DF 7D   RTS    
+  7980:  DF 7D DF   STX    $7D
+  7982:  DF 20 EE   STX    $20   ; LAMP_RAM+$20
+  7984:  EE 01 A6   LDX    $01,X
+  7986:  A6 00 26   LDAA   $00,X
+  7988:  26 05 A6   BNE    $798F
+  798A:  A6 01 26   LDAA   $01,X
+  798C:  26 4F 39   BNE    $79DD
+  798E:  39 DE 20   RTS    
+  798F:  DE 20 A1   LDX    $20   ; LAMP_RAM+$20
+  7991:  A1 03 27   CMPA   $03,X
+  7993:  27 0B A1   BEQ    $79A0
+  7995:  A1 04 27   CMPA   $04,X
+  7997:  27 58 4C   BEQ    $79F1
+  7999:  4C EE 01   INCA   
+  799A:  EE 01 A7   LDX    $01,X
+  799C:  A7 00 20   STAA   $00,X
+  799E:  20 10 DE   BRA    $79B0
+  79A0:  DE 20 EE   LDX    $20   ; LAMP_RAM+$20
+  79A2:  EE 01 A6   LDX    $01,X
+  79A4:  A6 01 26   LDAA   $01,X
+  79A6:  26 50 DE   BNE    $79F8
+  79A8:  DE 20 EE   LDX    $20   ; LAMP_RAM+$20
+  79AA:  EE 01 6C   LDX    $01,X
+  79AC:  6C 00 A6   INC    $00,X
+  79AE:  A6 00 DE   LDAA   $00,X
+  79B0:  DE 20 D6   LDX    $20   ; LAMP_RAM+$20
+  79B2:  D6 80 C4   LDAB   $80
+  79B4:  C4 F0 EA   ANDB   #$F0
+  79B6:  EA 00 F7   ORAB   $00,X
+  79B8:  F7 10 80   STAB   $1080   ; SOL_LATCH1
+  79BB:  BD 78 19   JSR    $7819
+  79BE:  A6 00 36   LDAA   $00,X
+  79C0:  36 84 0F   PSHA   
+  79C1:  84 0F D6   ANDA   #$0F
+  79C3:  D6 84 C4   LDAB   $84
+  79C5:  C4 F0 1B   ANDB   #$F0
+  79C7:  1B 33 B7   ABA    
+  79C8:  33 B7 10   PULB   
+  79C9:  B7 10 84   STAA   $1084   ; SOL_LATCH2
+  79CC:  BD 7C 23   JSR    $7C23
+  79CF:  96 88 84   LDAA   $88
+  79D1:  84 F0 1B   ANDA   #$F0
+  79D3:  1B B7 10   ABA    
+  79D4:  B7 10 88   STAA   $1088   ; SOL_LATCH3
+  79D7:  B7 30 00   STAA   $3000   ; AUDIO_OUT_3000
+  79DA:  31 31 39   INS    
+  79DB:  31 39 2A   INS    
+  79DC:  39 2A 06   RTS    
+  79DD:  2A 06 6F   BPL    $79E5
+  79DF:  6F 01 86   CLR    $01,X
+  79E1:  86 07 20   LDAA   #$07
+  79E3:  20 AA 6A   BRA    $798F
+  79E5:  6A 01 DE   DEC    $01,X
+  79E7:  DE 20 E6   LDX    $20   ; LAMP_RAM+$20
+  79E9:  E6 05 27   LDAB   $05,X
+  79EB:  27 F4 8D   BEQ    $79E1
+  79ED:  8D 10 20   BSR    $79FF
+  79EF:  20 F0 DE   BRA    $79E1
+  79F1:  DE 20 EE   LDX    $20   ; LAMP_RAM+$20
+  79F3:  EE 01 6F   LDX    $01,X
+  79F5:  6F 00 39   CLR    $00,X
+  79F7:  39 6F 00   RTS    
+  79F8:  6F 00 DE   CLR    $00,X
+  79FA:  DE 20 7E   LDX    $20   ; LAMP_RAM+$20
+  79FC:  7E 79 80   JMP    $7980
+  79FF:  96 8B 27   LDAA   $8B
+  7A01:  27 01 39   BEQ    $7A04
+  7A03:  39 86 02   RTS    
+  7A04:  86 02 97   LDAA   #$02
+  7A06:  97 17 97   STAA   $17   ; DISP_RAM+$17
+  7A08:  97 19 37   STAA   $19   ; DISP_RAM+$19
+  7A0A:  37 91 83   PSHB   
+  7A0B:  91 83 27   CMPA   $83
+  7A0D:  27 0D 7F   BEQ    $7A1C
+  7A0F:  7F 00 83   CLR    $0083
+  7A12:  86 02 BD   LDAA   #$02
+  7A14:  BD 7C 2A   JSR    $7C2A
+  7A17:  86 42 BD   LDAA   #$42
+  7A19:  BD 7C 2A   JSR    $7C2A
+  7A1C:  33 96 29   PULB   
+  7A1D:  96 29 4A   LDAA   $29   ; LAMP_RAM+$29
+  7A1F:  4A 48 48   DECA   
+  7A20:  48 48 97   ASLA   
+  7A21:  48 97 23   ASLA   
+  7A22:  97 23 86   STAA   $23   ; LAMP_RAM+$23
+  7A24:  86 0E 90   LDAA   #$0E
+  7A26:  90 23 7F   SUBA   $23   ; LAMP_RAM+$23
+  7A28:  7F 00 23   CLR    $0023   ; LAMP_RAM+$23
+  7A2B:  97 24 5A   STAA   $24   ; LAMP_RAM+$24
+  7A2D:  5A 2B 45   DECB   
+  7A2E:  2B 45 17   BMI    $7A75
+  7A30:  17 49 1B   TBA    
+  7A31:  49 1B 9B   ROLA   
+  7A32:  1B 9B 17   ABA    
+  7A33:  9B 17 CE   ADDA   $17   ; DISP_RAM+$17
+  7A35:  CE 7B 20   LDX    #$7B20
+  7A38:  F6 20 0D   LDAB   $200D   ; DIP_STROBE13
+  7A3B:  2B 03 CE   BMI    $7A40
+  7A3D:  CE 7B 28   LDX    #$7B28
+  7A40:  BD 78 19   JSR    $7819
+  7A43:  08 DF 15   INX    
+  7A44:  DF 15 DE   STX    $15   ; DISP_RAM+$15
+  7A46:  DE 15 09   LDX    $15   ; DISP_RAM+$15
+  7A48:  09 DF 15   DEX    
+  7A49:  DF 15 E6   STX    $15   ; DISP_RAM+$15
+  7A4B:  E6 00 37   LDAB   $00,X
+  7A4D:  37 07 36   PSHB   
+  7A4E:  07 36 D6   TPA    
+  7A4F:  36 D6 29   PSHA   
+  7A50:  D6 29 5A   LDAB   $29   ; LAMP_RAM+$29
+  7A52:  5A 17 48   DECB   
+  7A53:  17 48 1B   TBA    
+  7A54:  48 1B 9B   ASLA   
+  7A55:  1B 9B 17   ABA    
+  7A56:  9B 17 CE   ADDA   $17   ; DISP_RAM+$17
+  7A58:  CE 00 8D   LDX    #$008D
+  7A5B:  BD 78 19   JSR    $7819
+  7A5E:  A6 00 16   LDAA   $00,X
+  7A60:  16 32 06   TAB    
+  7A61:  32 06 17   PULA   
+  7A62:  06 17 89   TAP    
+  7A63:  17 89 00   TBA    
+  7A64:  89 00 33   ADCA   #$00
+  7A66:  33 1B 19   PULB   
+  7A67:  1B 19 A7   ABA    
+  7A68:  19 A7 00   DAA    
+  7A69:  A7 00 7A   STAA   $00,X
+  7A6B:  7A 00 17   DEC    $0017   ; DISP_RAM+$17
+  7A6E:  2C D6 8D   BGE    $7A46
+  7A70:  8D 4F 7C   BSR    $7AC1
+  7A72:  7C 00 17   INC    $0017   ; DISP_RAM+$17
+  7A75:  CE 00 8D   LDX    #$008D
+  7A78:  D6 29 5A   LDAB   $29   ; LAMP_RAM+$29
+  7A7A:  5A 17 48   DECB   
+  7A7B:  17 48 1B   TBA    
+  7A7C:  48 1B 9B   ASLA   
+  7A7D:  1B 9B 17   ABA    
+  7A7E:  9B 17 BD   ADDA   $17   ; DISP_RAM+$17
+  7A80:  BD 78 19   JSR    $7819
+  7A83:  09 DF 15   DEX    
+  7A84:  DF 15 8D   STX    $15   ; DISP_RAM+$15
+  7A86:  8D 31 27   BSR    $7AB9
+  7A88:  27 23 17   BEQ    $7AAD
+  7A8A:  17 84 F0   TBA    
+  7A8B:  84 F0 27   ANDA   #$F0
+  7A8D:  27 24 8D   BEQ    $7AB3
+  7A8F:  8D 08 8D   BSR    $7A99
+  7A91:  8D 26 8D   BSR    $7AB9
+  7A93:  8D 04 8D   BSR    $7A99
+  7A95:  8D 22 8D   BSR    $7AB9
+  7A97:  8D 00 DE   BSR    $7A99
+  7A99:  DE 23 E7   LDX    $23   ; LAMP_RAM+$23
+  7A9B:  E7 00 09   STAB   $00,X
+  7A9D:  09 DF 23   DEX    
+  7A9E:  DF 23 7C   STX    $23   ; LAMP_RAM+$23
+  7AA0:  7C 00 17   INC    $0017   ; DISP_RAM+$17
+  7AA3:  96 17 81   LDAA   $17   ; DISP_RAM+$17
+  7AA5:  81 03 27   CMPA   #$03
+  7AA7:  27 01 39   BEQ    $7AAA
+  7AA9:  39 31 31   RTS    
+  7AAA:  31 31 39   INS    
+  7AAB:  31 39 CA   INS    
+  7AAC:  39 CA FF   RTS    
+  7AAD:  CA FF 8D   ORAB   #$FF
+  7AAF:  8D E8 20   BSR    $7A99
+  7AB1:  20 D3 CA   BRA    $7A86
+  7AB3:  CA F0 8D   ORAB   #$F0
+  7AB5:  8D E2 20   BSR    $7A99
+  7AB7:  20 D8 DE   BRA    $7A91
+  7AB9:  DE 15 08   LDX    $15   ; DISP_RAM+$15
+  7ABB:  08 DF 15   INX    
+  7ABC:  DF 15 E6   STX    $15   ; DISP_RAM+$15
+  7ABE:  E6 00 39   LDAB   $00,X
+  7AC0:  39 36 96   RTS    
+  7AC1:  36 96 29   PSHA   
+  7AC2:  96 29 CE   LDAA   $29   ; LAMP_RAM+$29
+  7AC4:  CE 00 BF   LDX    #$00BF
+  7AC7:  BD 78 19   JSR    $7819
+  7ACA:  A6 00 26   LDAA   $00,X
+  7ACC:  26 15 33   BNE    $7AE3
+  7ACE:  33 37 B6   PULB   
+  7ACF:  37 B6 20   PSHB   
+  7AD0:  B6 20 0D   LDAA   $200D   ; DIP_STROBE13
+  7AD3:  2B 04 C1   BMI    $7AD9
+  7AD5:  C1 50 20   CMPB   #$50
+  7AD7:  20 02 C1   BRA    $7ADB
+  7AD9:  C1 10 26   CMPB   #$10
+  7ADB:  26 06 E7   BNE    $7AE3
+  7ADD:  E7 00 86   STAB   $00,X
+  7ADF:  86 28 97   LDAA   #$28
+  7AE1:  97 BF 96   STAA   $BF
+  7AE3:  96 29 CE   LDAA   $29   ; LAMP_RAM+$29
+  7AE5:  CE 00 78   LDX    #$0078
+  7AE8:  BD 78 19   JSR    $7819
+  7AEB:  96 DF E6   LDAA   $DF
+  7AED:  E6 00 C1   LDAB   $00,X
+  7AEF:  C1 01 2D   CMPB   #$01
+  7AF1:  2D 09 2E   BLT    $7AFC
+  7AF3:  2E B6 B6   BGT    $7AAB
+  7AF5:  B6 20 09   LDAA   $2009   ; DIP_STROBE9
+  7AF8:  2A B1 96   BPL    $7AAB
+  7AFA:  96 E0 33   LDAA   $E0
+  7AFC:  33 11 26   PULB   
+  7AFD:  11 26 AC   CBA    
+  7AFE:  26 AC 96   BNE    $7AAC
+  7B00:  96 29 CE   LDAA   $29   ; LAMP_RAM+$29
+  7B02:  CE 00 78   LDX    #$0078
+  7B05:  BD 78 19   JSR    $7819
+  7B08:  6C 00 96   INC    $00,X
+  7B0A:  96 8C 8A   LDAA   $8C
+  7B0C:  8A 01 B7   ORAA   #$01
+  7B0E:  B7 10 8C   STAA   $108C   ; SOL_LATCH4
+  7B11:  86 04 97   LDAA   #$04
+  7B13:  97 1F B6   STAA   $1F   ; DISP_RAM+$1F
+  7B15:  B6 20 0C   LDAA   $200C   ; DIP_STROBE12
+  7B18:  2A 03 7E   BPL    $7B1D
+  7B1A:  7E 76 B2   JMP    $76B2
+  7B1D:  7E 76 B9   JMP    $76B9
+  7B20:  00 00 0A   ???  $00
+  7B21:  00 0A 00   ???  $00
+  7B22:  0A 00 01   CLV    
+  7B23:  00 01 00   ???  $00
+  7B24:  01 00 00   NOP    
+  7B25:  00 00 0A   ???  $00
+  7B26:  00 0A 00   ???  $00
+  7B27:  0A 00 00   CLV    
+  7B28:  00 00 50   ???  $00
+  7B29:  00 50 00   ???  $00
+  7B2A:  50 00 05   NEGB   
+  7B2B:  00 05 00   ???  $00
+  7B2C:  05 00 00   ???  $05
+  7B2D:  00 00 50   ???  $00
+  7B2E:  00 50 00   ???  $00
+  7B2F:  50 00 C6   NEGB   
+  7B30:  00 C6 01   ???  $00
+  7B31:  C6 01 B6   LDAB   #$01
+  7B33:  B6 20 08   LDAA   $2008   ; DIP_STROBE8
+  7B36:  2B 08 96   BMI    $7B40
+  7B38:  96 22 4A   LDAA   $22   ; LAMP_RAM+$22
+  7B3A:  4A 91 1C   DECA   
+  7B3B:  91 1C 26   CMPA   $1C   ; DISP_RAM+$1C
+  7B3D:  26 01 58   BNE    $7B40
+  7B3F:  58 5D 27   ASLB   
+  7B40:  5D 27 0F   TSTB   
+  7B41:  27 0F 96   BEQ    $7B52
+  7B43:  96 82 81   LDAA   $82
+  7B45:  81 1E 27   CMPA   #$1E
+  7B47:  27 09 7C   BEQ    $7B52
+  7B49:  7C 00 82   INC    $0082
+  7B4C:  5A 20 F1   DECB   
+  7B4D:  20 F1 7A   BRA    $7B40
+  7B4F:  7A 00 82   DEC    $0082
+  7B52:  96 82 27   LDAA   $82
+  7B54:  27 38 CE   BEQ    $7B8E
+  7B56:  CE 7B EA   LDX    #$7BEA
+  7B59:  BD 78 19   JSR    $7819
+  7B5C:  A6 00 16   LDAA   $00,X
+  7B5E:  16 84 F0   TAB    
+  7B5F:  84 F0 81   ANDA   #$F0
+  7B61:  81 10 27   CMPA   #$10
+  7B63:  27 53 81   BEQ    $7BB8
+  7B65:  81 20 27   CMPA   #$20
+  7B67:  27 59 81   BEQ    $7BC2
+  7B69:  81 30 27   CMPA   #$30
+  7B6B:  27 5B 37   BEQ    $7BC8
+  7B6D:  37 86 74   PSHB   
+  7B6E:  86 74 BD   LDAA   #$74
+  7B70:  BD 7C 2A   JSR    $7C2A
+  7B73:  33 C4 0F   PULB   
+  7B74:  C4 0F 27   ANDB   #$0F
+  7B76:  27 16 17   BEQ    $7B8E
+  7B78:  17 CE 7D   TBA    
+  7B79:  CE 7D D8   LDX    #$7DD8
+  7B7C:  BD 78 19   JSR    $7819
+  7B7F:  DF 20 A6   STX    $20   ; LAMP_RAM+$20
+  7B81:  A6 00 BD   LDAA   $00,X
+  7B83:  BD 7C 09   JSR    $7C09
+  7B86:  DE 20 09   LDX    $20   ; LAMP_RAM+$20
+  7B88:  09 8C 7D   DEX    
+  7B89:  8C 7D D8   CPX    #$7DD8
+  7B8C:  26 F1 96   BNE    $7B7F
+  7B8E:  96 82 81   LDAA   $82
+  7B90:  81 1E 27   CMPA   #$1E
+  7B92:  27 23 CE   BEQ    $7BB7
+  7B94:  CE 7B EB   LDX    #$7BEB
+  7B97:  BD 78 19   JSR    $7819
+  7B9A:  A6 00 84   LDAA   $00,X
+  7B9C:  84 0F 27   ANDA   #$0F
+  7B9E:  27 17 CE   BEQ    $7BB7
+  7BA0:  CE 7D D8   LDX    #$7DD8
+  7BA3:  BD 78 19   JSR    $7819
+  7BA6:  DF 20 8C   STX    $20   ; LAMP_RAM+$20
+  7BA8:  8C 7D E2   CPX    #$7DE2
+  7BAB:  27 0A A6   BEQ    $7BB7
+  7BAD:  A6 00 BD   LDAA   $00,X
+  7BAF:  BD 7C 2A   JSR    $7C2A
+  7BB2:  DE 20 08   LDX    $20   ; LAMP_RAM+$20
+  7BB4:  08 20 EF   INX    
+  7BB5:  20 EF 39   BRA    $7BA6
+  7BB7:  39 8D 18   RTS    
+  7BB8:  8D 18 86   BSR    $7BD2
+  7BBA:  86 74 37   LDAA   #$74
+  7BBC:  37 8D 4A   PSHB   
+  7BBD:  8D 4A 33   BSR    $7C09
+  7BBF:  33 20 B2   PULB   
+  7BC0:  20 B2 8D   BRA    $7B74
+  7BC2:  8D 0E 86   BSR    $7BD2
+  7BC4:  86 B4 20   LDAA   #$B4
+  7BC6:  20 F4 86   BRA    $7BBC
+  7BC8:  86 74 8D   LDAA   #$74
+  7BCA:  8D 06 37   BSR    $7BD2
+  7BCC:  37 8D 3A   PSHB   
+  7BCD:  8D 3A 33   BSR    $7C09
+  7BCF:  33 20 F2   PULB   
+  7BD0:  20 F2 36   BRA    $7BC4
+  7BD2:  36 37 4F   PSHA   
+  7BD3:  37 4F 36   PSHB   
+  7BD4:  4F 36 CE   CLRA   
+  7BD5:  36 CE 7D   PSHA   
+  7BD6:  CE 7D D9   LDX    #$7DD9
+  7BD9:  BD 78 19   JSR    $7819
+  7BDC:  A6 00 8D   LDAA   $00,X
+  7BDE:  8D 4A 32   BSR    $7C2A
+  7BE0:  32 81 0A   PULA   
+  7BE1:  81 0A 27   CMPA   #$0A
+  7BE3:  27 03 4C   BEQ    $7BE8
+  7BE5:  4C 20 ED   INCA   
+  7BE6:  20 ED 33   BRA    $7BD5
+  7BE8:  33 32 39   PULB   
+  7BE9:  32 39 01   PULA   
+  7BEA:  39 01 02   RTS    
+  7BEB:  01 02 03   NOP    
+  7BEC:  02 03 04   ???  $02
+  7BED:  03 04 05   ???  $03
+  7BEE:  04 05 06   ???  $04
+  7BEF:  05 06 07   ???  $05
+  7BF0:  06 07 08   TAP    
+  7BF1:  07 08 09   TPA    
+  7BF2:  08 09 10   INX    
+  7BF3:  09 10 11   DEX    
+  7BF4:  10 11 12   SBA    
+  7BF5:  11 12 13   CBA    
+  7BF6:  12 13 14   ???  $12
+  7BF7:  13 14 15   ???  $13
+  7BF8:  14 15 16   ???  $14
+  7BF9:  15 16 17   ???  $15
+  7BFA:  16 17 18   TAB    
+  7BFB:  17 18 19   TBA    
+  7BFC:  18 19 20   ???  $18
+  7BFD:  19 20 21   DAA    
+  7BFE:  20 21 22   BRA    $7C21
+  7C00:  22 23 24   BHI    $7C25
+  7C02:  24 25 26   BCC    $7C29
+  7C04:  26 27 28   BNE    $7C2D
+  7C06:  28 29 30   BVC    $7C31
+  7C08:  30 DF DB   TSX    
+  7C09:  DF DB 8D   STX    $DB
+  7C0B:  8D 07 AA   BSR    $7C14
+  7C0D:  AA 00 A7   ORAA   $00,X
+  7C0F:  A7 00 DE   STAA   $00,X
+  7C11:  DE DB 39   LDX    $DB
+  7C13:  39 8D 0C   RTS    
+  7C14:  8D 0C CB   BSR    $7C22
+  7C16:  CB 30 D7   ADDB   #$30
+  7C18:  D7 24 7F   STAB   $24   ; LAMP_RAM+$24
+  7C1A:  7F 00 23   CLR    $0023   ; LAMP_RAM+$23
+  7C1D:  DE 23 84   LDX    $23   ; LAMP_RAM+$23
+  7C1F:  84 0F 39   ANDA   #$0F
+  7C21:  39 16 56   RTS    
+  7C22:  16 56 56   TAB    
+  7C23:  56 56 56   RORB   
+  7C24:  56 56 56   RORB   
+  7C25:  56 56 C4   RORB   
+  7C26:  56 C4 0F   RORB   
+  7C27:  C4 0F 39   ANDB   #$0F
+  7C29:  39 DF DB   RTS    
+  7C2A:  DF DB 8D   STX    $DB
+  7C2C:  8D E6 43   BSR    $7C14
+  7C2E:  43 A4 00   COMA   
+  7C2F:  A4 00 20   ANDA   $00,X
+  7C31:  20 DC B6   BRA    $7C0F
+  7C33:  B6 20 02   LDAA   $2002   ; DIP_STROBE2
+  7C36:  2A 74 86   BPL    $7CAC
+  7C38:  86 81 8D   LDAA   #$81
+  7C3A:  8D CD 86   BSR    $7C09
+  7C3C:  86 C1 8D   LDAA   #$C1
+  7C3E:  8D EA 7C   BSR    $7C2A
+  7C40:  7C 00 8B   INC    $008B
+  7C43:  86 32 97   LDAA   #$32
+  7C45:  97 86 7F   STAA   $86
+  7C47:  7F 00 6E   CLR    $006E
+  7C4A:  86 06 CE   LDAA   #$06
+  7C4C:  CE 7C BE   LDX    #$7CBE
+  7C4F:  36 BD 78   PSHA   
+  7C50:  BD 78 19   JSR    $7819
+  7C53:  A6 00 97   LDAA   $00,X
+  7C55:  97 8A BD   STAA   $8A
+  7C57:  BD 78 27   JSR    $7827
+  7C5A:  7C 00 6E   INC    $006E
+  7C5D:  7A 00 8A   DEC    $008A
+  7C60:  26 F5 D6   BNE    $7C57
+  7C62:  D6 86 8B   LDAB   $86
+  7C64:  8B 30 84   ADDA   #$30
+  7C66:  84 F0 8B   ANDA   #$F0
+  7C68:  8B 00 19   ADDA   #$00
+  7C6A:  19 97 1C   DAA    
+  7C6B:  97 1C 5A   STAA   $1C   ; DISP_RAM+$1C
+  7C6D:  5A 37 36   DECB   
+  7C6E:  37 36 96   PSHB   
+  7C6F:  36 96 25   PSHA   
+  7C70:  96 25 26   LDAA   $25   ; LAMP_RAM+$25
+  7C72:  26 03 7C   BNE    $7C77
+  7C74:  7C 00 26   INC    $0026   ; LAMP_RAM+$26
+  7C77:  BD 79 3A   JSR    $793A
+  7C7A:  32 33 5D   PULA   
+  7C7B:  33 5D 26   PULB   
+  7C7C:  5D 26 E5   TSTB   
+  7C7D:  26 E5 32   BNE    $7C64
+  7C7F:  32 7A 00   PULA   
+  7C80:  7A 00 86   DEC    $0086
+  7C83:  27 0C D6   BEQ    $7C91
+  7C85:  D6 6E C1   LDAB   $6E
+  7C87:  C1 30 2D   CMPB   #$30
+  7C89:  2D C1 4A   BLT    $7C4C
+  7C8B:  4A 7F 00   DECA   
+  7C8C:  7F 00 6E   CLR    $006E
+  7C8F:  20 BB 96   BRA    $7C4C
+  7C91:  96 89 97   LDAA   $89
+  7C93:  97 1C CE   STAA   $1C   ; DISP_RAM+$1C
+  7C95:  CE 00 0C   LDX    #$000C
+  7C98:  8C FF FC   CPX    #$FFFC
+  7C9B:  27 0F A1   BEQ    $7CAC
+  7C9D:  A1 00 26   CMPA   $00,X
+  7C9F:  26 05 36   BNE    $7CA6
+  7CA1:  36 BD 76   PSHA   
+  7CA2:  BD 76 B2   JSR    $76B2
+  7CA5:  32 09 09   PULA   
+  7CA6:  09 09 09   DEX    
+  7CA7:  09 09 09   DEX    
+  7CA8:  09 09 20   DEX    
+  7CA9:  09 20 EC   DEX    
+  7CAA:  20 EC 7F   BRA    $7C98
+  7CAC:  7F 00 8B   CLR    $008B
+  7CAF:  86 E2 BD   LDAA   #$E2
+  7CB1:  BD 7C 09   JSR    $7C09
+  7CB4:  96 6D 81   LDAA   $6D
+  7CB6:  81 01 26   CMPA   #$01
+  7CB8:  26 01 4C   BNE    $7CBB
+  7CBA:  4C 97 E1   INCA   
+  7CBB:  97 E1 39   STAA   $E1
+  7CBD:  39 28 0D   RTS    
+  7CBE:  28 0D 06   BVC    $7CCD
+  7CC0:  06 02 06   TAP    
+  7CC1:  02 06 0D   ???  $02
+  7CC2:  06 0D 20   TAP    
+  7CC3:  0D 20 0E   SEC    
+  7CC4:  20 0E 00   BRA    $7CD4
+  7CC6:  00 25 0E   ???  $00
+  7CC7:  25 0E 16   BCS    $7CD7
+  7CC9:  16 01 11   TAB    
+  7CCA:  01 11 22   NOP    
+  7CCB:  11 22 33   CBA    
+  7CCC:  22 33 44   BHI    $7D01
+  7CCE:  44 55 66   LSRA   
+  7CCF:  55 66 77   ???  $55
+  7CD0:  66 77 88   ROR    $77,X
+  7CD2:  88 99 AA   EORA   #$99
+  7CD4:  AA BB CC   ORAA   $BB,X
+  7CD6:  CC DD EE   ???  $CC
+  7CD7:  DD EE FF   ???  $DD
+  7CD8:  EE FF EE   LDX    $FF,X
+  7CDA:  EE 04 00   LDX    $04,X
+  7CDC:  00 2B 10   ???  $00
+  7CDD:  2B 10 1D   BMI    $7CEF
+  7CDF:  1D 02 FF   ?1D    
+  7CE0:  02 FF FE   ???  $02
+  7CE1:  FF FE DF   STX    $FEDF
+  7CE4:  CF BF AF   ???  $CF
+  7CE5:  BF AF 9F   STS    $AF9F
+  7CE8:  8F 7F 6F   ???  $8F
+  7CE9:  7F 6F 5F   CLR    $6F5F
+  7CEC:  4F 3F 2F   CLRA   
+  7CED:  3F 2F 1F   SWI    
+  7CEE:  2F 1F 2F   BLE    $7D0F
+  7CF0:  2F 3F 4F   BLE    $7D31
+  7CF2:  4F 5F 6F   CLRA   
+  7CF3:  5F 6F 7F   CLRB   
+  7CF4:  6F 7F 8F   CLR    $7F,X
+  7CF6:  8F 9F AF   ???  $8F
+  7CF7:  9F AF 03   STS    $AF
+  7CF9:  03 00 27   ???  $03
+  7CFA:  00 27 17   ???  $00
+  7CFB:  27 17 25   BEQ    $7D14
+  7CFD:  25 03 33   BCS    $7D02
+  7CFF:  33 22 11   PULB   
+  7D00:  22 11 0F   BHI    $7D13
+  7D02:  0F 11 22   SEI    
+  7D03:  11 22 33   CBA    
+  7D04:  22 33 44   BHI    $7D39
+  7D06:  44 55 66   LSRA   
+  7D07:  55 66 77   ???  $55
+  7D08:  66 77 88   ROR    $77,X
+  7D0A:  88 99 AA   EORA   #$99
+  7D0C:  AA BB CC   ORAA   $BB,X
+  7D0E:  CC DD EE   ???  $CC
+  7D0F:  DD EE FF   ???  $DD
+  7D10:  EE FF EE   LDX    $FF,X
+  7D12:  EE DD CC   LDX    $DD,X
+  7D14:  CC DD EE   ???  $CC
+  7D15:  DD EE DD   ???  $DD
+  7D16:  EE DD CC   LDX    $DD,X
+  7D18:  CC BB CC   ???  $CC
+  7D19:  BB CC DD   ADDA   $CCDD
+  7D1C:  CC BB AA   ???  $CC
+  7D1D:  BB AA 08   ADDA   $AA08
+  7D20:  00 BE 14   ???  $00
+  7D21:  BE 14 15   LDS    $1415
+  7D24:  00 11 FF   ???  $00
+  7D25:  11 FF 22   CBA    
+  7D26:  FF 22 EE   STX    $22EE
+  7D29:  33 DD 44   PULB   
+  7D2A:  DD 44 CC   ???  $DD
+  7D2B:  44 CC 55   LSRA   
+  7D2C:  CC 55 BB   ???  $CC
+  7D2D:  55 BB 66   ???  $55
+  7D2E:  BB 66 AA   ADDA   $66AA
+  7D31:  77 99 88   ASR    $9988
+  7D34:  88 08 00   EORA   #$08
+  7D36:  00 BB 1E   ???  $00
+  7D37:  BB 1E 1F   ADDA   $1E1F
+  7D3A:  00 01 12   ???  $00
+  7D3B:  01 12 23   NOP    
+  7D3C:  12 23 34   ???  $12
+  7D3D:  23 34 45   BLS    $7D73
+  7D3F:  45 56 67   ???  $45
+  7D40:  56 67 78   RORB   
+  7D41:  67 78 89   ASR    $78,X
+  7D43:  89 9A AB   ADCA   #$9A
+  7D45:  AB BC CD   ADDA   $BC,X
+  7D47:  CD DE EF   ???  $CD
+  7D48:  DE EF DE   LDX    $EF
+  7D4A:  DE CD DE   LDX    $CD
+  7D4C:  DE CD DE   LDX    $CD
+  7D4E:  DE CD DE   LDX    $CD
+  7D50:  DE CD DE   LDX    $CD
+  7D52:  DE CD 03   LDX    $CD
+  7D54:  03 00 6A   ???  $03
+  7D55:  00 6A 18   ???  $00
+  7D56:  6A 18 24   DEC    $18,X
+  7D58:  24 00 00   BCC    $7D5A
+  7D5A:  00 00 00   ???  $00
+  7D5B:  00 00 00   ???  $00
+  7D5C:  00 00 01   ???  $00
+  7D5D:  00 01 12   ???  $00
+  7D5E:  01 12 23   NOP    
+  7D5F:  12 23 34   ???  $12
+  7D60:  23 34 45   BLS    $7D96
+  7D62:  45 56 67   ???  $45
+  7D63:  56 67 78   RORB   
+  7D64:  67 78 89   ASR    $78,X
+  7D66:  89 9A AB   ADCA   #$9A
+  7D68:  AB BC CD   ADDA   $BC,X
+  7D6A:  CD EF FF   ???  $CD
+  7D6B:  EF FF EF   STX    $FF,X
+  7D6D:  EF DE CD   STX    $DE,X
+  7D6F:  CD BC CD   ???  $CD
+  7D70:  BC CD DE   CPX    $CDDE
+  7D73:  EF FF EF   STX    $FF,X
+  7D75:  EF DE 00   STX    $DE,X
+  7D77:  00 00 00   ???  $00
+  7D78:  00 00 07   ???  $00
+  7D79:  00 07 00   ???  $00
+  7D7A:  07 00 B7   TPA    
+  7D7B:  00 B7 12   ???  $00
+  7D7C:  B7 12 13   STAA   $1213
+  7D7F:  00 44 55   ???  $00
+  7D80:  44 55 66   LSRA   
+  7D81:  55 66 77   ???  $55
+  7D82:  66 77 88   ROR    $77,X
+  7D84:  88 99 AA   EORA   #$99
+  7D86:  AA BB CC   ORAA   $BB,X
+  7D88:  CC DD EE   ???  $CC
+  7D89:  DD EE FF   ???  $DD
+  7D8A:  EE FF EE   LDX    $FF,X
+  7D8C:  EE DD 08   LDX    $DD,X
+  7D8E:  08 00 B9   INX    
+  7D8F:  00 B9 12   ???  $00
+  7D90:  B9 12 13   ADCA   $1213
+  7D93:  00 1F 2F   ???  $00
+  7D94:  1F 2F 3F   ???  $1F
+  7D95:  2F 3F 4F   BLE    $7DD6
+  7D97:  4F 5F 6F   CLRA   
+  7D98:  5F 6F 7F   CLRB   
+  7D99:  6F 7F 8F   CLR    $7F,X
+  7D9B:  8F 9F AF   ???  $8F
+  7D9C:  9F AF BF   STS    $AF
+  7D9E:  BF CF DF   STS    $CFDF
+  7DA1:  EF 00 11   STX    $00,X
+  7DA3:  11 22 33   CBA    
+  7DA4:  22 33 44   BHI    $7DD9
+  7DA6:  44 55 66   LSRA   
+  7DA7:  55 66 40   ???  $55
+  7DA8:  66 40 01   ROR    $40,X
+  7DAA:  01 13 27   NOP    
+  7DAB:  13 27 58   ???  $13
+  7DAC:  27 58 69   BEQ    $7E06
+  7DAE:  69 8A B0   ROL    $8A,X
+  7DB0:  B0 02 01   SUBA   $0201
+  7DB3:  02 03 04   ???  $02
+  7DB4:  03 04 11   ???  $03
+  7DB5:  04 11 13   ???  $04
+  7DB6:  11 13 15   CBA    
+  7DB7:  13 15 06   ???  $13
+  7DB8:  15 06 17   ???  $15
+  7DB9:  06 17 05   TAP    
+  7DBA:  17 05 07   TBA    
+  7DBB:  05 07 21   ???  $05
+  7DBC:  07 21 04   TPA    
+  7DBD:  21 04 21   BRN    $7DC3
+  7DBF:  21 A2 C2   BRN    $7D63
+  7DC1:  C2 E1 62   SBCB   #$E1
+  7DC3:  62 82 22   ???  $62
+  7DC4:  82 22 A1   SBCA   #$22
+  7DC6:  A1 44 38   CMPA   $44,X
+  7DC8:  38 84 C4   ?38    
+  7DC9:  84 C4 18   ANDA   #$C4
+  7DCB:  18 94 54   ???  $18
+  7DCC:  94 54 61   ANDA   $54
+  7DCE:  61 11 14   ???  $61
+  7DCF:  11 14 91   CBA    
+  7DD0:  14 91 D4   ???  $14
+  7DD1:  91 D4 51   CMPA   $D4
+  7DD3:  51 D2 52   ???  $51
+  7DD4:  D2 52 D1   SBCB   $52
+  7DD6:  D1 12 92   CMPB   $12   ; DISP_RAM+$12
+  7DD8:  92 31 71   SBCA   $31   ; LAMP_RAM+$31
+  7DDA:  71 B1 F1   ???  $71
+  7DDB:  B1 F1 32   CMPA   $F132
+  7DDE:  72 B2 F2   ???  $72
+  7DDF:  B2 F2 34   SBCA   $F234
+  7DE2:  74 B4 24   LSR    $B424
+  7DE5:  64 A4 E4   LSR    $A4,X
+  7DE7:  E4 00 0F   ANDB   $00,X
+  7DE9:  0F 00 0B   SEI    
+  7DEA:  00 0B 00   ???  $00
+  7DEB:  0B 00 07   SEV    
+  7DEC:  00 07 00   ???  $00
+  7DED:  07 00 03   TPA    
+  7DEE:  00 03 05   ???  $00
+  7DEF:  03 05 15   ???  $03
+  7DF0:  05 15 10   ???  $05
+  7DF1:  15 10 20   ???  $15
+  7DF2:  10 20 20   SBA    
+  7DF3:  20 20 36   BRA    $7E15
+  7DF5:  36 20 37   PSHA   
+  7DF6:  20 37 20   BRA    $7E2F
+  7DF8:  20 43 20   BRA    $7E3D
+  7DFA:  20 41 20   BRA    $7E3D
+  7DFC:  20 47 20   BRA    $7E45
+  7DFE:  20 48 20   BRA    $7E48
+  7E00:  20 49 20   BRA    $7E4B
+  7E02:  20 4A 20   BRA    $7E4E
+  7E04:  20 4B 20   BRA    $7E51
+  7E06:  20 44 00   BRA    $7E4C
+  7E08:  00 00 04   ???  $00
+  7E09:  00 04 06   ???  $00
+  7E0A:  04 06 05   ???  $04
+  7E0B:  06 05 07   TAP    
+  7E0C:  05 07 06   ???  $05
+  7E0D:  07 06 09   TPA    
+  7E0E:  06 09 07   TAP    
+  7E0F:  09 07 10   DEX    
+  7E10:  07 10 08   TPA    
+  7E11:  10 08 11   SBA    
+  7E12:  08 11 09   INX    
+  7E13:  11 09 12   CBA    
+  7E14:  09 12 10   DEX    
+  7E15:  12 10 13   ???  $12
+  7E16:  10 13 11   SBA    
+  7E17:  13 11 14   ???  $13
+  7E18:  11 14 12   CBA    
+  7E19:  14 12 15   ???  $14
+  7E1A:  12 15 13   ???  $12
+  7E1B:  15 13 16   ???  $15
+  7E1C:  13 16 14   ???  $13
+  7E1D:  16 14 17   TAB    
+  7E1E:  14 17 16   ???  $14
+  7E1F:  17 16 20   TBA    
+  7E20:  16 20 18   TAB    
+  7E21:  20 18 22   BRA    $7E3B
+  7E23:  22 20 25   BHI    $7E45
+  7E25:  25 22 27   BCS    $7E49
+  7E27:  27 00 00   BEQ    $7E29
+  7E29:  00 20 30   ???  $00
+  7E2A:  20 30 25   BRA    $7E5C
+  7E2C:  25 35 30   BCS    $7E63
+  7E2E:  30 45 35   TSX    
+  7E2F:  45 35 50   ???  $45
+  7E30:  35 50 40   TXS    
+  7E31:  50 40 55   NEGB   
+  7E32:  40 55 45   NEGA   
+  7E33:  55 45 60   ???  $55
+  7E34:  45 60 50   ???  $45
+  7E35:  60 50 65   NEG    $50,X
+  7E37:  65 55 70   ???  $65
+  7E38:  55 70 60   ???  $55
+  7E39:  70 60 75   NEG    $6075
+  7E3C:  65 80 70   ???  $65
+  7E3D:  80 70 85   SUBA   #$70
+  7E3F:  85 80 95   BITA   #$80
+  7E41:  95 80 95   BITA   $80
+  7E43:  95 85 95   BITA   $85
+  7E45:  95 85 95   BITA   $85
+  7E47:  95 10 8C   BITA   $10   ; DISP_RAM+$10
+  7E49:  8C 10 20   CPX    #$1020
+  7E4C:  3A 22 10   ?3A    
+  7E4D:  22 10 8C   BHI    $7E5F
+  7E4F:  8C 20 20   CPX    #$2020
+  7E52:  39 22 10   RTS    
+  7E53:  22 10 84   BHI    $7E65
+  7E55:  84 20 20   ANDA   #$20
+  7E57:  20 26 71   BRA    $7E7F
+  7E59:  71 10 80   ???  $71
+  7E5A:  10 80 80   SBA    
+  7E5B:  80 80 20   SUBA   #$80
+  7E5D:  20 27 71   BRA    $7E86
+  7E5F:  71 00 E5   ???  $71
+  7E60:  00 E5 01   ???  $00
+  7E61:  E5 01 20   BITB   $01,X
+  7E63:  20 3B F7   BRA    $7EA0
+  7E65:  F7 00 E6   STAB   $00E6
+  7E68:  01 20 30   NOP    
+  7E69:  20 30 53   BRA    $7E9B
+  7E6B:  53 00 E7   COMB   
+  7E6C:  00 E7 01   ???  $00
+  7E6D:  E7 01 20   STAB   $01,X
+  7E6F:  20 31 53   BRA    $7EA2
+  7E71:  53 00 E8   COMB   
+  7E72:  00 E8 01   ???  $00
+  7E73:  E8 01 20   EORB   $01,X
+  7E75:  20 32 D3   BRA    $7EA9
+  7E77:  D3 00 E9   ???  $D3
+  7E78:  00 E9 01   ???  $00
+  7E79:  E9 01 20   ADCB   $01,X
+  7E7B:  20 33 F7   BRA    $7EB0
+  7E7D:  F7 00 EA   STAB   $00EA
+  7E80:  01 20 42   NOP    
+  7E81:  20 42 71   BRA    $7EC5
+  7E83:  71 00 EB   ???  $71
+  7E84:  00 EB 01   ???  $00
+  7E85:  EB 01 20   ADDB   $01,X
+  7E87:  20 40 11   BRA    $7EC9
+  7E89:  11 00 EC   CBA    
+  7E8A:  00 EC 01   ???  $00
+  7E8B:  EC 01 20   ???  $EC
+  7E8C:  01 20 46   NOP    
+  7E8D:  20 46 71   BRA    $7ED5
+  7E8F:  71 00 ED   ???  $71
+  7E90:  00 ED 01   ???  $00
+  7E91:  ED 01 20   ???  $ED
+  7E92:  01 20 24   NOP    
+  7E93:  20 24 53   BRA    $7EB9
+  7E95:  53 00 EE   COMB   
+  7E96:  00 EE 01   ???  $00
+  7E97:  EE 01 20   LDX    $01,X
+  7E99:  20 25 53   BRA    $7EC0
+  7E9B:  53 00 EF   COMB   
+  7E9C:  00 EF 01   ???  $00
+  7E9D:  EF 01 20   STX    $01,X
+  7E9F:  20 3C 00   BRA    $7EDD
+  7EA1:  00 00 F0   ???  $00
+  7EA2:  00 F0 01   ???  $00
+  7EA3:  F0 01 20   SUBB   $0120
+  7EA6:  3D 00 00   ?3D    
+  7EA7:  00 00 F1   ???  $00
+  7EA8:  00 F1 01   ???  $00
+  7EA9:  F1 01 20   CMPB   $0120
+  7EAC:  3E D5 00   WAI    
+  7EAD:  D5 00 F2   BITB   $00   ; DISP_RAM+$00
+  7EAF:  F2 01 20   SBCB   $0120
+  7EB2:  3F D5 00   SWI    
+  7EB3:  D5 00 F3   BITB   $00   ; DISP_RAM+$00
+  7EB5:  F3 01 20   ???  $F3
+  7EB6:  01 20 34   NOP    
+  7EB7:  20 34 00   BRA    $7EED
+  7EB9:  00 00 F4   ???  $00
+  7EBA:  00 F4 01   ???  $00
+  7EBB:  F4 01 20   ANDB   $0120
+  7EBE:  35 00 00   TXS    
+  7EBF:  00 00 F5   ???  $00
+  7EC0:  00 F5 01   ???  $00
+  7EC1:  F5 01 20   BITB   $0120
+  7EC4:  45 33 3B   ???  $45
+  7EC5:  33 3B 4F   PULB   
+
+NMI_ISR:
+  7EC6:  3B 4F B7   RTI    
+  7EC7:  4F B7 60   CLRA   
+  7EC8:  B7 60 00   STAA   $6000   ; AUDIO_OUT_6000
+  7ECB:  B7 10 80   STAA   $1080   ; SOL_LATCH1
+  7ECE:  B7 10 84   STAA   $1084   ; SOL_LATCH2
+  7ED1:  B7 10 84   STAA   $1084   ; SOL_LATCH2
+  7ED4:  B7 10 88   STAA   $1088   ; SOL_LATCH3
+  7ED7:  B7 10 8C   STAA   $108C   ; SOL_LATCH4
+  7EDA:  97 18 97   STAA   $18   ; DISP_RAM+$18
+  7EDC:  97 83 BD   STAA   $83
+  7EDE:  BD 7F EF   JSR    $7FEF
+  7EE1:  CE 00 08   LDX    #$0008
+  7EE4:  86 FF 97   LDAA   #$FF
+  7EE6:  97 6C BD   STAA   $6C
+  7EE8:  BD 7F F2   JSR    $7FF2
+  7EEB:  D6 DF D7   LDAB   $DF
+  7EED:  D7 0E F6   STAB   $0E   ; DISP_RAM+$0E
+  7EEF:  F6 20 09   LDAB   $2009   ; DIP_STROBE9
+  7EF2:  2B 08 CE   BMI    $7EFC
+  7EF4:  CE 00 0C   LDX    #$000C
+  7EF7:  BD 7F F2   JSR    $7FF2
+  7EFA:  20 04 96   BRA    $7F00
+  7EFC:  96 E0 97   LDAA   $E0
+  7EFE:  97 0A 96   STAA   $0A   ; DISP_RAM+$0A
+  7F00:  96 1A 97   LDAA   $1A   ; DISP_RAM+$1A
+  7F02:  97 1D 96   STAA   $1D   ; DISP_RAM+$1D
+  7F04:  96 22 4A   LDAA   $22   ; LAMP_RAM+$22
+  7F06:  4A 97 1C   DECA   
+  7F07:  97 1C 86   STAA   $1C   ; DISP_RAM+$1C
+  7F09:  86 F1 97   LDAA   #$F1
+  7F0B:  97 00 CE   STAA   $00   ; DISP_RAM+$00
+  7F0D:  CE 00 30   LDX    #$0030
+  7F10:  86 FF A7   LDAA   #$FF
+  7F12:  A7 00 08   STAA   $00,X
+  7F14:  08 8C 00   INX    
+  7F15:  8C 00 40   CPX    #$0040
+  7F18:  26 F8 8D   BNE    $7F12
+  7F1A:  8D 7D 26   BSR    $7F99
+  7F1C:  26 FC 8C   BNE    $7F1A
+  7F1E:  8C 00 2F   CPX    #$002F
+  7F21:  27 13 6F   BEQ    $7F36
+  7F23:  6F 00 09   CLR    $00,X
+  7F25:  09 20 F6   DEX    
+  7F26:  20 F6 86   BRA    $7F1E
+  7F28:  86 17 36   LDAA   #$17
+  7F2A:  36 BD 79   PSHA   
+  7F2B:  BD 79 3A   JSR    $793A
+  7F2E:  BD 78 27   JSR    $7827
+  7F31:  32 4A 26   PULA   
+  7F32:  4A 26 F5   DECA   
+  7F33:  26 F5 39   BNE    $7F2A
+  7F35:  39 96 88   RTS    
+  7F36:  96 88 8A   LDAA   $88
+  7F38:  8A 40 B7   ORAA   #$40
+  7F3A:  B7 10 88   STAA   $1088   ; SOL_LATCH3
+  7F3D:  86 FF 97   LDAA   #$FF
+  7F3F:  97 1C 97   STAA   $1C   ; DISP_RAM+$1C
+  7F41:  97 8B 7C   STAA   $8B
+  7F43:  7C 00 00   INC    $0000   ; DISP_RAM+$00
+  7F46:  86 01 7F   LDAA   #$01
+  7F48:  7F 00 C5   CLR    $00C5
+  7F4B:  97 1D 20   STAA   $1D   ; DISP_RAM+$1D
+  7F4D:  20 00 B6   BRA    $7F4F
+  7F4F:  B6 20 12   LDAA   $2012   ; SW_ROW+$02
+  7F52:  2B 1A D6   BMI    $7F6E
+  7F54:  D6 1D C1   LDAB   $1D   ; DISP_RAM+$1D
+  7F56:  C1 01 26   CMPB   #$01
+  7F58:  26 14 8D   BNE    $7F6E
+  7F5A:  8D 3D 26   BSR    $7F99
+  7F5C:  26 F1 20   BNE    $7F4F
+  7F5E:  20 59 8D   BRA    $7FB9
+  7F60:  8D C6 7C   BSR    $7F28
+  7F62:  7C 00 C5   INC    $00C5
+  7F65:  96 1D 4C   LDAA   $1D   ; DISP_RAM+$1D
+  7F67:  4C 81 09   INCA   
+  7F68:  81 09 26   CMPA   #$09
+  7F6A:  26 DF 20   BNE    $7F4B
+  7F6C:  20 D8 CE   BRA    $7F46
+  7F6E:  CE 7F 91   LDX    #$7F91
+  7F71:  96 C5 BD   LDAA   $C5
+  7F73:  BD 78 19   JSR    $7819
+  7F76:  A6 00 BD   LDAA   $00,X
+  7F78:  BD 7C 14   JSR    $7C14
+  7F7B:  36 96 24   PSHA   
+  7F7C:  96 24 CE   LDAA   $24   ; LAMP_RAM+$24
+  7F7E:  CE 10 50   LDX    #$1050
+  7F81:  BD 78 19   JSR    $7819
+  7F84:  86 01 33   LDAA   #$01
+  7F86:  33 27 04   PULB   
+  7F87:  27 04 48   BEQ    $7F8D
+  7F89:  48 5A 20   ASLA   
+  7F8A:  5A 20 FA   DECB   
+  7F8B:  20 FA 8D   BRA    $7F87
+  7F8D:  8D 1C 20   BSR    $7FAB
+  7F8F:  20 CF 47   BRA    $7F60
+  7F91:  47 C5 C6   ASRA   
+  7F92:  C5 C6 07   BITB   #$C6
+  7F94:  07 45 C7   TPA    
+  7F95:  45 C7 C4   ???  $45
+  7F96:  C7 C4 05   ???  $C7
+  7F97:  C4 05 BD   ANDB   #$05
+  7F99:  BD 78 27   JSR    $7827
+  7F9C:  B6 20 0B   LDAA   $200B   ; DIP_STROBE11
+  7F9F:  D6 C4 97   LDAB   $C4
+  7FA1:  97 C4 5D   STAA   $C4
+  7FA3:  5D 2B 04   TSTB   
+  7FA4:  2B 04 4D   BMI    $7FAA
+  7FA6:  4D 2A 01   TSTA   
+  7FA7:  2A 01 4F   BPL    $7FAA
+  7FA9:  4F 39 DF   CLRA   
+  7FAA:  39 DF DD   RTS    
+  7FAB:  DF DD A7   STX    $DD
+  7FAD:  A7 00 BD   STAA   $00,X
+  7FAF:  BD 7F 28   JSR    $7F28
+  7FB2:  DE DD 6F   LDX    $DD
+  7FB4:  6F 00 7E   CLR    $00,X
+  7FB6:  7E 7F 28   JMP    $7F28
+  7FB9:  7F 10 88   CLR    $1088   ; SOL_LATCH3
+  7FBC:  7C 00 00   INC    $0000   ; DISP_RAM+$00
+  7FBF:  86 01 7F   LDAA   #$01
+  7FC1:  7F 00 1D   CLR    $001D   ; DISP_RAM+$1D
+  7FC4:  CE 20 10   LDX    #$2010
+  7FC7:  E6 00 2A   LDAB   $00,X
+  7FC9:  2A 0E 97   BPL    $7FD9
+  7FCB:  97 1D 7C   STAA   $1D   ; DISP_RAM+$1D
+  7FCD:  7C 00 26   INC    $0026   ; LAMP_RAM+$26
+  7FD0:  DF DD 36   STX    $DD
+  7FD2:  36 BD 7F   PSHA   
+  7FD3:  BD 7F 28   JSR    $7F28
+  7FD6:  DE DD 32   LDX    $DD
+  7FD8:  32 4C 19   PULA   
+  7FD9:  4C 19 08   INCA   
+  7FDA:  19 08 8C   DAA    
+  7FDB:  08 8C 20   INX    
+  7FDC:  8C 20 4C   CPX    #$204C
+  7FDF:  26 E6 8D   BNE    $7FC7
+  7FE1:  8D B6 26   BSR    $7F99
+  7FE3:  26 DA 86   BNE    $7FBF
+  7FE5:  86 11 97   LDAA   #$11
+  7FE7:  97 6C 86   STAA   $6C
+  7FE9:  86 88 97   LDAA   #$88
+  7FEB:  97 1C 97   STAA   $1C   ; DISP_RAM+$1C
+  7FED:  97 1D CE   STAA   $1D   ; DISP_RAM+$1D
+  7FEF:  CE 00 10   LDX    #$0010
+  7FF2:  09 A7 00   DEX    
+  7FF3:  A7 00 8C   STAA   $00,X
+  7FF5:  8C FF FF   CPX    #$FFFF
+
+VECTORS:
+  7FF8:  26 F8 39   BNE    $7FF2
+  7FFA:  39 4E 7E   RTS    
+  7FFB:  4E 7E C6   ???  $4E
+  7FFC:  7E C6 70   JMP    $C670
+  7FFF:  00         ???  $00
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NMI ISR  context  @7EC6  (±32 bytes)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  7EC2:  01 20 45   NOP    
+  7EC3:  20 45 33   BRA    $7F0A
+  7EC5:  33 3B 4F   PULB   
+
+NMI_ISR:
+  7EC6:  3B 4F B7   RTI    
+  7EC7:  4F B7 60   CLRA   
+  7EC8:  B7 60 00   STAA   $6000   ; AUDIO_OUT_6000
+  7ECB:  B7 10 80   STAA   $1080   ; SOL_LATCH1
+  7ECE:  B7 10 84   STAA   $1084   ; SOL_LATCH2
+  7ED1:  B7 10 84   STAA   $1084   ; SOL_LATCH2
+  7ED4:  B7 10 88   STAA   $1088   ; SOL_LATCH3
+  7ED7:  B7 10 8C   STAA   $108C   ; SOL_LATCH4
+  7EDA:  97 18 97   STAA   $18   ; DISP_RAM+$18
+  7EDC:  97 83 BD   STAA   $83
+  7EDE:  BD 7F EF   JSR    $7FEF
+  7EE1:  CE 00 08   LDX    #$0008
+  7EE4:  86 FF 97   LDAA   #$FF
+  7EE6:  97 6C BD   STAA   $6C
+  7EE8:  BD 7F F2   JSR    $7FF2
+  7EEB:  D6 DF D7   LDAB   $DF
+  7EED:  D7 0E F6   STAB   $0E   ; DISP_RAM+$0E
+  7EEF:  F6 20 09   LDAB   $2009   ; DIP_STROBE9
+  7EF2:  2B 08 CE   BMI    $7EFC
+  7EF4:  CE 00 0C   LDX    #$000C
+  7EF7:  BD 7F F2   JSR    $7FF2
+  7EFA:  20 04 96   BRA    $7F00
+  7EFC:  96 E0 97   LDAA   $E0
+  7EFE:  97 0A 96   STAA   $0A   ; DISP_RAM+$0A
+  7F00:  96 1A      LDAA   $1A   ; DISP_RAM+$1A

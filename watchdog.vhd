@@ -10,7 +10,7 @@ use ieee.std_logic_1164.all;
 entity watchdog is
   generic (
     TIMEOUT_COUNT : natural := 12_500_000;  -- ~250 ms @ 50 MHz
-    RESET_WIDTH   : natural := 50           -- reset pulse width in clk cycles (~1 us)
+    RESET_WIDTH   : natural := 800          -- reset pulse width in clk cycles (~16 us @ 50 MHz = 16 cpu_clk-Zyklen)
   );
   port (
     clk      : in  std_logic;  -- clk_50
