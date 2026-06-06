@@ -22,16 +22,24 @@ Aktuell ROM: Middle Earth 608/609 + 82s130 Sound-ROM.
 - **Synchroner 9-Bit-Zähler** statt 3× SN7493-Ripple-Kaskade; NMI-Periode = 512 cpu_clk = 512 µs
 
 ## Offene Bugs (bewusst zurückgestellt)
-- **B4**: Async-Inputs ohne Synchronizer (`switch[]`, `options[]`) — unkritisch solange Fake-Defaults
+- **B4**: Async-Inputs ohne Synchronizer — `switch[1..4]` haben jetzt 2-FF-Sync (`sw_meta`/`sw_sync`, clk_50); `switch[5..16]` und `options[]` noch ohne (Phase D)
 - **B5**: Open Outputs / Tristate-Defaults (BUFFER_*, SRAM_*, SPI, Audio)
 - **B10–B12**: Toter Code, Non-Standard-Libs, Display-Signal-Ownership
 
+## Watchdog-Status (offen)
+- `reset_h` enthält **kein** `wd_reset` (bewusst entfernt): Game kickt 0x4000 nicht im Attract Mode → WD würde CPU resetten
+- WD-Instanz bleibt aktiv (LED_D1 zeigt intern-Timeouts via `wd_seen`)
+- Klären bei aktivem Spiel: ROM-Disassembly oder Schaltplan prüfen, ob/wann 0x4000 geschrieben wird
+- **Nicht reaktivieren** bis Kick-Mechanismus verstanden
+
 ## Noch nicht implementiert (Roadmap)
 - **Phase B**: Switch-Matrix real (0x2010–0x204F), Solenoid-Latches (0x1080/84/88/8C), Lamp-Matrix (RAM 0x30–0x3F)
+  - ✓ 4 Switch-Eingänge verdrahtet (Commit `2d3cdd1`): `switch[1]`=Test→$200B, `[2]`=Coin1→$2010, `[3]`=Coin2→$2011, `[4]`=Start→$2013; auf GottFA3-Testboard verifiziert (Test/Coin1/Coin2 ✅, Start braucht Kugel-Erkennung)
   - ✓ Lamp-Driver gebaut: `lamp_driver.vhd` (84 Lampen → 11× TPIC6B595N, statisch gelatcht, Double-Buffer + Shift-FSM @ clk_50, ersetzt 9334+ULN2003A). RAM-0x30–0x3F-Sniffer analog Display-Shadow-Buffer.
-  - In `AtariFA.vhd` noch **komplett auskommentiert** (Ports, `lamp_state`-Signal, Sniffer-Prozess, `LD`-Instanz) — erst Display-Zwischenziel abschließen, dann alle 4 Blöcke gemeinsam aktivieren + Pins in `.qsf`.
+  - Lamp-Driver in `AtariFA.vhd` noch **komplett auskommentiert** (Ports, `lamp_state`-Signal, Sniffer-Prozess, `LD`-Instanz) — auf Prototyp-HW gemeinsam mit vollständiger Switch-Matrix aktivieren + Pins in `.qsf`.
+  - Noch offen: restliche Switch-Matrix (0x2014–0x204F), Solenoid-Latches
 - **Phase C**: Audio (0x3000/0x6000), generische Spiel-Konfiguration per Generic
-- **Phase D**: Cleanup, SDC weiter vervollständigen (async Inputs B4, IO-Delays), Test-Module hinter Generic
+- **Phase D**: Cleanup, SDC weiter vervollständigen (B4 switch[5..16]/options[], IO-Delays), Test-Module hinter Generic
   - ✓ Hold-Violations behoben (`set_false_path` cpu_clk_d1), SDC → `AtariFA.sdc` umbenannt
 
 ## Bekannte HW-Feintuning-Stellen
