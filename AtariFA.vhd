@@ -167,8 +167,41 @@ signal rom2_cs			: std_logic;
 type rom_byte_array is array(0 to 4) of std_logic_vector(7 downto 0);
 signal rom1_douts	: rom_byte_array;   -- 0=Atarians 1=Time 2=Airborne 3=MiddleEarth 4=SpaceRiders
 signal rom2_douts	: rom_byte_array;
+signal rom1_sel		: std_logic_vector(7 downto 0);   -- roher Game-Mux-Ausgang (vor Freispiel-Overlay)
+signal rom2_sel		: std_logic_vector(7 downto 0);
 signal game_idx		: integer range 0 to 7;
 signal game_sel		: integer range 0 to 4;   -- geklemmt: unbenutzte Codes 5..7 -> 3 (Middle Earth)
+
+-- Freispiel-Overlay: statt 6 zweite ROMs (=+12 M9K, passt nicht) werden die wenigen
+-- gepatchten Bytes kombinatorisch ueberlagert, wenn options(3)=Freispiel aktiv (active-low).
+-- 42 Bytes, Quelle: Diff rom/<orig> vs rom/freeplay/<orig+f> (validiert: Basis+Patch == Freeplay-ROM).
+type fp_patch_t is record
+	game : integer range 0 to 4;     -- 0=Atarians 1=Time 2=Airborne 3=MiddleEarth 4=SpaceRiders
+	slot : integer range 1 to 2;     -- 1=ROM1 (E0), 2=ROM2 (E00)
+	addr : integer range 0 to 2047;  -- ROM-Offset = cpu_addr(10 downto 0)
+	data : std_logic_vector(7 downto 0);
+end record;
+type fp_patch_array_t is array(natural range <>) of fp_patch_t;
+constant FP_PATCHES : fp_patch_array_t := (
+	-- Atarians ROM2 (atarianf.e00) 0x1DA..0x1E1
+	(0,2,16#1DA#,x"B6"),(0,2,16#1DB#,x"00"),(0,2,16#1DC#,x"E0"),(0,2,16#1DD#,x"4C"),
+	(0,2,16#1DE#,x"97"),(0,2,16#1DF#,x"CE"),(0,2,16#1E0#,x"4F"),(0,2,16#1E1#,x"01"),
+	-- Time 2000 ROM2 (timef.e00) 0x721..0x728
+	(1,2,16#721#,x"B6"),(1,2,16#722#,x"00"),(1,2,16#723#,x"CA"),(1,2,16#724#,x"4C"),
+	(1,2,16#725#,x"97"),(1,2,16#726#,x"D6"),(1,2,16#727#,x"4F"),(1,2,16#728#,x"01"),
+	-- Airborne ROM1 (airbornef.e0) 0x77C..0x781
+	(2,1,16#77C#,x"B6"),(2,1,16#77D#,x"00"),(2,1,16#77E#,x"BC"),(2,1,16#77F#,x"97"),
+	(2,1,16#780#,x"D5"),(2,1,16#781#,x"39"),
+	-- Middle Earth ROM2 (609f) 0x171..0x178
+	(3,2,16#171#,x"B6"),(3,2,16#172#,x"00"),(3,2,16#173#,x"1A"),(3,2,16#174#,x"97"),
+	(3,2,16#175#,x"1D"),(3,2,16#176#,x"01"),(3,2,16#177#,x"01"),(3,2,16#178#,x"01"),
+	-- Space Riders ROM1 (spacelf) 0x1EB..0x1F0 + 0x7F7
+	(4,1,16#1EB#,x"00"),(4,1,16#1EC#,x"A8"),(4,1,16#1ED#,x"97"),(4,1,16#1EE#,x"B7"),
+	(4,1,16#1EF#,x"01"),(4,1,16#1F0#,x"01"),(4,1,16#7F7#,x"90"),
+	-- Space Riders ROM2 (spacerf) 0x000 + 0x752..0x755
+	(4,2,16#000#,x"42"),(4,2,16#752#,x"97"),(4,2,16#753#,x"04"),(4,2,16#754#,x"96"),
+	(4,2,16#755#,x"B7")
+);
 
 signal dma_clk		: std_logic;
 signal audio_clk		: std_logic;
@@ -563,8 +596,33 @@ E00_SPACE   : entity work.game_rom generic map(init_file => "./rom/spacer.hex")
 -- Decode game_select (active-low) -> Index, unbenutzte Codes 5..7 -> Middle Earth (3)
 game_idx <= conv_integer(not game_select);
 game_sel <= game_idx when game_idx <= 4 else 3;
-rom1_dout <= rom1_douts(game_sel);
-rom2_dout <= rom2_douts(game_sel);
+rom1_sel <= rom1_douts(game_sel);
+rom2_sel <= rom2_douts(game_sel);
+
+-- Freispiel-Overlay: bei options(3)=0 (active-low) die gepatchten Bytes ueberlagern.
+-- Default ist der rohe Game-Mux-Ausgang; Bus-Mux (rom1_cs/rom2_cs) bleibt unveraendert.
+fp_overlay : process(rom1_sel, rom2_sel, cpu_addr, game_sel, options)
+	variable a  : integer range 0 to 2047;
+	variable d1 : std_logic_vector(7 downto 0);
+	variable d2 : std_logic_vector(7 downto 0);
+begin
+	d1 := rom1_sel;
+	d2 := rom2_sel;
+	if options(3) = '0' then                       -- Freispiel aktiv (active-low)
+		a := conv_integer(cpu_addr(10 downto 0));
+		for i in FP_PATCHES'range loop
+			if FP_PATCHES(i).game = game_sel and FP_PATCHES(i).addr = a then
+				if FP_PATCHES(i).slot = 1 then
+					d1 := FP_PATCHES(i).data;
+				else
+					d2 := FP_PATCHES(i).data;
+				end if;
+			end if;
+		end loop;
+	end if;
+	rom1_dout <= d1;
+	rom2_dout <= d2;
+end process;
 
 
 U9: entity work.cpu68

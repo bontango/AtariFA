@@ -18,6 +18,12 @@ gemuxt (`AtariFA.vhd`). BRAM 21/30 M9K (70 %). Sound-ROM 82s130 separat.
 - **HEX-Init-Warnung 113009** („data too wide … wrapping to subsequent addresses") ist
   **harmlos/format-inhärent**: Intel-HEX 32-Byte-Records (`:20…`) in 8-Bit-Speicher → korrekte
   byteweise Befüllung. Tritt für ALLE rom/*.hex auf (auch das HW-erprobte 608/609).
+- **Freispiel-Option** (`options(3)`, active-low): statt 6 zweite ROMs (=+12 M9K, passt nicht)
+  werden die nur **42 geänderten Bytes** kombinatorisch überlagert (`fp_overlay`-Prozess +
+  Konstante `FP_PATCHES` in `AtariFA.vhd`) → **0 zusätzliches BRAM** (bleibt 21/30 M9K).
+  Quelle der Patches: Diff `rom/<orig>` vs `rom/freeplay/<orig+f>.hex` (Freeplay-Hex nur Referenz,
+  NICHT synthetisiert). Validiert: Basis+Patch == Freeplay-ROM byte-exakt. Ersetzte ROM je Spiel:
+  Atarians/Time/MiddleEarth=ROM2, Airborne=ROM1, Space Riders=ROM1+ROM2.
 
 ## Wichtige Konventionen
 - VHDL: `use ieee.std_logic_unsigned.all` — kein `numeric_std` (würde Konflikte erzeugen)
