@@ -33,3 +33,6 @@ greybox_tmp/
 # Windows junk
 Thumbs.db
 desktop.ini
+
+# Local tools / binaries
+tools/
