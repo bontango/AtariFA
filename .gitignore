@@ -26,3 +26,10 @@ PLLJ_PLLSPE_INFO.txt
 greybox_tmp/
 *.cmp
 *.ppf
+
+# Build/verification logs
+*.log
+
+# Windows junk
+Thumbs.db
+desktop.ini
