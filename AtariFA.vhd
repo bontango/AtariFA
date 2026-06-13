@@ -1,70 +1,68 @@
 -- 'AtariFA' a Atari Gen1 MPU on a low cost FPGA
--- Ralf Thelen 'bontango' 08.2021
+-- Atarians, Time 2000, Airborne Avenger, Middle Earth, Space Riders.
+-- Ralf Thelen 'bontango' June 2026
 -- www.lisy.dev
 --
--- version 0.1 Test outputs only
+-- The central part of the replacement CPU is a self designed 'piggy back'
+-- FPGA board with a Cyclone 10 (10CL006YE144C8G) https://lisy.dev/cyclone10-dev-board.html
+-- It emulates the 6800 CPU, provides ram & rom and replaces parts
+-- of the TTL chips ( mainly for address latches )
+-- parallel to the Atari edge connectors AtariFA do provide alternative 'Box Connectors'
+--
+-- hardware design by categorie
+--
+-- 1) general on board components
+-- reset switch ( parallel to FPGA board switch)
+-- 3 LEDs for status ( parallel to FPGA board LEDs)
+-- 6 DIP switch bank for rom/game selection
+--
+-- 2) display interface ( 4 x 6digit 7segment & 1 x 4digit 7segment )
+-- interface to original Atari displays ( score & status)
+-- driven by 74HCT540 (inverter)
+--
+-- 3) switches
+-- 1:1 implementation of Atari design with 10x 74LS145 selected by a 74HCT42
+-- 1:1 implementation of special handling (glitch filter) of Start,Coin1,Coin2 and Slam Switches
+-- 1:1 implementation of onboard programming DIP banks ( 2x8Dips) and hex switch for 'Replay'
+-- additional parallel onboard switches for 'Atari Test', 'coin2' and 'start' for easy testing
+-- inputs of 74HCT42 ( 4 IOs) and common A,B,C inputs (3 IOs) of 74LS145 driven by 74HCT540 (inverter)
+-- switch common input signal connected to FPGA via 74HC4049 level shifter (inverter)
+--
+-- 4) lamps
+-- 1:1 implementation of Atari design with 12 x ULN2003A drivers ( 21x4 lamp matrix for 84 lamps)
+-- inputs of ULN2003A or grouped by 4 inputs, selection is done by a cascade of three 74HC595
+-- SERIN, CLK, RCLK and OE/ signals are driven by a 74HCT541 ( only non inverted driver on the board!)
+-- the 4 lamp strobes are provided by the Atari 'Auxilary Board' ( interface see below)
+-- parallel to the Atari edge connectors there 2x25 pins 'Box connectors' for testing purposes
+-- the box connectors do also provide the 4 lamp strobes ( driven by four P-Channel Mosfets, Testleds only! )
+--
+-- 5) solenoids
+-- 20 N-Channel MOSFETs (IRL540) driven by 74HCT540 (inverter)
+-- The 74HCT540 enable signal for the solenoids is driven by a 74HCT541 ( non inverting)
+-- onboard fuseholders for 2A slow blow fuses
+--
+-- 6) auxilary board interface
+-- interface to original Atari auxilary board ( Lamp strobes, Audio, Audio latches, coin door switches input)
+-- output signals driven by 74HCT540 (inverter), enable via 'solenoids_enable' (routed through the 74HCT541)
+--
+-- 7) FRAM
+-- I2C FRAM chip (FM24CL64B-GTR) for saving highscores ( Atari do not have a CMOS battery backup)
+--
+-- 8) integrated sound
+-- additional to the sound on Atari auxilary board AtariFA do provide an internal soundcard
+-- with an audio amplifier (TDA7267) and an MP3-Mini-Player for Background audio
+--
+-- 9) ESP32-C3 interface 
+-- AtariFA do provide an optional serial interface for an ESP32-C3 ( ESP32-C3 Supper Mini )
+-- The ESP32 will provide a Web Interface for easy testing
+--
+-- 10) debug ports
+-- 8 debug ports via 10pin connector for direct connecting Logic Analyzer
+--
 
--- from pinmame Atari.c
------------------------------------------
---  Memory map for CPU board (GENERATION 1)
------------------------------------------
---static MEMORY_READ_START(ATARI1_readmem)
---{0x0000,0x01ff, ram_r},			/* RAM */
---{0x0200,0x0200,	MRA_ROM},		/* fake NVRAM */
---{0x1080,0x1080,	latch1080_r},	/* read latches */
---{0x1084,0x1084,	latch1084_r},	/* read latches */
---{0x1088,0x1088,	latch1088_r},	/* read latches */
---{0x108c,0x108c,	latch108c_r},	/* read latches */
---{0x2000,0x200f,	dipg1_r},		/* dips */
---{0x2010,0x204f,	swg1_r},		/* inputs */
---{0x7000,0x7fff,	MRA_ROM},		/* ROM */
---{0xf000,0xffff,	MRA_ROM},		/* reset vector */
---MEMORY_END
+-- version for AtariFA PCB
 
---static MEMORY_WRITE_START(ATARI1_writemem)
---{0x0000,0x01ff, ram_w, &ram},	/* RAM */
---{0x0200,0x0200,	MWA_RAM, &generic_nvram, &generic_nvram_size},	/* fake NVRAM */
---{0x1000,0x107f, ram_w},			/* RAM mirror, on Middle Earth only */
---{0x1080,0x1080,	latch1080_w},	/* solenoids */
---{0x1081,0x1083, ram_w1},		/* RAM mirror, on Middle Earth only */
---{0x1084,0x1084,	latch1084_w},	/* solenoids */
---{0x1085,0x1087, ram_w2},		/* RAM mirror, on Middle Earth only */
---{0x1088,0x1088,	latch1088_w},	/* solenoids */
---{0x1089,0x108b, ram_w3},		/* RAM mirror, on Middle Earth only */
---{0x108c,0x108c,	latch108c_w},	/* solenoids */
---{0x108d,0x11ff, ram_w4},		/* RAM mirror, on Middle Earth only */
---{0x2000,0x200f,	dipg1_w},		/* dip switch memory area is written to by code */
---{0x3000,0x3000,	soundg1_w},		/* audio enable */
---{0x4000,0x4000,	watchdog_w},	/* watchdog reset? */
---{0x508c,0x508c,	latch508c_w},	/* additional solenoids, on Time 2000 only */
---{0x6000,0x6000,	audiog1_w},		/* audio reset */
---{0xffff,0xffff,	MWA_NOP},		/* Middle Earth writes here */
---MEMORY_END
-	
--- atarigames.c
--------------------------------------------------------------------
--- Middle Earth (02/1978)
--------------------------------------------------------------------
---INITGAME1(midearth, atari_disp1, FLIPSW1920, 1, 2)
---ATARI_2_ROMSTART(midearth,      "608.bin",      CRC(28b92faf) SHA1(8585770f4059049f1dcbc0c6ef5718b6ff1a5431),
---                                                        "609.bin",      CRC(589df745) SHA1(4bd3e4f177e8d86bab41f3a14c169b936eeb480a))
---ATARI_SNDSTART("82s130.bin", CRC(da1f77b4) SHA1(b21fdc1c6f196c320ec5404013d672c35f95890b))
---ATARI_ROMEND
---CORE_GAMEDEFNV(midearth,"Middle Earth",1978,"Atari",gl_mATARI1A,0)
 
--- atari.h	
---NOTE: E00 should be loaded lower in memory,
---           so we load it first - easier than changing each entry in atarigames.c*/
---#define ATARI_2_ROMSTART(name, n1, chk1, n2, chk2) \
---   ROM_START(name) \
---     NORMALREGION(0x10000, ATARI_MEMREG_CPU) \
---       ROM_LOAD(n2, 0x7000, 0x0800, chk2) \
---       ROM_LOAD(n1, 0x7800, 0x0800, chk1) \
---         ROM_RELOAD(0xf800, 0x0800)
-
---#define ATARI_SNDSTART(n1, chk1) \
---     NORMALREGION(0x1000, REGION_SOUND1) \
---       ROM_LOAD_NIB_LOW(n1, 0x0000, 0x0200, chk1)
 
 LIBRARY ieee;
 USE ieee.std_logic_1164.all;
@@ -81,79 +79,61 @@ use work.instruction_buffer_type.all;
 
 entity AtariFA is
 	port(		
-		-- GottFA3 Testboard		
-		SEG7		: out 	std_logic_vector(3 downto 0);
-		LED_D1 	: out STD_LOGIC;	-- E9
-		LED_D2 	: out STD_LOGIC;  -- F7
-		LED_D3 	: out STD_LOGIC;	-- C6
-		
-	   -- the FPGA board
-		clk_50	: in std_logic; 	-- E1
-		reset_l  : in std_logic; 	-- K6
-		LED_FPGA		: out std_logic; 	-- J6 (on FPGA board, do not use)
-		-- sram
-		BUFFER_E_N		: out std_logic; -- 74HC541 buffer control
-		--BUFFER_DATA		: out std_logic_vector(7 downto 0); -- data out (for buffer)
-		BUFFER_DATA		: buffer std_logic_vector(7 downto 0); -- data out (for buffer)
-		
-		--SRAM_ADDR	: out std_logic_vector(17 downto 0); -- address 
-		SRAM_ADDR	: buffer std_logic_vector(17 downto 0); -- address 
-		SRAM_CE_N   : out std_logic; -- chip select					
-		SRAM_OE_N   : out std_logic; -- output enable
-		--SRAM_WE_N   : out std_logic; -- write enable		
-		SRAM_WE_N   : buffer std_logic; -- write enable		
-		SRAM_IO     : in std_logic_vector(7 downto 0); -- data in
-		
-		-- integrated sound
-		Audio_O	: out std_logic; 	-- A14
-		DFP_tx	: out std_logic; 	-- D15
 
-		-- WillFA DIAG Interface
-		Diag_Seg_1		: out 	std_logic_vector(6 downto 0);
-		Diag_Seg_2		: out 	std_logic_vector(5 downto 0);
-		Diag_option		: in std_logic;
 		
-		-- SPI SD card & EEprom
-		CS_SDcard	: 	buffer 	std_logic; 
-		CS_EEprom	: 	buffer 	std_logic;
-		MOSI			: 	out 	std_logic;
-		MISO			: 	in 	std_logic;
-		SPI_CLK			: 	out 	std_logic;
-						
-		--display
+	   -- 1) general
+		clk_50	: in std_logic;
+		reset_l  : in std_logic;
+		LED_D1 	: out STD_LOGIC; -- active low
+		LED_D2 	: out STD_LOGIC; -- active low
+		LED_D3 	: out STD_LOGIC; -- active low
+		-- 3 dips game select; 3 dips options
+		game_select : in 	std_logic_vector(2 downto 0);
+		options		: in 	std_logic_vector(1 to 3);
+
+		-- 2) display interface
 		disp_Data: out 	std_logic_vector(3 downto 0);
 		disp_Adr: out 	std_logic_vector(6 downto 0);
 		disp_Load			: 	out 	std_logic;
 		disp_Cathode_blank			: 	out 	std_logic;
 		disp_Anode_blank			: 	out 	std_logic;
 
-		-- lamps (Phase B) - cascade of 11x TPIC6B595N, see lamp_driver.vhd
-		-- TODO: enable together with lamp_driver instance below; assign real pins in .qsf
-		--lamp_ser			: 	out 	std_logic;   -- serial data to chain
-		--lamp_srck			: 	out 	std_logic;   -- shift register clock
-		--lamp_rck			: 	out 	std_logic;   -- storage/latch clock
-		--lamp_g_n			: 	out 	std_logic;   -- output enable, active low
-
-		--switches
-		switch: in 	std_logic_vector(16 downto 1);			
+		-- 3) switches
+		sw_strobe: out 	std_logic_vector(3 downto 0);
+		sw_com: out 	std_logic_vector(2 downto 0);
+		sw_com_in: in std_logic;
 		
-		--dips 		
-		options		: in 	std_logic_vector(7 downto 0);
+		-- 4) lamps
+		serin_595			: 	out 	std_logic;
+		clk_595			: 	out 	std_logic;
+		rclk_595			: 	out 	std_logic;
+		oe_595			: 	out 	std_logic; -- active low
+		
+		-- 5) solenoids
+		solenoids		: out 	std_logic_vector(1 to 20);
+		solenoids_enable		: out std_logic;
+		
+		-- 6) auxilary board interface
+		aux_lamp_strobe: out 	std_logic_vector(1 downto 0);
+		aux_audio: out 	std_logic_vector(3 downto 0);
+		aux_audio_latch: out 	std_logic_vector(5 downto 0);
+		
+		-- 7) FRAM
+		fram_i2c_sda		: inout std_logic;  -- I2C SDA: bidirektional/open-drain (ACK + Read-Back)
+		fram_i2c_scl		: out std_logic;
+		
+		-- 8) integrated sound
+		SB_Audio	: out std_logic;
+		SB_Sound	: out std_logic;
 
-		-- DEBug
-		--debug_addr	: out std_logic_vector(15 downto 0);
-		--debug_data	: out std_logic_vector(7 downto 0);
-		--only 8 debug signals possible with my LA
+		-- 9) ESP32-C3 interface 
+		ESP32_ser_tx	: in std_logic;				
+		ESP32_ser_rx	: out std_logic;				
+		ESP32_sig   	: out std_logic;				
+
+		-- 10) debug ports
 		debug_signal	: out std_logic_vector(7 downto 0)
---debug_signal(0) - G2
---debug_signal(1) - G1
---debug_signal(2) - F2
---debug_signal(3) - F1
---debug_signal(4) - D3
---debug_signal(5) - D1
---debug_signal(6) - C2
---debug_signal(7) - C3
-
+		
 		);
 end;
 
@@ -222,20 +202,13 @@ signal	display3			: DISPLAY_T;
 signal	display4			: DISPLAY_T;
 signal	status_d			: DISPLAY_TS;
 
--- lamp shadow buffer (Phase B) - filled by RAM 0x30-0x3F write-sniffer
--- 84 lamps used, 88 bits = 11x TPIC6B595N. Enable together with sniffer + instance below.
---signal	lamp_state			: std_logic_vector(87 downto 0) := (others => '0');
 
 -- Diagnose / Verifikation ---------------------------------------------------
 -- DISPLAY_TEST: true = disp_test 0→9-Zählmuster (unabhängig vom Game-Code)
 --               false = normaler Game-Betrieb (Write-Sniffer aus CPU-RAM)
 constant DISPLAY_TEST : boolean := false;
--- DIAG_SEL: wählt was SEG7 (GottFA3-Board, BCD-dekodiert) anzeigt
---   0 = cpu_addr(15:12): CPU-Adressregion (flackert 0/1=RAM,2=I/O,7=ROM; steht=CPU hängt)
---   1 = display1(0):     erstes Score-Nibble (8=Game schreibt 8; ≠8=Daten laufen/Display frei)
---   2 = status_d(0):     Credit/Match-Nibble (in Attract typisch ≠8)
---   3 = nvram_dout(3:0): NVRAM-Low-Nibble (zeigt ob Game 0x0200 beschreibt)
-constant DIAG_SEL : integer range 0 to 3 := 1;
+-- (DIAG_SEL/hex7seg entfernt: gehörten zum GottFA3-Testboard mit BCD-SEG7-Anzeige;
+--  die Zielplatine hat keinen SEG7-Port. Diagnose läuft hier über debug_signal/LEDs.)
 -- DBG_MODE: wählt Belegung debug_signal[7:0] am LA-Header
 --   0 = Standard-Mix (cpu_clk/vma/rw/ram_wren/NMI/wd_reset/dma_toggle/rom_cs)
 --   1 = cpu_addr(7:0)  — PC-Low-Byte; steht → hängt an diesem Offset in der Page
@@ -264,47 +237,9 @@ signal sw_sync        : std_logic_vector(16 downto 1) := (others => '1');
 -- Dekodierter Switch-Matrix-Wert für cpu_din (gedrückt=0xFF, idle=0x00, non-inverted laut PinMAME swg1_r)
 signal sw_value       : std_logic_vector(7 downto 0);
 
--- 4-bit Hex → 7-Segment-Decoder (bit0=a .. bit6=g, aktiv-HIGH)
--- Falls Diag-Display mit Common-Anode: Ausgabe invertieren
-function hex7seg(nibble : std_logic_vector(3 downto 0)) return std_logic_vector is
-begin
-	case nibble is
-		when "0000" => return "0111111"; -- 0
-		when "0001" => return "0000110"; -- 1
-		when "0010" => return "1011011"; -- 2
-		when "0011" => return "1001111"; -- 3
-		when "0100" => return "1100110"; -- 4
-		when "0101" => return "1101101"; -- 5
-		when "0110" => return "1111101"; -- 6
-		when "0111" => return "0000111"; -- 7
-		when "1000" => return "1111111"; -- 8
-		when "1001" => return "1101111"; -- 9
-		when "1010" => return "1110111"; -- A
-		when "1011" => return "1111100"; -- b
-		when "1100" => return "0111001"; -- C
-		when "1101" => return "1011110"; -- d
-		when "1110" => return "1111001"; -- E
-		when others => return "1110001"; -- F
-	end case;
-end function;
 -- ---------------------------------------------------------------------------
 
 begin
-
---debug
---debug_addr <= cpu_addr;
---debug_data <= cpu_din when cpu_rw='1' else cpu_dout;
---debug_signal(0) <= reset_l_stable;
---debug_signal(1) <= cpu_rw;
---debug_signal(2) <= ram_cs;
---debug_signal(3) <= cpu_rw;
---debug_signal(4) <= dma_int;
---debug_signal(5) <= dma_clk;
---debug_signal(6) <= cpu_clk;
-
--- Debug: vollständiger CPU-Bus auf Header (32 Pins, bereits in .qsf gepinnt)
---debug_addr  <= cpu_addr;
---debug_data  <= cpu_din when cpu_rw = '1' else cpu_dout;
 
 -- 8-Kanal-LA auf debug_signal[7:0] — Belegung per DBG_MODE-Konstante wählbar:
 -- DBG_MODE=0 (Standard-Mix):
@@ -347,30 +282,52 @@ LED_D2   <= not cpu_fetch_cnt(20); -- CPU-Fetch-Blinker ~0.6 Hz: blinkt = cpu68 
                                     -- (steht dauerhaft: CPU halted oder hängt ohne ROM-Zugriff)
 LED_D3   <= not nmi_blink_cnt(11); -- NMI-Generator-Blinker ~0.48 Hz: blinkt = HW-NMI-Takt läuft
                                     -- (unabhängig von CPU; Freilauf aus dma_counter)
-LED_FPGA <= '1'; --OFF
--- SEG7 (GottFA3-Board, 4-bit BCD-dekodiert): Diagnose-Anzeige, per DIAG_SEL umschaltbar
--- DIAG_SEL=0: cpu_addr(15:12)   — flackert 0/1=RAM,2=I/O,7=ROM; steht=CPU hängt
--- DIAG_SEL=1: display1(0)       — Score-Nibble P1; 8=Game schreibt 8; ≠8=Daten laufen
--- DIAG_SEL=2: status_d(0)       — Credit/Match (in Attract ≠8 erwartet)
--- DIAG_SEL=3: nvram_dout(3:0)   — NVRAM-Low-Nibble (≠0 = Game hat 0x0200 beschrieben)
-SEG7 <= cpu_addr(15 downto 12)  when DIAG_SEL = 0 else
-        display1(0)              when DIAG_SEL = 1 else
-        status_d(0)              when DIAG_SEL = 2 else
-        nvram_dout(3 downto 0);
 
-----output reversed because of 74HCT240 drivers
+----output reversed because of 74HCT540 drivers
 disp_Data <= not i_disp_Data;
 disp_Adr <= not i_disp_Adr;
 disp_Load <= not i_disp_Load;
 disp_Cathode_blank <= not i_disp_Cathode_blank;
 disp_Anode_blank <= not i_disp_Anode_blank;
 
--- Diag_Seg_1 (WillFA-Diag-Interface, 7-Segment a-g): CPU-Adressregion als Hex-Ziffer
--- Flackert bei laufender CPU (wechselt zwischen 0/1 RAM, 2 I/O, 7/F ROM)
--- Steht still: CPU hängt an der angezeigten Adresse (z.B. 'F' = ROM-Fetch-Loop)
--- Segment-Polarität: aktiv-high; bei common-anode-Display ggf. 'not' davor
-Diag_Seg_1 <= hex7seg(cpu_addr(15 downto 12));
-Diag_Seg_2 <= (others => '0');
+------------------------------------------------------------------------------
+-- Sichere Inaktiv-Pegel fuer noch nicht implementierte Ausgaenge (Phase B/C).
+-- Ohne diese Zuweisungen zieht Quartus undriven Outputs auf '0'. Ueber den
+-- INVERTIERENDEN 74HCT540 wuerde '0' die Solenoid-MOSFETs EINschalten. Daher
+-- jeden ungenutzten Ausgang explizit inaktiv treiben, damit die Platine schon
+-- vor der Phase-B/C-Verdrahtung sicher ist.
+------------------------------------------------------------------------------
+-- Solenoide: invertierender 74HCT540 -> FPGA '1' => 540-Ausgang '0' => Gate low => MOSFET AUS.
+-- Das ist der harte Sicherheitsnetz-Pegel, unabhaengig vom Enable.
+solenoids        <= (others => '1');
+-- solenoids_enable: laeuft ueber den NICHT invertierenden 74HCT541 an die active-low
+-- /OE der 74HCT540 (Solenoid-MOSFETs UND Aux-Board). '1' => /OE high => 540 disabled
+-- (hochohmig) => Gate-Pulldowns halten MOSFETs AUS, Aux-Ausgaenge inaktiv.
+solenoids_enable <= '1';
+-- Lampentreiber (TPIC6B595): oe_595 ist aktiv-low -> '1' = Ausgaenge disabled.
+oe_595    <= '1';
+serin_595 <= '0';
+clk_595   <= '0';
+rclk_595  <= '0';
+-- Switch-Matrix-Strobes (Phase B): Idle
+sw_strobe <= (others => '0');
+sw_com    <= (others => '0');
+-- Aux-Board (ueber invertierenden 74HCT540, gated von solenoids_enable): solange der
+-- 540 disabled ist, definieren die aux-seitigen Pulls den Pegel; Werte hier nur Idle.
+aux_lamp_strobe <= (others => '0');
+aux_audio       <= (others => '0');
+aux_audio_latch <= (others => '0');
+-- Integrierter Sound (Phase C): Idle
+SB_Audio <= '0';
+SB_Sound <= '0';
+-- FRAM I2C: Open-Drain im Leerlauf freigeben (externer Pull-up zieht high); SCL idle high.
+fram_i2c_sda <= 'Z';
+fram_i2c_scl <= '1';
+-- ESP32-Link: UART-Leitung ruht HIGH; Signalpin Idle low.
+ESP32_ser_rx <= '1';
+ESP32_sig    <= '0';
+------------------------------------------------------------------------------
+
 
 BM: entity work.boot_message
 port map(
@@ -391,18 +348,6 @@ port map(
 	status_d	=> status_d
 	);
 	
--- lamp driver (Phase B): shift lamp_state out to 11x TPIC6B595N cascade
--- enable together with lamp_state signal, sniffer process and lamp_* ports above
---LD: entity work.lamp_driver
---port map(
---	clk_50     => clk_50,
---	reset      => reset_h,
---	lamp_state => lamp_state,
---	ser        => lamp_ser,
---	srck       => lamp_srck,
---	rck        => lamp_rck,
---	g_n        => lamp_g_n
---	);
 
 gen_disptest : if DISPLAY_TEST generate
 DT: entity work.disp_test
@@ -566,31 +511,6 @@ begin
 end process;
 end generate gen_gamedisp;
 
--- lamp shadow buffer (Phase B): sniff CPU writes to lamp RAM 0x30-0x3F
--- 16 bytes x 8 bit = 128 possible lamps, 84 used. Linear byte->bit mapping here;
--- physical lamp# <-> bit assignment is HW fine-tuning (cf. PinMAME col formula
--- col = (offset%4)*2 + offset/8). Enable together with lamp_state signal + instance.
---process(clk_50)
---begin
---	if rising_edge(clk_50) then
---		if ram_wren = '1' and cpu_addr(8 downto 4) = "00011" then  -- 0x30..0x3F
---			case cpu_addr(3 downto 0) is
---				when "0000" => lamp_state(7   downto 0)  <= cpu_dout;  -- 0x30
---				when "0001" => lamp_state(15  downto 8)  <= cpu_dout;  -- 0x31
---				when "0010" => lamp_state(23  downto 16) <= cpu_dout;  -- 0x32
---				when "0011" => lamp_state(31  downto 24) <= cpu_dout;  -- 0x33
---				when "0100" => lamp_state(39  downto 32) <= cpu_dout;  -- 0x34
---				when "0101" => lamp_state(47  downto 40) <= cpu_dout;  -- 0x35
---				when "0110" => lamp_state(55  downto 48) <= cpu_dout;  -- 0x36
---				when "0111" => lamp_state(63  downto 56) <= cpu_dout;  -- 0x37
---				when "1000" => lamp_state(71  downto 64) <= cpu_dout;  -- 0x38
---				when "1001" => lamp_state(79  downto 72) <= cpu_dout;  -- 0x39
---				when "1010" => lamp_state(87  downto 80) <= cpu_dout;  -- 0x3A (last used: bit 83)
---				when others => null;                                   -- 0x3B..0x3F unused (>84 lamps)
---			end case;
---		end if;
---	end if;
---end process;
 
 -- RAM -- 0x0000-0x01FF (512 Byte); 0x0200 ist 1-Byte-NVRAM-Register (s.o., nvram_dout)
 RAM: entity work.RAM --512byte
@@ -642,11 +562,6 @@ port map(
 	c0	=> cpu_clk
 );
 
---clock_gen: entity work.cpu_clk_gen
---port map(   
---	clk_in => clk_50,
---	clk_out	=> cpu_clk
---);
 
 META1: entity work.Cross_Slow_To_Fast_Clock
 port map(
@@ -654,16 +569,6 @@ port map(
 	o_Q => reset_l_stable,
    i_Fast_Clk => clk_50
 	);
-
-------------------------------
--- Taster-Synchronizer (2-FF, clk_50-Domäne, B4 für switch[1..4])
-------------------------------
-process(clk_50) begin
-  if rising_edge(clk_50) then
-    sw_meta <= switch;   -- 1. FF: metastability capture
-    sw_sync <= sw_meta;  -- 2. FF: stable in clk_50
-  end if;
-end process;
 
 ------------------------------
 -- Diagnose-Prozesse
