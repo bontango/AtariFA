@@ -161,6 +161,15 @@ signal rom1_cs			: std_logic;
 signal rom2_dout		: std_logic_vector(7 downto 0);
 signal rom2_cs			: std_logic;
 
+-- Game-Select: 5 Spiele gleichzeitig im BRAM, ROM1/ROM2-Ausgang per Mux gewaehlt.
+-- game_select ist active-low (10K-Pullup an 3,3V, Schalter gegen GND; ON=geschlossen='0').
+-- Annahme: Schalter1 = game_select(0) = LSB  ->  game_idx = not game_select.
+type rom_byte_array is array(0 to 4) of std_logic_vector(7 downto 0);
+signal rom1_douts	: rom_byte_array;   -- 0=Atarians 1=Time 2=Airborne 3=MiddleEarth 4=SpaceRiders
+signal rom2_douts	: rom_byte_array;
+signal game_idx		: integer range 0 to 7;
+signal game_sel		: integer range 0 to 4;   -- geklemmt: unbenutzte Codes 5..7 -> 3 (Middle Earth)
+
 signal dma_clk		: std_logic;
 signal audio_clk		: std_logic;
 signal dma_int		: std_logic;
@@ -523,20 +532,39 @@ port map(
 );
 
 
---Middle Earth 608
-E0_ROM: entity work.ROM1 --2K 0x7800, 0x0800 & 0xf800, 0x0800
-port map(
-	address	=> cpu_addr(10 downto 0),
-	clock		=> clk_50,
-	q			=> rom1_dout
-	);
+-- ============================================================
+-- Game-Select ROMs: 5 Spiele x ROM1 (E0, 0x7800/0xF800) + ROM2 (E00, 0x7000),
+-- je 2K x 8. Alle gleichzeitig im BRAM; der aktive Ausgang wird unten gemuxt.
+-- ============================================================
+-- ROM1-Slot (E0)
+E0_ATARIAN : entity work.game_rom generic map(init_file => "./rom/atarian.e0.hex")
+	port map(address => cpu_addr(10 downto 0), clock => clk_50, q => rom1_douts(0));
+E0_TIME    : entity work.game_rom generic map(init_file => "./rom/time.e0.hex")
+	port map(address => cpu_addr(10 downto 0), clock => clk_50, q => rom1_douts(1));
+E0_AIRBORNE: entity work.game_rom generic map(init_file => "./rom/airborne.e0.hex")
+	port map(address => cpu_addr(10 downto 0), clock => clk_50, q => rom1_douts(2));
+E0_MIDEARTH: entity work.game_rom generic map(init_file => "./rom/608.hex")
+	port map(address => cpu_addr(10 downto 0), clock => clk_50, q => rom1_douts(3));
+E0_SPACE   : entity work.game_rom generic map(init_file => "./rom/spacel.hex")
+	port map(address => cpu_addr(10 downto 0), clock => clk_50, q => rom1_douts(4));
 
-E00_ROM: entity work.ROM2 --2K 0x7000, 0x0800
-port map(
-	address	=> cpu_addr(10 downto 0),
-	clock		=> clk_50,
-	q			=> rom2_dout
-);
+-- ROM2-Slot (E00)
+E00_ATARIAN : entity work.game_rom generic map(init_file => "./rom/atarian.e00.hex")
+	port map(address => cpu_addr(10 downto 0), clock => clk_50, q => rom2_douts(0));
+E00_TIME    : entity work.game_rom generic map(init_file => "./rom/time.e00.hex")
+	port map(address => cpu_addr(10 downto 0), clock => clk_50, q => rom2_douts(1));
+E00_AIRBORNE: entity work.game_rom generic map(init_file => "./rom/airborne.e00.hex")
+	port map(address => cpu_addr(10 downto 0), clock => clk_50, q => rom2_douts(2));
+E00_MIDEARTH: entity work.game_rom generic map(init_file => "./rom/609.hex")
+	port map(address => cpu_addr(10 downto 0), clock => clk_50, q => rom2_douts(3));
+E00_SPACE   : entity work.game_rom generic map(init_file => "./rom/spacer.hex")
+	port map(address => cpu_addr(10 downto 0), clock => clk_50, q => rom2_douts(4));
+
+-- Decode game_select (active-low) -> Index, unbenutzte Codes 5..7 -> Middle Earth (3)
+game_idx <= conv_integer(not game_select);
+game_sel <= game_idx when game_idx <= 4 else 3;
+rom1_dout <= rom1_douts(game_sel);
+rom2_dout <= rom2_douts(game_sel);
 
 
 U9: entity work.cpu68

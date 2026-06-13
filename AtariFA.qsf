@@ -66,8 +66,7 @@ set_global_assignment -name SDC_FILE AtariFA.sdc
 set_global_assignment -name VHDL_FILE display_test.vhd
 set_global_assignment -name VHDL_FILE slow_to_fast_clock.vhd
 set_global_assignment -name VHDL_FILE cpu68.vhd
-set_global_assignment -name QIP_FILE ROM2.qip
-set_global_assignment -name QIP_FILE ROM1.qip
+set_global_assignment -name VHDL_FILE game_rom.vhd
 set_global_assignment -name QIP_FILE RAM.qip
 set_global_assignment -name VHDL_FILE boot_message.vhd
 set_global_assignment -name VHDL_FILE watchdog.vhd

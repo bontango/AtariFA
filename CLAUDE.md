@@ -8,7 +8,16 @@ Quartus Prime **22.1std.2 Lite Edition**. GitHub: https://github.com/bontango/At
 
 ## Zielspiele
 Generische Gen1-Basis: Atarians, Time 2000, Airborne Avenger, Middle Earth, Space Riders.
-Aktuell ROM: Middle Earth 608/609 + 82s130 Sound-ROM.
+**Game-Select implementiert:** alle 5 Spiele liegen gleichzeitig im BRAM (je ROM1+ROM2 = 2K×8),
+Auswahl per `game_select` (3-Bit-DIP, **active-low**). Generischer Wrapper `game_rom.vhd`
+(altsyncram, init_file per Generic) 10× instanziiert; Ausgang per `game_idx = not game_select`
+gemuxt (`AtariFA.vhd`). BRAM 21/30 M9K (70 %). Sound-ROM 82s130 separat.
+- Decode: 0=Atarians, 1=Time, 2=Airborne, 3=Middle Earth (608/609, auch Fallback für 5–7),
+  4=Space Riders. **HW-Vorbehalt:** Schalter↔Bit-Reihenfolge (Annahme Schalter1=game_select[0]=LSB)
+  und Spielzuordnung auf Platine prüfen, im `case` leicht anzupassen.
+- **HEX-Init-Warnung 113009** („data too wide … wrapping to subsequent addresses") ist
+  **harmlos/format-inhärent**: Intel-HEX 32-Byte-Records (`:20…`) in 8-Bit-Speicher → korrekte
+  byteweise Befüllung. Tritt für ALLE rom/*.hex auf (auch das HW-erprobte 608/609).
 
 ## Wichtige Konventionen
 - VHDL: `use ieee.std_logic_unsigned.all` — kein `numeric_std` (würde Konflikte erzeugen)
