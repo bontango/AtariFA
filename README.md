@@ -29,12 +29,25 @@ simultaneously and are multiplexed — no reconfiguration needed to switch games
 
 ## Free play
 
-A free-play variant of each game is supported via the `options(3)` DIP (active-low).
+A free-play variant of each game is supported via the `freeplay` DIP (active-low).
 Instead of storing six additional 2 KB ROMs (which would not fit on the device), the few
 bytes that differ between the stock and free-play ROMs (42 bytes total across all games)
 are overlaid combinationally onto the ROM data path. This costs **zero additional block
 RAM**. The free-play ROM images live in `rom/freeplay/` as reference only; the patch table
 in `AtariFA.vhd` is generated and verified by `rom/freeplay/gen_patches.py`.
+
+## DIP configuration (10 switches)
+
+Configuration uses **10 DIP switches**: a 4-switch block (3× game select + 1× free-play) and a
+6-switch block (6× options).
+
+- The **first 6 DIPs** (3× game select + free-play + options 1–2) are read once at boot through a
+  3×2 strobe matrix. The FSM in `read_the_dips.vhd` temporarily repurposes the lamp shift-register
+  IOs `serin_595 / clk_595 / rclk_595` as matrix strobes (returns on `dip_ret`), then hands the pins
+  back to the lamp logic once boot is complete.
+- DIPs **7–10** (`options(3..6)`) are read directly from `dip_opt` and may be changed live during a game.
+- Boot is sequenced by `boot_phase`: phase 0 reads the DIPs, phase 1 (read done) releases the CPU
+  from reset.
 
 ## Target hardware
 
@@ -79,6 +92,7 @@ written to `output_files/`.
 | `AtariFA.vhd` | Top level: CPU integration, memory map, game select, free-play overlay |
 | `cpu68.vhd` | MC6800-compatible CPU core (John Kent) |
 | `game_rom.vhd` | Generic 2 K×8 ROM wrapper (init file via generic) |
+| `read_the_dips.vhd` | Boot-time DIP read FSM (3×2 strobe matrix on the lamp IOs) |
 | `cpu_clock.vhd` | PLL (50 MHz → 1 MHz CPU clock) |
 | `watchdog.vhd`, `slow_to_fast_clock.vhd`, `boot_message.vhd` | Support modules |
 | `lamp_driver.vhd` | Lamp matrix driver (TPIC6B595N) — present, activated in Phase B |

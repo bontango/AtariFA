@@ -18,12 +18,26 @@ gemuxt (`AtariFA.vhd`). BRAM 21/30 M9K (70 %). Sound-ROM 82s130 separat.
 - **HEX-Init-Warnung 113009** („data too wide … wrapping to subsequent addresses") ist
   **harmlos/format-inhärent**: Intel-HEX 32-Byte-Records (`:20…`) in 8-Bit-Speicher → korrekte
   byteweise Befüllung. Tritt für ALLE rom/*.hex auf (auch das HW-erprobte 608/609).
-- **Freispiel-Option** (`options(3)`, active-low): statt 6 zweite ROMs (=+12 M9K, passt nicht)
-  werden die nur **42 geänderten Bytes** kombinatorisch überlagert (`fp_overlay`-Prozess +
-  Konstante `FP_PATCHES` in `AtariFA.vhd`) → **0 zusätzliches BRAM** (bleibt 21/30 M9K).
+- **Freispiel-Option** (Signal `freeplay`, active-low; früher `options(3)`): statt 6 zweite ROMs
+  (=+12 M9K, passt nicht) werden die nur **42 geänderten Bytes** kombinatorisch überlagert
+  (`fp_overlay`-Prozess + Konstante `FP_PATCHES` in `AtariFA.vhd`) → **0 zusätzliches BRAM** (bleibt 21/30 M9K).
   Quelle der Patches: Diff `rom/<orig>` vs `rom/freeplay/<orig+f>.hex` (Freeplay-Hex nur Referenz,
   NICHT synthetisiert). Validiert: Basis+Patch == Freeplay-ROM byte-exakt. Ersetzte ROM je Spiel:
   Atarians/Time/MiddleEarth=ROM2, Airborne=ROM1, Space Riders=ROM1+ROM2.
+
+## DIP-Konfiguration (10 Schalter, 2026-06-17)
+Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freeplay`; **6er-Block** = 6× `options`.
+- **Boot-Read-Matrix:** die **ersten 6 DIPs** (3 game_select + freeplay + options(1..2)) werden im Boot
+  über eine 3×2-Strobe-Matrix eingelesen — FSM in `read_the_dips.vhd`, die die Lampen-IOs
+  `serin_595/clk_595/rclk_595` als Strobes **zweckentfremdet** (`dip_ret(0..1)` = Rückleitungen).
+- **Direkt-Read:** DIPs 7–10 = `options(3..6)` über Top-Port `dip_opt(1..4)` direkt (im Spiel dynamisch änderbar).
+- **Boot-Phasen** (`boot_phase`, 4 Bit, weitere geplant): `boot_phase(0)` = sync. `reset_sw` **und** FSM-Reset;
+  `boot_phase(1)` = FSM-`done` → `reset_l_stable` (CPU-Release). Strobe-Mux gated auf **`boot_phase(1)='0'`**
+  (DIP-Read-Fenster), danach gehen die Pins an die Lampen-Logik. FSM-Start zusätzlich über `por_active`
+  gated (Read erst nach PLL-Lock). **`options`/`SW_MAIN/SUB1/SUB2`** sind reserviert (noch nicht gelesen).
+- **Pin-Umbenennung:** Top-Ports `game_select`/`options`/`reset_l` → `dip_ret`/`dip_opt`/`reset_sw`
+  (siehe `AtariFA.qsf`). **Loose End:** `AtariFA.sdc(39)` referenziert noch `reset_l` (jetzt `reset_sw`)
+  → `set_false_path` wird ignoriert (Warning 332174), bei nächstem SDC-Durchgang nachziehen.
 
 ## Wichtige Konventionen
 - VHDL: `use ieee.std_logic_unsigned.all` — kein `numeric_std` (würde Konflikte erzeugen)
@@ -41,7 +55,10 @@ gemuxt (`AtariFA.vhd`). BRAM 21/30 M9K (70 %). Sound-ROM 82s130 separat.
 - **Synchroner 9-Bit-Zähler** statt 3× SN7493-Ripple-Kaskade; NMI-Periode = 512 cpu_clk = 512 µs
 
 ## Offene Bugs (bewusst zurückgestellt)
-- **B4**: Async-Inputs ohne Synchronizer — `switch[1..4]` haben jetzt 2-FF-Sync (`sw_meta`/`sw_sync`, clk_50); `switch[5..16]` und `options[]` noch ohne (Phase D)
+- **B4**: Async-Inputs ohne Synchronizer — `sw_meta`/`sw_sync` (2-FF, clk_50) sind deklariert und werden
+  gelesen (Test/Coin1/Coin2/Start), aber der **Sync-Prozess fehlt aktuell** → `sw_sync` bleibt konstant
+  `'1'` (idle), Switch-Eingänge wirkungslos (Warning 10540, nur als Kommentar vermerkt). Switch-Design
+  wird ohnehin an die neue AtariFA-HW angepasst (Phase B); `switch[5..16]`/`options[]`/`dip_*` ebenfalls offen.
 - **B5**: ✓ adressiert — alle unimplementierten Ausgänge auf sicheren Inaktiv-Pegel getrieben (s.o. „Sichere Inaktiv-Pegel"). Offen nur noch echte Logik in Phase B/C.
 - **B10–B12**: ✓ Teil-Cleanup — `DIAG_SEL`+`hex7seg` (GottFA3-SEG7-Reste) entfernt, `cpu_clk_gen.vhd` aus `.qsf` (toter Code; PLL `cpu_clock` wird genutzt). Display-Signal-Ownership noch offen.
 

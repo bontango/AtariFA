@@ -14,7 +14,8 @@
 -- 1) general on board components
 -- reset switch ( parallel to FPGA board switch)
 -- 3 LEDs for status ( parallel to FPGA board LEDs)
--- 6 DIP switch bank for rom/game selection
+-- 10 DIP switches: 4er bank (3 game select + 1 freeplay) + 6er bank (options)
+--   first 6 DIPs read at boot via 3x2 strobe matrix (read_the_dips), last 4 (options 3..6) read directly
 --
 -- 2) display interface ( 4 x 6digit 7segment & 1 x 4digit 7segment )
 -- interface to original Atari displays ( score & status)
@@ -83,13 +84,15 @@ entity AtariFA is
 		
 	   -- 1) general
 		clk_50	: in std_logic;
-		reset_l  : in std_logic;
+		reset_sw  : in std_logic;
 		LED_D1 	: out STD_LOGIC; -- active low
 		LED_D2 	: out STD_LOGIC; -- active low
 		LED_D3 	: out STD_LOGIC; -- active low
-		-- 3 dips game select; 3 dips options
-		game_select : in 	std_logic_vector(2 downto 0);
-		options		: in 	std_logic_vector(1 to 3);
+		
+		-- 4 DIPs bank game select; 6 DIPs bank options
+		-- first 6 DIPs matrix, last 4 DIPs direct
+		dip_ret: in	std_logic_vector(1 downto 0);
+		dip_opt: in	std_logic_vector(1 to 4);
 
 		-- 2) display interface
 		disp_Data: out 	std_logic_vector(3 downto 0);
@@ -104,9 +107,9 @@ entity AtariFA is
 		sw_com_in: in std_logic;
 		
 		-- 4) lamps
-		serin_595			: 	out 	std_logic;
-		clk_595			: 	out 	std_logic;
-		rclk_595			: 	out 	std_logic;
+		serin_595			: 	out 	std_logic; -- DIP strobe1 while boot_phase(1)='0' (DIP read window), else lamp serin
+		clk_595			: 	out 	std_logic; -- DIP strobe2 while boot_phase(1)='0' (DIP read window), else lamp clk
+		rclk_595			: 	out 	std_logic; -- DIP strobe3 while boot_phase(1)='0' (DIP read window), else lamp rclk
 		oe_595			: 	out 	std_logic; -- active low
 		
 		-- 5) solenoids
@@ -139,6 +142,12 @@ end;
 
 architecture rtl of AtariFA is 
 
+-- SW version (reserved): not yet read anywhere. Intended to be made readable later
+-- (e.g. via a DIP/debug read address or the ESP32 link) so software can query the version.
+constant SW_MAIN : std_logic_vector(3 downto 0) := x"0";
+constant SW_SUB1 : std_logic_vector(3 downto 0) := x"0";
+constant SW_SUB2 : std_logic_vector(3 downto 0) := x"2";
+
 --internal signals via logic
 signal reset_h		: 	std_logic;
 signal reset_l_stable	:	std_logic; 
@@ -161,6 +170,18 @@ signal rom1_cs			: std_logic;
 signal rom2_dout		: std_logic_vector(7 downto 0);
 signal rom2_cs			: std_logic;
 
+-- helpers DIP read & boot phase
+signal dip_strobe  : std_logic_vector(2 downto 0);
+signal g_serin_595 : std_logic := '0';
+signal g_clk_595 : std_logic := '0';
+signal g_rclk_595 : std_logic := '0';
+signal boot_phase	: 	std_logic_vector(3 downto 0) := "0000";
+signal game_select : std_logic_vector(2 downto 0);
+signal freeplay 	 : std_logic;
+-- options(1..2) from matrix (read_the_dips), options(3..6) direct from dip_opt.
+-- Reserved for future use (Phase B/C) -- currently assigned but not yet read anywhere.
+signal options		 : std_logic_vector(1 to 6);
+
 -- Game-Select: 5 Spiele gleichzeitig im BRAM, ROM1/ROM2-Ausgang per Mux gewaehlt.
 -- game_select ist active-low (10K-Pullup an 3,3V, Schalter gegen GND; ON=geschlossen='0').
 -- Annahme: Schalter1 = game_select(0) = LSB  ->  game_idx = not game_select.
@@ -173,7 +194,7 @@ signal game_idx		: integer range 0 to 7;
 signal game_sel		: integer range 0 to 4;   -- geklemmt: unbenutzte Codes 5..7 -> 3 (Middle Earth)
 
 -- Freispiel-Overlay: statt 6 zweite ROMs (=+12 M9K, passt nicht) werden die wenigen
--- gepatchten Bytes kombinatorisch ueberlagert, wenn options(3)=Freispiel aktiv (active-low).
+-- gepatchten Bytes kombinatorisch ueberlagert, wenn freeplay=Freispiel aktiv (active-low).
 -- 42 Bytes, Quelle: Diff rom/<orig> vs rom/freeplay/<orig+f> (validiert: Basis+Patch == Freeplay-ROM).
 type fp_patch_t is record
 	game : integer range 0 to 4;     -- 0=Atarians 1=Time 2=Airborne 3=MiddleEarth 4=SpaceRiders
@@ -274,6 +295,10 @@ signal por_active     : std_logic := '1';
 
 -- Taster-Synchronizer (2-FF, clk_50-Domäne) — adressiert B4 für die genutzten Eingänge
 -- switch[1]=Test, switch[2]=Coin1, switch[3]=Coin2, switch[4]=Start (aktiv-LOW, Pull-up idle='1')
+-- HINWEIS: Der 2-FF-Sync-Prozess (sw_meta->sw_sync aus den HW-Switch-Eingängen) ist in dieser
+-- Version NICHT vorhanden -> sw_sync bleibt konstant auf Default (alle '1' = idle), die Switch-
+-- Eingänge (Test/Coin1/Coin2/Start) sind damit aktuell wirkungslos (Quartus-Warning 10540).
+-- Bewusst offen: das Switch-Design muss ohnehin an die neue AtariFA-HW angepasst werden (Phase B).
 signal sw_meta        : std_logic_vector(16 downto 1) := (others => '1');
 signal sw_sync        : std_logic_vector(16 downto 1) := (others => '1');
 -- Dekodierter Switch-Matrix-Wert für cpu_din (gedrückt=0xFF, idle=0x00, non-inverted laut PinMAME swg1_r)
@@ -313,7 +338,7 @@ gen_dbg2: if DBG_MODE = 2 generate
 end generate gen_dbg2;
 
 -------------------------------
-
+reset_l_stable <= boot_phase(1); --may be set higher if new boot phases added
 reset_h <= (not reset_l_stable) or por_active;
    -- WD deliberately disconnected: Game kickt 0x4000 nicht im Attract Mode → permanenter Reset-Loop.
    -- Reaktivieren (or wd_reset) sobald Kick-Bedingung aus Schaltplan/ROM-Disassembly bekannt.
@@ -324,6 +349,37 @@ LED_D2   <= not cpu_fetch_cnt(20); -- CPU-Fetch-Blinker ~0.6 Hz: blinkt = cpu68 
                                     -- (steht dauerhaft: CPU halted oder hängt ohne ROM-Zugriff)
 LED_D3   <= not nmi_blink_cnt(11); -- NMI-Generator-Blinker ~0.48 Hz: blinkt = HW-NMI-Takt läuft
                                     -- (unabhängig von CPU; Freilauf aus dma_counter)
+
+-- use some IOs to read dips at start
+-- Route the matrix strobes to the lamp IOs only DURING the DIP read window.
+-- Gate on boot_phase(1) (= read_the_dips 'done'): '0' while reading, '1' once finished.
+-- (Gating on boot_phase(0) was wrong: boot_phase(0) is the synchronized reset_sw AND the
+--  FSM reset, so the FSM only runs when boot_phase(0)='1' -- exactly when the old mux routed
+--  g_*_595 instead of dip_strobe, so the strobes never reached the pins.)
+serin_595 <= dip_strobe(0) when boot_phase(1) = '0' else g_serin_595;
+clk_595 <= dip_strobe(1) when boot_phase(1) = '0' else g_clk_595;
+rclk_595 <= dip_strobe(2) when boot_phase(1) = '0' else g_rclk_595;
+options(3 to 6) <= dip_opt(1 to 4);
+RDIPS: entity work.read_the_dips
+port map(
+	clk_in		=> cpu_clk,
+	-- Hold the DIP-read FSM in reset during boot_phase(0)=0 AND during power-on-reset,
+	-- so the (terminal) DIP latch happens only after the PLL has locked and inputs settled.
+	i_Rst_L  => boot_phase(0) and not por_active,
+	--output 
+	game_select	=> game_select,
+	freeplay => freeplay,
+	game_option	=> options(1 to 2),
+	-- strobes
+	dip_strobe => dip_strobe,
+	-- input
+	return1 => dip_ret(0),
+	return2 => dip_ret(1),
+	-- signal when finished
+	done	=> boot_phase(1) -- set to '1' when reading dips is done
+);		
+
+
 
 ----output reversed because of 74HCT540 drivers
 disp_Data <= not i_disp_Data;
@@ -348,9 +404,9 @@ solenoids        <= (others => '1');
 solenoids_enable <= '1';
 -- Lampentreiber (TPIC6B595): oe_595 ist aktiv-low -> '1' = Ausgaenge disabled.
 oe_595    <= '1';
-serin_595 <= '0';
-clk_595   <= '0';
-rclk_595  <= '0';
+g_serin_595 <= '0';
+g_clk_595   <= '0';
+g_rclk_595  <= '0';
 -- Switch-Matrix-Strobes (Phase B): Idle
 sw_strobe <= (others => '0');
 sw_com    <= (others => '0');
@@ -599,16 +655,16 @@ game_sel <= game_idx when game_idx <= 4 else 3;
 rom1_sel <= rom1_douts(game_sel);
 rom2_sel <= rom2_douts(game_sel);
 
--- Freispiel-Overlay: bei options(3)=0 (active-low) die gepatchten Bytes ueberlagern.
+-- Freispiel-Overlay: bei freeplay=0 (active-low) die gepatchten Bytes ueberlagern.
 -- Default ist der rohe Game-Mux-Ausgang; Bus-Mux (rom1_cs/rom2_cs) bleibt unveraendert.
-fp_overlay : process(rom1_sel, rom2_sel, cpu_addr, game_sel, options)
+fp_overlay : process(rom1_sel, rom2_sel, cpu_addr, game_sel, freeplay)
 	variable a  : integer range 0 to 2047;
 	variable d1 : std_logic_vector(7 downto 0);
 	variable d2 : std_logic_vector(7 downto 0);
 begin
 	d1 := rom1_sel;
 	d2 := rom2_sel;
-	if options(3) = '0' then                       -- Freispiel aktiv (active-low)
+	if freeplay = '0' then                       -- Freispiel aktiv (active-low)
 		a := conv_integer(cpu_addr(10 downto 0));
 		for i in FP_PATCHES'range loop
 			if FP_PATCHES(i).game = game_sel and FP_PATCHES(i).addr = a then
@@ -648,11 +704,14 @@ port map(
 	c0	=> cpu_clk
 );
 
-
+-----------------------------------------------
+-- phase 0: activated by switch on FPGA board	
+-- read first time dip settings which sets boot phase 1
+-----------------------------------------------
 META1: entity work.Cross_Slow_To_Fast_Clock
 port map(
-   i_D => reset_l,
-	o_Q => reset_l_stable,
+   i_D => reset_sw,
+	o_Q => boot_phase(0),
    i_Fast_Clk => clk_50
 	);
 
