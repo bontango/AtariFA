@@ -32,9 +32,19 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
   `serin_595/clk_595/rclk_595` als Strobes **zweckentfremdet** (`dip_ret(0..1)` = Rückleitungen).
 - **Direkt-Read:** DIPs 7–10 = `options(3..6)` über Top-Port `dip_opt(1..4)` direkt (im Spiel dynamisch änderbar).
 - **Boot-Phasen** (`boot_phase`, 4 Bit, weitere geplant): `boot_phase(0)` = sync. `reset_sw` **und** FSM-Reset;
-  `boot_phase(1)` = FSM-`done` → `reset_l_stable` (CPU-Release). Strobe-Mux gated auf **`boot_phase(1)='0'`**
+  `boot_phase(1)` = FSM-`done` (DIP-Read fertig) → treibt `disp_show` (Display an); `boot_phase(2)` = Info-Anzeige
+  fertig → `reset_l_stable` (CPU-Release). Strobe-Mux gated auf **`boot_phase(1)='0'`**
   (DIP-Read-Fenster), danach gehen die Pins an die Lampen-Logik. FSM-Start zusätzlich über `por_active`
-  gated (Read erst nach PLL-Lock). **`options`/`SW_MAIN/SUB1/SUB2`** sind reserviert (noch nicht gelesen).
+  gated (Read erst nach PLL-Lock). **`SW_MAIN/SUB1/SUB2`** werden jetzt in der Info-Phase angezeigt;
+  `options` ansonsten noch reserviert.
+- **`boot_phase(2)` — Version/Config-Infoanzeige (~5s):** nach dem DIP-Read und **vor** CPU-Start zeigt
+  `display_control` für `INFO_SHOW_CYCLES`=5 000 000 cpu_clk (=5s @1MHz) die Konfiguration (rechtsbündig,
+  `x"F"`=blank, Digit 6=Player-up-LED aus): **Disp1**=Version `SW_MAIN SW_SUB1 SW_SUB2`, **Disp2**=Game-Select
+  `game_idx` (0–7) 2-stellig dezimal, **Disp3**=`options(1..6)` binär (Option1 links; ON wird als `'0'` gelesen
+  → Anzeige `1`), **Disp4**=Freeplay (`'1'` wenn aktiv), **Status**=blank. Timer + `boot_info`-Prozess + DC-Eingangs-Mux
+  (`bi_*`/`dc_*`) in `AtariFA.vhd`. `disp_show <= boot_phase(1)` (Display aktiv durch Info-Phase bis ins Spiel),
+  `reset_l_stable <= boot_phase(2)`. **HW-Vorbehalt:** Ziffern-/Options-Reihenfolge (Index 5=rechts angenommen)
+  bei Bedarf 1-zeilig im `boot_info`-Prozess tauschbar.
 - **Pin-Umbenennung:** Top-Ports `game_select`/`options`/`reset_l` → `dip_ret`/`dip_opt`/`reset_sw`
   (siehe `AtariFA.qsf`). **Loose End:** `AtariFA.sdc(39)` referenziert noch `reset_l` (jetzt `reset_sw`)
   → `set_false_path` wird ignoriert (Warning 332174), bei nächstem SDC-Durchgang nachziehen.

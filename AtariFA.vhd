@@ -258,12 +258,29 @@ signal i_disp_Load			: 		std_logic;
 signal i_disp_Cathode_blank			: 		std_logic;
 signal i_disp_Anode_blank			: 	std_logic;
 
-				-- input (display data)
+				-- input (display data) -- "Spiel/Normal"-Quelle (Sniffer bzw. disp_test)
 signal   display1			: DISPLAY_T;
 signal	display2			: DISPLAY_T;
 signal	display3			: DISPLAY_T;
 signal	display4			: DISPLAY_T;
 signal	status_d			: DISPLAY_TS;
+
+-- Boot-Phase 2: Version/Config-Infoanzeige (~5s nach DIP-Read, vor CPU-Start)
+constant INFO_SHOW_CYCLES : integer := 5000000;          -- cpu_clk=1MHz -> 5s
+signal	info_count		: integer range 0 to INFO_SHOW_CYCLES := 0;
+signal	disp_show		: std_logic;                     -- Display aktiv ab DIP-Read fertig
+-- Boot-Info-Inhalt (kombinatorisch aus SW_*, game_idx, options, freeplay)
+signal	bi_display1		: DISPLAY_T;
+signal	bi_display2		: DISPLAY_T;
+signal	bi_display3		: DISPLAY_T;
+signal	bi_display4		: DISPLAY_T;
+signal	bi_status		: DISPLAY_TS;
+-- gemuxte display_control-Eingaenge: Boot-Info (Phase 2) vs. Spiel/Normal
+signal	dc_display1		: DISPLAY_T;
+signal	dc_display2		: DISPLAY_T;
+signal	dc_display3		: DISPLAY_T;
+signal	dc_display4		: DISPLAY_T;
+signal	dc_status		: DISPLAY_TS;
 
 
 -- Diagnose / Verifikation ---------------------------------------------------
@@ -338,7 +355,8 @@ gen_dbg2: if DBG_MODE = 2 generate
 end generate gen_dbg2;
 
 -------------------------------
-reset_l_stable <= boot_phase(1); --may be set higher if new boot phases added
+reset_l_stable <= boot_phase(2); -- CPU-Release erst nach DIP-Read (Phase 1) + Info-Anzeige (Phase 2)
+disp_show <= boot_phase(1);       -- Display aktiv ab DIP-Read fertig (durch Info-Phase bis ins Spiel)
 reset_h <= (not reset_l_stable) or por_active;
    -- WD deliberately disconnected: Game kickt 0x4000 nicht im Attract Mode → permanenter Reset-Loop.
    -- Reaktivieren (or wd_reset) sobald Kick-Bedingung aus Schaltplan/ROM-Disassembly bekannt.
@@ -427,31 +445,104 @@ ESP32_sig    <= '0';
 ------------------------------------------------------------------------------
 
 
+------------------------------------------------------------------------------
+-- Boot-Phase 2: ~5s Version/Config-Anzeige nach DIP-Read, vor CPU-Freigabe.
+-- Timer laeuft auf cpu_clk (1 MHz); haelt boot_phase(2)=0 solange Phase 1 nicht
+-- fertig, zaehlt dann INFO_SHOW_CYCLES hoch und gibt mit boot_phase(2)='1' die
+-- CPU frei (reset_l_stable). Eigener Treiber nur fuer Bit 2 (Bits 0/1 separat).
+------------------------------------------------------------------------------
+boot_info_timer : process(cpu_clk)
+begin
+	if rising_edge(cpu_clk) then
+		if boot_phase(1) = '0' then          -- DIP-Read noch nicht fertig
+			info_count <= 0;
+			boot_phase(2) <= '0';
+		elsif info_count < INFO_SHOW_CYCLES then
+			info_count <= info_count + 1;     -- Info-Fenster laeuft (~5s)
+		else
+			boot_phase(2) <= '1';             -- Info-Fenster vorbei -> CPU freigeben
+		end if;
+	end if;
+end process;
+
+------------------------------------------------------------------------------
+-- Boot-Info-Inhalt (kombinatorisch). Digit 0=links .. 5=rechts, x"F"=blank,
+-- Digit 6 = Player-up-LED (hier aus = x"0"). Alles rechtsbuendig.
+------------------------------------------------------------------------------
+boot_info : process(game_select, options, freeplay)
+begin
+	-- Display 1: Version SW_MAIN SW_SUB1 SW_SUB2
+	bi_display1 <= (others => x"F");
+	bi_display1(3) <= SW_MAIN;
+	bi_display1(4) <= SW_SUB1;
+	bi_display1(5) <= SW_SUB2;
+	bi_display1(6) <= x"0";
+
+	-- Display 2: Game Select game_idx (0..7 = not game_select), 2-stellig dezimal
+	-- mit fuehrender 0. Wertebereich 0..7 -> Zehnerstelle stets 0, Einer = 0..7.
+	bi_display2 <= (others => x"F");
+	bi_display2(4) <= x"0";                       -- Zehnerstelle (immer 0)
+	bi_display2(5) <= '0' & (not game_select);    -- Einerstelle 0..7
+	bi_display2(6) <= x"0";
+
+	-- Display 3: options(1..6), ON wird als '0' gelesen -> '1' anzeigen.
+	-- Option 1 = Digit 0 (links) .. Option 6 = Digit 5 (rechts).
+	bi_display3 <= (others => x"F");
+	for i in 1 to 6 loop
+		if options(i) = '0' then
+			bi_display3(i-1) <= x"1";
+		else
+			bi_display3(i-1) <= x"0";
+		end if;
+	end loop;
+	bi_display3(6) <= x"0";
+
+	-- Display 4: Freeplay (active-low) -> '1' wenn aktiv, sonst '0'
+	bi_display4 <= (others => x"F");
+	if freeplay = '0' then
+		bi_display4(5) <= x"1";
+	else
+		bi_display4(5) <= x"0";
+	end if;
+	bi_display4(6) <= x"0";
+
+	-- Status-Display: blank
+	bi_status <= (others => x"F");
+end process;
+
+-- Mux: in Phase 2 (boot_phase(2)='0') Boot-Info, danach Spiel/Normal-Daten.
+dc_display1 <= bi_display1 when boot_phase(2) = '0' else display1;
+dc_display2 <= bi_display2 when boot_phase(2) = '0' else display2;
+dc_display3 <= bi_display3 when boot_phase(2) = '0' else display3;
+dc_display4 <= bi_display4 when boot_phase(2) = '0' else display4;
+dc_status   <= bi_status   when boot_phase(2) = '0' else status_d;
+
+
 DC: entity work.display_control
 port map(
-	clk		=> cpu_clk, 	
-	show => reset_l_stable,
+	clk		=> cpu_clk,
+	show => disp_show,
 	-- Control/Data Signals,
 	disp_Data => i_disp_Data,
 	disp_Adr => i_disp_Adr,
 	disp_Load => i_disp_Load,
 	disp_Cathode_blank => i_disp_Cathode_blank, --C11 -> DSTB Pin1 on K4
 	disp_Anode_blank => i_disp_Anode_blank,
-	-- input (display data)
+	-- input (display data) -- gemuxt: Boot-Info (Phase 2) vs. Spiel/Normal
 	-- digit #6 is Player up LEDS 8==ON 0==OFF
-	display1	=> display1,
-	display2	=> display2,
-	display3	=> display3,
-	display4	=> display4,
-	status_d	=> status_d
+	display1	=> dc_display1,
+	display2	=> dc_display2,
+	display3	=> dc_display3,
+	display4	=> dc_display4,
+	status_d	=> dc_status
 	);
-	
+
 
 gen_disptest : if DISPLAY_TEST generate
 DT: entity work.disp_test
 port map(
 	clk		=> cpu_clk,
-	show => reset_l_stable,
+	show => disp_show,
 	display1	=> display1,
 	display2	=> display2,
 	display3	=> display3,

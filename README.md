@@ -46,8 +46,21 @@ Configuration uses **10 DIP switches**: a 4-switch block (3× game select + 1× 
   IOs `serin_595 / clk_595 / rclk_595` as matrix strobes (returns on `dip_ret`), then hands the pins
   back to the lamp logic once boot is complete.
 - DIPs **7–10** (`options(3..6)`) are read directly from `dip_opt` and may be changed live during a game.
-- Boot is sequenced by `boot_phase`: phase 0 reads the DIPs, phase 1 (read done) releases the CPU
-  from reset.
+- Boot is sequenced by `boot_phase`: phase 0 reads the DIPs, phase 1 (read done) turns the displays
+  on, phase 2 shows the configuration for ~5 s (see below) and then releases the CPU from reset.
+
+### Boot info display
+
+Once the DIPs are latched and before the game ROM starts, the displays show the current
+configuration for about 5 seconds (right-justified, blanks where unused):
+
+| Display | Shows |
+|---|---|
+| 1 | Firmware version `SW_MAIN SW_SUB1 SW_SUB2` |
+| 2 | Selected game index (0–7), two-digit decimal with leading zero |
+| 3 | The six `options` bits (option 1 leftmost), `1` = ON / `0` = OFF |
+| 4 | Free-play state: `1` when enabled, `0` otherwise |
+| Status | blank |
 
 ## Target hardware
 
@@ -103,7 +116,8 @@ written to `output_files/`.
 ## Roadmap
 
 - **Implemented:** CPU integration, clocking, NMI/DMA, memory map, display routines,
-  5-game selection, free-play option, 4 test-board inputs, safe driver default levels.
+  5-game selection, free-play option, boot configuration display, 4 test-board inputs,
+  safe driver default levels.
 - **Phase B:** full switch matrix (`0x2010–0x204F`), solenoid latches, lamp matrix
   (`lamp_driver.vhd` activation).
 - **Phase C:** audio (internal sound card + Atari aux board), generic per-game configuration.
