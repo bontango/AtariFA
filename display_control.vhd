@@ -1,4 +1,4 @@
--- boot message on Atari Display
+-- display control on Atari Display
 -- part of  AtariFA
 -- bontango 02.2025
 --
@@ -38,7 +38,7 @@ use ieee.std_logic_unsigned.all;
 
 use work.instruction_buffer_type.all;
 
-    entity boot_message is        
+    entity display_control is
         port(
             clk  : in std_logic;      -- 1MHz clock  one clock each uS  
 				show   : in  std_logic;		
@@ -56,9 +56,9 @@ use work.instruction_buffer_type.all;
 				disp_Cathode_blank			: 	out 	std_logic;
 				disp_Anode_blank			: 	out 	std_logic			
             );
-    end boot_message;
+    end display_control;
     ---------------------------------------------------
-    architecture Behavioral of boot_message is
+    architecture Behavioral of display_control is
 	 	type STATE_T is ( St_Disp_off, St_Load1, St_Push1, St_Wait1,
 								St_Load2, St_Push2, St_Wait2,
 								St_Load3, St_Push3,
@@ -81,7 +81,10 @@ use work.instruction_buffer_type.all;
 				digit <= 0;
 				state <= St_Disp_off;
 			elsif rising_edge(clk) then
-				case state is 		
+				-- disp_Adr(6) ist ungenutzt (nur Bits 0..2 Digit, 3..5 Select);
+				-- hier getaktet auf '0' treiben -> Register statt Latch (vermeidet Warning 10631)
+				disp_Adr(6) <= '0';
+				case state is
 					when St_Disp_off => 								
 						-- make sure display is OFF during pushing new data
 						disp_Cathode_blank <= '0';

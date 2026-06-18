@@ -427,7 +427,7 @@ ESP32_sig    <= '0';
 ------------------------------------------------------------------------------
 
 
-BM: entity work.boot_message
+DC: entity work.display_control
 port map(
 	clk		=> cpu_clk, 	
 	show => reset_l_stable,

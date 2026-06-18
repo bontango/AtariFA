@@ -94,7 +94,7 @@ written to `output_files/`.
 | `game_rom.vhd` | Generic 2 K×8 ROM wrapper (init file via generic) |
 | `read_the_dips.vhd` | Boot-time DIP read FSM (3×2 strobe matrix on the lamp IOs) |
 | `cpu_clock.vhd` | PLL (50 MHz → 1 MHz CPU clock) |
-| `watchdog.vhd`, `slow_to_fast_clock.vhd`, `boot_message.vhd` | Support modules |
+| `watchdog.vhd`, `slow_to_fast_clock.vhd`, `display_control.vhd` | Support modules |
 | `lamp_driver.vhd` | Lamp matrix driver (TPIC6B595N) — present, activated in Phase B |
 | `AtariFA.qsf` / `AtariFA.sdc` | Pin/assignment and timing constraints |
 | `rom/` | Game ROM images (Intel HEX) + `82s130` sound PROM |
