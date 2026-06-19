@@ -3,6 +3,15 @@
 ## Projekt
 FPGA-Nachbau der Atari Gen1 Pinball-MPU (MC6800 / John Kent cpu68).
 Quartus Prime **22.1std.2 Lite Edition**. GitHub: https://github.com/bontango/AtariFA
+
+## Build / Compile (Claude kann das selbst ausführen)
+- **Full Compile (CLI):** `& "C:\intelFPGA_lite\22.1std\quartus\bin64\quartus_sh.exe" --flow compile AtariFA`
+  (aus dem Projekt-Root; läuft ~Minuten — am besten `run_in_background`). `quartus_sh` liegt **nicht im PATH**;
+  immer den vollen Pfad nutzen. Andere gefundene Installs (`C:\intelFPGA\23.1std\...`, `C:\altera\...`) sind
+  nur **qprogrammer** (kein Compile-Flow) bzw. falsche Version → **nicht** verwenden.
+- **Verifikation der Reports** (alle in `output_files/`): `AtariFA.map.rpt` (Analysis & Synthesis),
+  `AtariFA.fit.rpt` (Fitter/Pins), `AtariFA.sta.rpt` (TimeQuest/Slack), `AtariFA.flow.rpt` (Flow-Status).
+  Auf Warnings (z. B. 332174/332049/18236) und negative Slacks prüfen.
 - **Zielplatine (AtariFA-PCB):** Cyclone 10 LP **10CL006YE144C8G** (E144) — „piggy-back"-Replacement-CPU mit RAM/ROM + TTL-Ersatz, parallel zu den Atari-Edge-Connectors plus „Box-Connectors". Migriert 2026-06; nur Display-Routinen übernommen, Rest (Switch/Lamps/Solenoide/Audio/FRAM/ESP32) step-by-step (Phase B/C).
 - **Testplatine (vorher):** GottFA3 / Cyclone IV E EP4CE6F17C8 — Bring-up abgeschlossen 2026-06-06.
 
@@ -46,8 +55,10 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
   `reset_l_stable <= boot_phase(2)`. **HW-Vorbehalt:** Ziffern-/Options-Reihenfolge (Index 5=rechts angenommen)
   bei Bedarf 1-zeilig im `boot_info`-Prozess tauschbar.
 - **Pin-Umbenennung:** Top-Ports `game_select`/`options`/`reset_l` → `dip_ret`/`dip_opt`/`reset_sw`
-  (siehe `AtariFA.qsf`). **Loose End:** `AtariFA.sdc(39)` referenziert noch `reset_l` (jetzt `reset_sw`)
-  → `set_false_path` wird ignoriert (Warning 332174), bei nächstem SDC-Durchgang nachziehen.
+  (siehe `AtariFA.qsf`). **✓ Erledigt:** `AtariFA.sdc(39)` auf `reset_sw` korrigiert (Warning 332174/332049
+  behoben, `set_false_path` greift wieder). Zusätzlich `NUM_PARALLEL_PROCESSORS 14` in der QSF gesetzt
+  (Warning 18236 weg). **Achtung:** Quartus erkennt auf dieser Maschine nur **14** Prozessoren (Windows
+  meldet 20 logisch) → Wert >14 löst Warning **20031** (Über-Subskription) aus; daher 14, nicht 16.
 
 ## Wichtige Konventionen
 - VHDL: `use ieee.std_logic_unsigned.all` — kein `numeric_std` (würde Konflikte erzeugen)

@@ -35,8 +35,8 @@
 	# Constrain IOs (don't care...)
 	set_input_delay -clock clk_50 0 [all_inputs]
 	set_output_delay -clock clk_50 0 [all_outputs]
-	# reset_l goes only into a 2-flop synchronizer; exclude from timing analysis
-	set_false_path -from [get_ports reset_l]
+	# reset_sw goes only into a 2-flop synchronizer; exclude from timing analysis
+	set_false_path -from [get_ports reset_sw]
 	
 	#
 	# example second clock
