@@ -107,11 +107,20 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
 - **Phase D**: Cleanup, SDC weiter vervollständigen (B4 switch[5..16]/options[], IO-Delays), Test-Module hinter Generic
   - ✓ Hold-Violations behoben (`set_false_path` cpu_clk_d1), SDC → `AtariFA.sdc` umbenannt
 
+## Display-Timing (display_control.vhd v2.0, 2026-06-20)
+Multiplex-Timing aus realer LogicPort-Aufzeichnung des Original-Boards vermessen und FSM darauf
+abgeglichen. **Ausführliche Doku: `doc/Display_Timing.md`** (inkl. Schaltbild `doc/Display_Logic.png`,
+Sheet 15B, und Messmethodik). Kernwerte: Blank ~129 µs / Show ~383 µs → 512 µs/Digit, 8 Digits,
+4,10 ms/Frame, ~244 Hz, Duty ~75 %. Timing in Konstanten `C_BLANK_PAD/C_SHOW/C_LAST_DIGIT`.
+Wichtigster Fidelity-Hebel = Blank:Show-Verhältnis (vorher ~95 % an = ~25 % zu hell). Zwei
+index-sichere Funktionen `display_nibble/status_nibble` (entschärfen latenten `status_d(digit>3)`-Überlauf).
+
 ## Bekannte HW-Feintuning-Stellen
-- Ziffernreihenfolge im Shadow-Buffer-Demux (case-Zweige in `AtariFA.vhd`) — PinMAME-Segment-Indizes sind absteigend, physische Verdrahtung muss auf Hardware geprüft werden
+- Ziffernreihenfolge im Shadow-Buffer-Demux (case-Zweige in `AtariFA.vhd`) — PinMAME-Segment-Indizes sind absteigend, physische Verdrahtung muss auf Hardware geprüft werden. **Original-Scan-Reihenfolge der Digits = 0,2,4,6,1,3,5,7** (adr0 langsamstes Bit, aus LPF gemessen, siehe `doc/Display_Timing.md` §9); `display_control` zählt linear 0..7 — bei Bedarf hier oder im Demux anpassen.
 - Lampennummer↔Bit-Mapping im Lamp-Sniffer (`AtariFA.vhd`, derzeit linear) — PinMAME `col=(offset%4)*2+offset/8`, physische Zuordnung auf Hardware prüfen
 - TPIC6B595N nur ~150 mA Dauer/Ausgang — bei #44/#47-Glühlampen schwächer als ULN2003A (Paketverlustleistung prüfen), mit LEDs unkritisch
 
 ## Referenz
 - PinMAME `src/wpc/atari.c`: maßgeblich für Speicher-Map, Display-Mapping, Switch/DIP-Handler
+- **Display-Timing-Analyse: `doc/Display_Timing.md`** (gemessen aus Original-Board, Schaltbild Sheet 15B)
 - Vollständiger Code-Review: `N:\Projekte\FPGA Atari\AtariFA_Code_Review.md`

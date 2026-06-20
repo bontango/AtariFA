@@ -7,7 +7,8 @@
 -- ============================================================================
 --  TIMING-QUELLE: gemessen aus realer LogicPort-Aufzeichnung des Original-Boards
 --  Ausfuehrliche Doku + Schaltbild-Bezug:  doc/Display_Timing.md
---  (Schaltbild: doc/Display_Logic.png, Sheet 15B; Mess-LPF: _debug/Atari_Display_org*.LPF)
+--  (Schaltbild: doc/Display_Logic.png, Sheet 15B; Mess-LPF: ../_debug/Atari_Display_org*.LPF
+--   ausserhalb des Repos)
 -- ============================================================================
 --
 -- Gemessenes Original-Timing (10 ns Aufloesung):
