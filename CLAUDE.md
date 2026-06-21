@@ -103,7 +103,12 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
   - ✓ Lamp-Driver gebaut: `lamp_driver.vhd` (84 Lampen → 11× TPIC6B595N, statisch gelatcht, Double-Buffer + Shift-FSM @ clk_50, ersetzt 9334+ULN2003A). RAM-0x30–0x3F-Sniffer analog Display-Shadow-Buffer.
   - Lamp-Driver in `AtariFA.vhd` noch **komplett auskommentiert** (Ports, `lamp_state`-Signal, Sniffer-Prozess, `LD`-Instanz) — auf Prototyp-HW gemeinsam mit vollständiger Switch-Matrix aktivieren + Pins in `.qsf`.
   - Noch offen: restliche Switch-Matrix (0x2014–0x204F), Solenoid-Latches
-- **Phase C**: Audio (0x3000/0x6000), generische Spiel-Konfiguration per Generic
+  - **Achtung Sound-Überlappung:** 0x1080/84/88 sind geteilte Latches — **Bits 0–3 = Sound**
+    (bereits implementiert, s. „Sound"), **Bits 4–7 = Solenoide** (noch offen). Solenoid-Logik
+    nur auf die oberen Nibbles legen, Sound-Decode (`sound_cs`) nicht doppelt treiben.
+- **Phase C**: ✓ **Audio implementiert** (`sound.vhd`, s. eigener Abschnitt); offen: generische
+  Spiel-Konfiguration per Generic. *(Roadmap nannte früher 0x3000/0x6000 — falsch; schaltplan-
+  verifiziert sind die Sound-Latches **0x1080/1084/1088**.)*
 - **Phase D**: Cleanup, SDC weiter vervollständigen (B4 switch[5..16]/options[], IO-Delays), Test-Module hinter Generic
   - ✓ Hold-Violations behoben (`set_false_path` cpu_clk_d1), SDC → `AtariFA.sdc` umbenannt
 
@@ -114,6 +119,32 @@ Sheet 15B, und Messmethodik). Kernwerte: Blank ~129 µs / Show ~383 µs → 512 
 4,10 ms/Frame, ~244 Hz, Duty ~75 %. Timing in Konstanten `C_BLANK_PAD/C_SHOW/C_LAST_DIGIT`.
 Wichtigster Fidelity-Hebel = Blank:Show-Verhältnis (vorher ~95 % an = ~25 % zu hell). Zwei
 index-sichere Funktionen `display_nibble/status_nibble` (entschärfen latenten `status_d(digit>3)`-Überlauf).
+
+## Sound (sound.vhd, 2026-06-21)
+Digitale Nachbildung der Original-Tonerzeugung (Prozessor-PCB Sheet 15B + Aux-PCB), aus den
+Schaltplänen `doc/Display_Logic.png` + `doc/Auxiliary_PCB.png` verifiziert. **Drei geteilte
+Latches (Bits 0–3, Bits 4–7 = Solenoide/Phase B):**
+- **0x1080 = Wellenform-Auswahl** → D12-ROM Adr A5–A8 (16 Wellenformen).
+- **0x1088 = Tonhöhe** → D13 (74LS9316) Teiler `(16 − wert)` von AUDIO CLK (≈ cpu_clk/2 = 500 kHz).
+- **0x1084 = Lautstärke** → Aux-PCB CD4016-Attenuator (gewichtete R 68/33/18/8.2 K ≈ linear).
+
+**ROM-Befund (`rom/82s130.hex`, 512×4, nur untere 4 Bit):** 16 zusammenhängende 32-Byte-Blöcke =
+**16 Wellenformen × 32 Samples**. ROM-Adresse = `"0" & snd_select(4) & sample_cnt(5)`.
+Tonfrequenz ≈ `AUDIO_CLK / ((16 − pitch)·32)`. **Vereinfachungen:** synchrone Zähler statt
+74163/7493-Ripple; AUDIO ENABLE/RESET als „Dauerton, Wellenform-Neustart bei Auswahl-Wechsel",
+„Aus" via Volume=0. `C_AUDIO_DIV` (Generic, Default 100) = einziger Tonhöhen-Tuning-Hebel.
+
+**Ausgabe-Mux per `options(3)`** (active-low, im Spiel dynamisch umschaltbar; in `AtariFA.vhd`):
+- `'1'` (DIP OFF) = **Original**: `aux_audio <= not snd_sample`, `aux_audio_latch <= "00" & not snd_volume`
+  ans echte Aux-Board (dortiger R-DAC + 4016 + Verstärker). **Invertiert wg. 74HCT540** (Konvention `disp_*`).
+- `'0'` (DIP ON) = **Emulation**: `SB_Sound <= snd_pwm` (1-Bit Sigma-Delta von `(sample−8)·volume`,
+  @clk_50) → Onboard-RC (3k3/4n7, fc≈10 kHz) + TDA7267. `SB_Audio` = separater MP3-Pfad, unangetastet.
+
+**Compile (2026-06-21):** 0 Fehler, Timing ok (Setup ≥3,0 ns / Hold ≥0,16 ns); BRAM 22/30 M9K (+1 für
+D12). Warnung 14320 (ROM `q[7:4]` wegoptimiert) harmlos. **HW-Vorbehalte (im Code kommentiert):**
+(1) Original-Pfad erreicht das Aux-Board erst mit aktivem 74HCT540 (`solenoids_enable`, Phase B/C);
+(2) `aux_audio_latch` Bit 5/4 auf Idle '0' (HW-Zuordnung der oberen 2 Bit prüfen);
+(3) Adress-/Volume-Bit-Reihenfolge bei „falschem" Klang 1-zeilig tauschbar.
 
 ## Bekannte HW-Feintuning-Stellen
 - Ziffernreihenfolge im Shadow-Buffer-Demux (case-Zweige in `AtariFA.vhd`) — PinMAME-Segment-Indizes sind absteigend, physische Verdrahtung muss auf Hardware geprüft werden. **Original-Scan-Reihenfolge der Digits = 0,2,4,6,1,3,5,7** (adr0 langsamstes Bit, aus LPF gemessen, siehe `doc/Display_Timing.md` §9); `display_control` zählt linear 0..7 — bei Bedarf hier oder im Demux anpassen.

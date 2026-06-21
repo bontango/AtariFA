@@ -169,6 +169,13 @@ signal rom1_dout		: std_logic_vector(7 downto 0);
 signal rom1_cs			: std_logic;
 signal rom2_dout		: std_logic_vector(7 downto 0);
 signal rom2_cs			: std_logic;
+-- integrated sound (siehe sound.vhd): drei Sound-Latches + Modul-Ausgaenge
+signal snd_select	: std_logic_vector(3 downto 0) := (others => '0');  -- Latch 1080: Wellenform
+signal snd_pitch	: std_logic_vector(3 downto 0) := (others => '0');  -- Latch 1088: Tonhoehe
+signal snd_volume	: std_logic_vector(3 downto 0) := (others => '0');  -- Latch 1084: Lautstaerke
+signal snd_sample	: std_logic_vector(3 downto 0);  -- roher 4-Bit ROM-Nibble (Aux-Pfad)
+signal snd_pwm		: std_logic;                     -- 1-Bit Sigma-Delta (Onboard-Pfad)
+signal sound_cs		: std_logic;
 
 -- helpers DIP read & boot phase
 signal dip_strobe  : std_logic_vector(2 downto 0);
@@ -431,11 +438,17 @@ sw_com    <= (others => '0');
 -- Aux-Board (ueber invertierenden 74HCT540, gated von solenoids_enable): solange der
 -- 540 disabled ist, definieren die aux-seitigen Pulls den Pegel; Werte hier nur Idle.
 aux_lamp_strobe <= (others => '0');
-aux_audio       <= (others => '0');
-aux_audio_latch <= (others => '0');
--- Integrierter Sound (Phase C): Idle
+-- Sound-Ausgabe-Mux (options(3), active-low; dynamisch im Spiel umschaltbar):
+--   '1' (DIP OFF) = Original : AUDIO 0..3 + Volume-Latch ans Aux-Board (dortiger DAC/4016/Amp)
+--   '0' (DIP ON)  = Emulation: 1-Bit Sigma-Delta ueber SB_Sound (Onboard RC + TDA7267)
+-- Aux-Datenleitungen invertiert wegen 74HCT540 (Konvention wie disp_*); HW-Vorbehalt: der
+-- Original-Pfad erreicht das Aux-Board erst, wenn der 74HCT540 enabled ist (solenoids_enable,
+-- Phase B/C). aux_audio_latch ist 6 Bit: Volume auf Bit 3..0, Bit 5..4 Idle (HW-Zuordnung pruefen).
+aux_audio       <= not snd_sample                      when options(3) = '1' else (others => '0');
+aux_audio_latch <= ("00" & not snd_volume)             when options(3) = '1' else (others => '0');
+SB_Sound        <= snd_pwm                              when options(3) = '0' else '0';
+-- SB_Audio: separater MP3/Background-Pfad (ESP32/Mini-Player) -- nicht Teil der Emulation.
 SB_Audio <= '0';
-SB_Sound <= '0';
 -- FRAM I2C: Open-Drain im Leerlauf freigeben (externer Pull-up zieht high); SCL idle high.
 fram_i2c_sda <= 'Z';
 fram_i2c_scl <= '1';
@@ -551,6 +564,30 @@ port map(
 	);
 end generate gen_disptest;
 
+------------------------------------------------------------------------------
+-- integrated sound 
+------------------------------------------------------------------------------
+-- sound.vhd bildet D12-ROM + D13-Pitch-Teiler + E12/E13-Sample-Zaehler nach.
+-- Eingaenge: die drei Sound-Latches (1080/1088/1084), unten am Bus dekodiert.
+-- Ausgaenge: snd_sample (4-Bit, Aux-Pfad) und snd_pwm (Sigma-Delta, Onboard-Pfad).
+-- Die Auswahl Original/Emulation per options(3) erfolgt im Ausgabe-Mux (oben).
+SND: entity work.sound
+port map(
+	clk_50		=> clk_50,
+	reset_l		=> reset_l_stable,
+	snd_select	=> snd_select,
+	snd_pitch	=> snd_pitch,
+	snd_volume	=> snd_volume,
+	sample		=> snd_sample,
+	sb_pwm		=> snd_pwm
+	);
+
+-- Onboard-Pfad SB_Sound (Emulation): 1-Bit-PWM -> RC-Tiefpass -> TDA7267
+--   SB_Sound 0---XXXXX---+---0 analog audio
+--                 3k3    |
+--                       === 4n7
+--                        |
+--                       GND
 
 ------------------------------
 -- DMA interrupt counter (9-bit synchronous, replaces 3x SN7493 ripple chain)
@@ -603,6 +640,11 @@ rom1_cs <= '1' when ( cpu_addr(15 downto 11) = "01111" or cpu_addr(15 downto 11)
 --E00_ROM: entity work.ROM2 --2K 0x7000, 0x0800
 rom2_cs <= '1' when cpu_addr(15 downto 11) = "01110" and cpu_vma='1' else '0';
 
+-- Sound-Latches 0x1080/1084/1088 (nur Bits 3..0; Bits 7..4 reserviert fuer Solenoide, Phase B).
+-- Hinweis: 0x1080-0x108F ueberlappt den RAM-Mirror (ram_cs_mirror). Unkritisch -- die I/O-Latches
+-- sind write-only; das Spiel liest sie nicht als RAM zurueck, der redundante RAM-Write ist folgenlos.
+sound_cs <= '1' when cpu_addr(15 downto 4) = x"108" and cpu_vma='1' else '0';
+
 -- sw_value: Switch-Matrix-Dekodierung (aktiv-low Taster invertiert auf PinMAME-Pegel gedrückt=0xFF/idle=0x00)
 -- switch[2]=Coin1→$2010, switch[3]=Coin2→$2011, switch[4]=Start→$2013; übrige Rows idle=0x00.
 sw_value <= (others => not sw_sync(2)) when cpu_addr = x"2010" else  -- Coin1
@@ -634,6 +676,15 @@ begin
 		-- NVRAM latch: 1-Byte-Register, schreibbar analog RAM-Write-Strobe
 		if nvram_cs = '1' and cpu_rw = '0' and (cpu_clk_d2 = '1' and cpu_clk_d1 = '0') then
 			nvram_dout <= cpu_dout;
+		end if;
+		-- Sound-Latches 0x1080/1084/1088: Bits 3..0 in die Steuer-Register fuer sound.vhd.
+		if sound_cs = '1' and cpu_rw = '0' and (cpu_clk_d2 = '1' and cpu_clk_d1 = '0') then
+			case cpu_addr(3 downto 0) is
+				when x"0" => snd_select <= cpu_dout(3 downto 0);  -- 0x1080 Wellenform
+				when x"4" => snd_volume <= cpu_dout(3 downto 0);  -- 0x1084 Lautstaerke
+				when x"8" => snd_pitch  <= cpu_dout(3 downto 0);  -- 0x1088 Tonhoehe
+				when others => null;
+			end case;
 		end if;
 		if reset_l_stable = '0' then
 			dma_counter <= (others => '0');
