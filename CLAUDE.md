@@ -146,6 +146,36 @@ D12). Warnung 14320 (ROM `q[7:4]` wegoptimiert) harmlos. **HW-Vorbehalte (im Cod
 (2) `aux_audio_latch` Bit 5/4 auf Idle '0' (HW-Zuordnung der oberen 2 Bit prüfen);
 (3) Adress-/Volume-Bit-Reihenfolge bei „falschem" Klang 1-zeilig tauschbar.
 
+## Boot-Sprachausgabe „Lisü" (speech.vhd, 2026-06-22)
+Beim Boot wird einmalig das Wort „Lisü" (deutsche Roboterstimme) über die vorhandene Onboard-
+Audiokette ausgegeben (Sigma-Delta-PWM `SB_Sound` → RC 3k3/4n7 → TDA7267). Machbarkeitsanalyse +
+Umsetzungs-Ergebnis: **`doc/Speech_Boot_Feasibility.md`**.
+- **Codec = 8-Bit-PCM @ 8 kHz** (nicht Delta!). Ursprünglich war 1-Bit-Delta-Modulation geplant
+  (Logik-/ROM-Minimum, 1 M9K), klang aber **stark verrauscht** — Ursache: zu geringe Überabtastung
+  (Delta braucht hohe OSR; niedrigere Rate verschlimmert es). Daher PCM: **sauberster Klang,
+  einfacherer Decoder** (kein Akku), Preis = mehr ROM (war kein Engpass, 7 M9K frei).
+- **`speech.vhd`** = Adresszähler + Ratenteiler + First-Order-Sigma-Delta-DAC (identisch zu sound.vhd).
+  Generics: `N_SAMPLES=3687` (0,461 s), `CLK_DIV=6250` (=50e6/8000). **`speech_rom.vhd`** = altsyncram
+  4096×8 (12-Bit-Adresse) = **4 M9K**.
+- **`rom/lisy.mif`** = 8-Bit-PCM (WIDTH=8), ungenutzte Worte mit **128 = Stille** gefüllt
+  (NICHT 0 = -128 = lauter DC-Knall am ROM-Ende). Wortende per **Fade-Out 35 ms** auf ~128 ausgeblendet
+  (espeak kappt Vokale hart bei ~60 % → sonst „abgeschnitten"/Klick).
+- **Integration in `AtariFA.vhd`** (Instanz `SPEECH_INST`): `reset => not boot_phase(0)`
+  (= synchronisiertes reset_sw; **NICHT `por_active`/`reset_h`** — die sind über `if reset_l_stable='0'`
+  während des GANZEN Info-Fensters aktiv und würden Speech bei der Wiedergabe im Reset halten!).
+  `start => boot_phase(1)` (Pegel; internes `start_d`-Edge-Detect in speech.vhd löst Einmal-Wiedergabe aus).
+  Ausgabe-Mux mit **Vorrang**: `SB_Sound <= speech_pwm when speech_busy='1' else snd_pwm when options(3)='0' else '0'`.
+  Fällt komplett ins vorhandene ~5s-Info-Fenster (`boot_phase(2)`), kein zusätzliches Boot-Delay.
+- **Encoder `tools/make_speech_mif.py`** (pure stdlib, **gitignored** wie ganzes `tools/`): erzeugt das
+  `.mif` aus einer WAV. Optionen u.a. `--pcm` (8-Bit-PCM statt Delta), `--fade-out-ms`, `--smooth`
+  (Moving-Avg-LPF), `--trim-thresh`, `--pad-ms`, `--pcm-preview`. Quelle via espeak (klassisch,
+  `C:\Program Files (x86)\eSpeak\command_line\espeak.exe`): `espeak -v de -s 135 "[[l'i:zy]]"`.
+  Finaler Aufruf steht im `speech.vhd`-Header. ROM-Neu-Erzeugung: Quelle `speech_source_shortU.wav`
+  (lokal, untracked) durch den Encoder.
+- **Compile (2026-06-22):** 0 Fehler/0 Critical, **BRAM 26/30 M9K** (−1 Delta +4 PCM), LE 30 % (sogar
+  weniger als Delta), Timing ok. **HW-Vorbehalt:** falls TDA7267 eine Mute-/Einschaltphase hat und den
+  Wortanfang kappt → `--lead-ms` Vorlauf-Stille ins ROM legen (am echten Board testen).
+
 ## Bekannte HW-Feintuning-Stellen
 - Ziffernreihenfolge im Shadow-Buffer-Demux (case-Zweige in `AtariFA.vhd`) — PinMAME-Segment-Indizes sind absteigend, physische Verdrahtung muss auf Hardware geprüft werden. **Original-Scan-Reihenfolge der Digits = 0,2,4,6,1,3,5,7** (adr0 langsamstes Bit, aus LPF gemessen, siehe `doc/Display_Timing.md` §9); `display_control` zählt linear 0..7 — bei Bedarf hier oder im Demux anpassen.
 - Lampennummer↔Bit-Mapping im Lamp-Sniffer (`AtariFA.vhd`, derzeit linear) — PinMAME `col=(offset%4)*2+offset/8`, physische Zuordnung auf Hardware prüfen
@@ -154,4 +184,5 @@ D12). Warnung 14320 (ROM `q[7:4]` wegoptimiert) harmlos. **HW-Vorbehalte (im Cod
 ## Referenz
 - PinMAME `src/wpc/atari.c`: maßgeblich für Speicher-Map, Display-Mapping, Switch/DIP-Handler
 - **Display-Timing-Analyse: `doc/Display_Timing.md`** (gemessen aus Original-Board, Schaltbild Sheet 15B)
+- **Boot-Sprachausgabe: `doc/Speech_Boot_Feasibility.md`** (Codec-Analyse + Umsetzung PCM 8 kHz)
 - Vollständiger Code-Review: `N:\Projekte\FPGA Atari\AtariFA_Code_Review.md`

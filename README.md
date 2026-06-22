@@ -8,8 +8,9 @@ replacement that plugs into the original Atari edge connectors and replaces the 
 ROMs and TTL glue logic, while a single FPGA bitstream supports the whole Gen1 generation.
 
 > Status: hardware design verified, prototype-ready. The CPU core, clocking, memory map,
-> game selection, free-play option and sound are implemented and compile clean; switch
-> matrix, lamps and solenoids are being added step by step (see [Roadmap](#roadmap)).
+> game selection, free-play option, sound and a boot speech announcement are implemented and
+> compile clean; switch matrix, lamps and solenoids are being added step by step (see
+> [Roadmap](#roadmap)).
 
 ## Supported games
 
@@ -85,6 +86,18 @@ The output path is switchable live via `options(3)` (DIP, active-low):
 The implementation is intentionally simplified (synchronous counters, sigma-delta DAC) — see
 [`doc/Sound_Emulation.md`](doc/Sound_Emulation.md) for the full schematic analysis and model.
 
+## Boot speech
+
+At power-up the board speaks a short word ("Lisü", a retro robot voice) once, during the ~5 s
+boot configuration window, reusing the on-board sound path (sigma-delta PWM on `SB_Sound` →
+RC low-pass → TDA7267). [`speech.vhd`](speech.vhd) plays back **8-bit PCM at 8 kHz** from a
+4096×8 ROM ([`speech_rom.vhd`](speech_rom.vhd), 4 M9K) straight into the same sigma-delta DAC;
+the speech output takes priority over the game sound while it is playing. The ROM image
+[`rom/lisy.mif`](rom/lisy.mif) is generated offline from a text-to-speech WAV (the encoder and
+the full codec rationale — why PCM rather than 1-bit delta — are in
+[`doc/Speech_Boot_Feasibility.md`](doc/Speech_Boot_Feasibility.md)). The module is self-contained
+and reusable across boards: it needs only a clock, a reset and a start trigger.
+
 ## Target hardware
 
 - **FPGA:** Intel/Altera Cyclone 10 LP **10CL006YE144C8G** (E144 package)
@@ -93,7 +106,7 @@ The implementation is intentionally simplified (synchronous counters, sigma-delt
 - Displays driven via 74HCT540, lamps via TPIC6B595N, solenoids via IRL540 MOSFETs through
   74HCT540 drivers, I²C FRAM (FM24CL64B) for high-score storage, optional ESP32-C3 link
 
-Resource usage (full compile): logic 29 %, block RAM 22/30 M9K (73 %), 1/2 PLL, timing met.
+Resource usage (full compile): logic 30 %, block RAM 26/30 M9K (87 %), 1/2 PLL, timing met.
 
 ## Architecture highlights
 
@@ -136,17 +149,19 @@ written to `output_files/`.
 | `cpu_clock.vhd` | PLL (50 MHz → 1 MHz CPU clock) |
 | `watchdog.vhd`, `slow_to_fast_clock.vhd`, `display_control.vhd` | Support modules |
 | `sound.vhd` | Sound emulation (PROM playback + pitch divider + sigma-delta DAC) |
+| `speech.vhd` / `speech_rom.vhd` | Boot speech ("Lisü"): 8-bit PCM player + 4096×8 ROM |
 | `lamp_driver.vhd` | Lamp matrix driver (TPIC6B595N) — present, activated in Phase B |
 | `AtariFA.qsf` / `AtariFA.sdc` | Pin/assignment and timing constraints |
 | `rom/` | Game ROM images (Intel HEX) + `82s130` sound PROM |
 | `rom/freeplay/` | Free-play ROM variants (reference) + `gen_patches.py` |
-| `doc/` | Schematics (`Display_Logic.png` Sheet 15B, `Auxiliary_PCB.png` Sheet 15A) + analyses (`Display_Timing.md`, `Sound_Emulation.md`) |
+| `doc/` | Schematics (`Display_Logic.png` Sheet 15B, `Auxiliary_PCB.png` Sheet 15A) + analyses (`Display_Timing.md`, `Sound_Emulation.md`, `Speech_Boot_Feasibility.md`) |
 
 ## Roadmap
 
 - **Implemented:** CPU integration, clocking, NMI/DMA, memory map, display routines,
-  5-game selection, free-play option, boot configuration display, 4 test-board inputs,
-  safe driver default levels, sound emulation (switchable original aux board / on-board card).
+  5-game selection, free-play option, boot configuration display, boot speech announcement,
+  4 test-board inputs, safe driver default levels, sound emulation (switchable original aux
+  board / on-board card).
 - **Phase B:** full switch matrix (`0x2010–0x204F`), solenoid latches (high nibble of
   `0x1080/84/88`), lamp matrix (`lamp_driver.vhd` activation).
 - **Phase C:** ✓ audio done (`sound.vhd`); remaining: generic per-game configuration.

@@ -1,9 +1,15 @@
-# Machbarkeitsanalyse — Boot-Sprachausgabe „Lisy"
+# Machbarkeitsanalyse — Boot-Sprachausgabe „Lisü"
 
-**Datum:** 2026-06-21  ·  **Status:** Konzept / Machbarkeit (noch nicht implementiert)
-**Ziel:** Beim Boot ein kurzes Wort („Lisy") als „Roboterstimme" (80er-Stil) ausgeben —
-**minimaler Logikzellen-Verbrauch** für das VHDL-Modul und **minimaler ROM-Platzbedarf**.
-Wiederverwendbar über mehrere Platinen (FPGA + RC-Tiefpass + TDA7267).
+**Datum:** 2026-06-21 (Analyse) · 2026-06-22 (Umsetzung)  ·  **Status:** ✅ IMPLEMENTIERT
+**Ziel:** Beim Boot ein kurzes Wort („Lisü") als „Roboterstimme" (80er-Stil) ausgeben.
+Die ursprüngliche Analyse optimierte auf **minimalen Logik- und ROM-Verbrauch** und empfahl
+1-Bit-Delta-Modulation. In der Umsetzung erwies sich deren Rauschen als zu stark → final
+**8-Bit-PCM @ 8 kHz** (siehe Abschnitt **„Umsetzung"** unten). Das Modul ist wiederverwendbar
+über mehrere Platinen (FPGA + RC-Tiefpass + TDA7267).
+
+> **TL;DR Umsetzung:** Nicht Delta (Empfehlung der Analyse), sondern **PCM 8-Bit @ 8 kHz**,
+> 4 M9K, `speech.vhd`/`speech_rom.vhd`, ROM `rom/lisy.mif`. Grund: Delta-Quantisierungsrauschen
+> bei der nötigen kurzen Wortlänge zu hörbar (zu geringe Überabtastung). Details: §11.
 
 ---
 
@@ -238,7 +244,55 @@ Logik (~25–40 LE) und ROM (1 M9K / 8 kbit)**; CVSD ist der low-cost Qualitäts
 identischem ROM-Bedarf. Das Modul ist als eigenständiges `speech.vhd` (ROM per `altsyncram`)
 über andere Platinen hinweg wiederverwendbar und fügt sich verlustfrei in das bestehende
 `boot_phase`-/`SB_Sound`-Konzept ein.
-```
 
-*Noch nicht implementiert — dies ist eine Vorab-Analyse. Implementierung: `speech.vhd` +
-Encoder-Skript + Mux/Trigger in `AtariFA.vhd`.*
+---
+
+## 11. Umsetzung (2026-06-22) — final: 8-Bit-PCM statt Delta
+
+Die Analyse empfahl 1-Bit-Delta-Modulation (Logik-/ROM-Minimum). In der praktischen Umsetzung
+klang das **deutlich verrauscht**. Ursache: Delta-Modulation braucht hohe **Überabtastung**
+(OSR), um leise zu sein; bei der für „Lisü" nötigen kurzen Wortlänge und ~3 kHz Sprachbandbreite
+lag die OSR zu niedrig (bei 10 kHz nur ~1,7×). Eine **niedrigere** Rate verschlechtert das Delta-
+Rauschen sogar (weniger OSR). Höhere Rate (16/24/32 kHz) half hörbar, kostet aber ROM — und da
+**Speicher nicht der Engpass war** (7 M9K frei), fiel die Wahl auf den saubersten, einfachsten Weg:
+
+> **Final: 8-Bit-PCM @ 8 kHz.** Sauberster Klang, **einfacherer** Decoder (kein Delta-Akku),
+> Preis = 4 M9K statt 1.
+
+**Vergleich (gemessen, gleiche Quelle „Lisü", ~0,46 s):**
+
+| Verfahren | Rauschen | ROM | Entscheidung |
+|---|---|--:|---|
+| Delta 10 kHz (1 Bit) | stark | 1 M9K | verworfen (zu verrauscht) |
+| Delta 16/24/32 kHz | ↓ mit Rate | 1–2 M9K | besser, aber PCM klarer |
+| **PCM 8-Bit @ 8 kHz** | **am saubersten** | **4 M9K** | **✅ gewählt** |
+| PCM 8-Bit @ 16 kHz | sehr sauber | 8 M9K | unnötig (BRAM fast voll) |
+
+**Konkrete Umsetzung:**
+- **`speech.vhd`** — Adresszähler + Sample-Ratenteiler + First-Order-Sigma-Delta-DAC (identisch
+  zu `sound.vhd`). Generics `N_SAMPLES=3687` (0,461 s), `CLK_DIV=6250` (=50e6/8000). Kein `STEP`.
+- **`speech_rom.vhd`** — `altsyncram` 4096×8 (12-Bit-Adresse) = **4 M9K**.
+- **`rom/lisy.mif`** — 8-Bit-PCM (WIDTH=8); ungenutzte Worte = **128 (Stille)**, NICHT 0
+  (=-128 = DC-Knall). Wortende per **Fade-Out 35 ms** auf ~128 ausgeblendet (espeak kappt Vokale
+  hart bei ~60 % → sonst „abgeschnitten"/Klick).
+- **Integration `AtariFA.vhd`** (Instanz `SPEECH_INST`): `reset => not boot_phase(0)` —
+  **wichtig:** NICHT `por_active`/`reset_h`, die sind während des gesamten Info-Fensters aktiv
+  und würden Speech bei der Wiedergabe im Reset halten. `start => boot_phase(1)` (Pegel; internes
+  Edge-Detect). Ausgabe-Mux mit Vorrang:
+  `SB_Sound <= speech_pwm when speech_busy='1' else snd_pwm when options(3)='0' else '0'`.
+- **Encoder `tools/make_speech_mif.py`** (pure stdlib; `tools/` ist gitignored): erzeugt das `.mif`
+  aus einer WAV. Relevante Optionen: `--pcm`, `--fade-out-ms`, `--smooth` (Moving-Avg-LPF),
+  `--trim-thresh`, `--pad-ms`, `--pcm-preview`. Quelle via espeak (deutsch):
+  `espeak -v de -s 135 "[[l'i:zy]]"` (= /liːzy/, langes i, kurzes ü).
+- **Finaler Erzeugungs-Befehl:**
+  ```sh
+  espeak -v de -s 135 -w speech_source_shortU.wav "[[l'i:zy]]"
+  python tools/make_speech_mif.py --in speech_source_shortU.wav --out rom/lisy.mif \
+         --rate 8000 --pcm --fade-out-ms 35 --depth 4096
+  ```
+
+**Ergebnis Compile (2026-06-22):** 0 Fehler / 0 Critical Warnings, **BRAM 26/30 M9K** (−1 Delta
++4 PCM), LE 30 % (sogar weniger als Delta — PCM-Decoder ist simpler), Timing erfüllt.
+
+**Offen (HW):** Klangtest am echten Board; falls der TDA7267 eine Mute-/Einschaltphase hat und den
+Wortanfang kappt → `--lead-ms` Vorlauf-Stille ins ROM legen (Risiko-Punkt §9.4).
