@@ -159,6 +159,8 @@ set_global_assignment -name VHDL_FILE game_rom.vhd
 set_global_assignment -name QIP_FILE RAM.qip
 set_global_assignment -name VHDL_FILE display_control.vhd
 set_global_assignment -name VHDL_FILE sound.vhd
+set_global_assignment -name VHDL_FILE speech.vhd
+set_global_assignment -name VHDL_FILE speech_rom.vhd
 set_global_assignment -name VHDL_FILE watchdog.vhd
 set_global_assignment -name VHDL_FILE AtariFA.vhd
 set_global_assignment -name QIP_FILE cpu_clock.qip

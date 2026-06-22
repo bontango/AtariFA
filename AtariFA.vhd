@@ -176,6 +176,10 @@ signal snd_volume	: std_logic_vector(3 downto 0) := (others => '0');  -- Latch 1
 signal snd_sample	: std_logic_vector(3 downto 0);  -- roher 4-Bit ROM-Nibble (Aux-Pfad)
 signal snd_pwm		: std_logic;                     -- 1-Bit Sigma-Delta (Onboard-Pfad)
 signal sound_cs		: std_logic;
+-- Boot-Sprachausgabe ("Lisy", speech.vhd): eigener 1-Bit-Sigma-Delta-Strom + busy.
+-- Start an Vorderflanke boot_phase(1); Ausgabe ueber SB_Sound-Mux (Vorrang vor Sound).
+signal speech_pwm	: std_logic;                     -- 1-Bit Sigma-Delta der Sprachausgabe
+signal speech_busy	: std_logic;                     -- '1' waehrend "Lisy" abgespielt wird
 
 -- helpers DIP read & boot phase
 signal dip_strobe  : std_logic_vector(2 downto 0);
@@ -446,7 +450,11 @@ aux_lamp_strobe <= (others => '0');
 -- Phase B/C). aux_audio_latch ist 6 Bit: Volume auf Bit 3..0, Bit 5..4 Idle (HW-Zuordnung pruefen).
 aux_audio       <= not snd_sample                      when options(3) = '1' else (others => '0');
 aux_audio_latch <= ("00" & not snd_volume)             when options(3) = '1' else (others => '0');
-SB_Sound        <= snd_pwm                              when options(3) = '0' else '0';
+-- Boot-Sprache hat Vorrang: waehrend speech_busy spricht das Sprachmodul ueber SB_Sound,
+-- danach (im Spiel) normaler Emulations-Sound bei options(3)=ON. Faellt ins Info-Fenster.
+SB_Sound        <= speech_pwm                           when speech_busy = '1'
+              else snd_pwm                              when options(3) = '0'
+              else '0';
 -- SB_Audio: separater MP3/Background-Pfad (ESP32/Mini-Player) -- nicht Teil der Emulation.
 SB_Audio <= '0';
 -- FRAM I2C: Open-Drain im Leerlauf freigeben (externer Pull-up zieht high); SCL idle high.
@@ -580,6 +588,23 @@ port map(
 	snd_volume	=> snd_volume,
 	sample		=> snd_sample,
 	sb_pwm		=> snd_pwm
+	);
+
+------------------------------------------------------------------------------
+-- Boot-Sprachausgabe "Lisy" (speech.vhd) -- spielt einmal beim Boot.
+-- reset: not boot_phase(0) (= synchronisiertes reset_sw, active-low). '0' im Lauf,
+--   '1' bei Config/HW-Reset -> sauberer Neustart der Wiedergabe nach Reset.
+--   (por_active/reset_h sind WAEHREND des Info-Fensters aktiv -> hier ungeeignet!)
+-- start: Pegel boot_phase(1) (DIP-Read fertig). Das interne start_d-Edge-Detect in
+--   speech.vhd loest die einmalige Wiedergabe an der 0->1-Flanke aus.
+-- Ausgabe ueber SB_Sound-Mux (speech_busy hat Vorrang, siehe oben).
+SPEECH_INST: entity work.speech
+port map(
+	clk_50  => clk_50,
+	reset   => not boot_phase(0),
+	start   => boot_phase(1),
+	busy    => speech_busy,
+	pwm_out => speech_pwm
 	);
 
 -- Onboard-Pfad SB_Sound (Emulation): 1-Bit-PWM -> RC-Tiefpass -> TDA7267
