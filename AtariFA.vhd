@@ -304,7 +304,9 @@ constant DISPLAY_TEST : boolean := false;
 --   0 = Standard-Mix (cpu_clk/vma/rw/ram_wren/NMI/wd_reset/dma_toggle/rom_cs)
 --   1 = cpu_addr(7:0)  — PC-Low-Byte; steht → hängt an diesem Offset in der Page
 --   2 = cpu_addr(15:8) — PC-High-Byte; steht → hängt in dieser ROM/RAM-Page
-constant DBG_MODE : integer range 0 to 2 := 0;
+--   3 = Boot-Trace (cpu_clk/boot_phase0/por_active/boot_phase1/boot_phase2/reset_h/
+--       dip_strobe0/i_disp_Load) — zeigt Fortschritt der Power-on-/Boot-Sequenz
+constant DBG_MODE : integer range 0 to 3 := 0;
 signal heartbeat_div  : std_logic_vector(24 downto 0) := (others => '0');
    -- Bit 24 toggelt alle 2^24/50e6 ≈ 0.67s → ~0.75 Hz Heartbeat; nur als FPGA-Takt-Fallback genutzt
 signal cpu_fetch_cnt  : std_logic_vector(20 downto 0) := (others => '0');
@@ -364,6 +366,25 @@ end generate gen_dbg1;
 gen_dbg2: if DBG_MODE = 2 generate
 	debug_signal <= cpu_addr(15 downto 8);
 end generate gen_dbg2;
+-- DBG_MODE=3 (Boot-Trace): Fortschritt der Power-on-/Boot-Sequenz sichtbar machen.
+--  [0] cpu_clk        Referenz/Heartbeat (läuft immer aus der PLL)
+--  [1] boot_phase(0)  synchronisiertes reset_sw ('1' = Reset NICHT gedrückt)
+--  [2] por_active     Power-on-Reset — steht dauerhaft '1': Boot-Deadlock (POR zählt nie herunter)
+--  [3] boot_phase(1)  DIP-Read fertig (read_the_dips 'done')
+--  [4] boot_phase(2)  Info-Fenster vorbei (= reset_l_stable, CPU freigegeben)
+--  [5] reset_h        CPU-Reset ('1' = CPU im Reset)
+--  [6] dip_strobe(0)  DIP-Read-Matrix-Aktivität (nur im Read-Fenster)
+--  [7] i_disp_Load    Display-Multiplex-Aktivität (Load-Strobe)
+gen_dbg3: if DBG_MODE = 3 generate
+	debug_signal(0) <= cpu_clk;
+	debug_signal(1) <= boot_phase(0);
+	debug_signal(2) <= por_active;
+	debug_signal(3) <= boot_phase(1);
+	debug_signal(4) <= boot_phase(2);
+	debug_signal(5) <= reset_h;
+	debug_signal(6) <= dip_strobe(0);
+	debug_signal(7) <= i_disp_Load;
+end generate gen_dbg3;
 
 -------------------------------
 reset_l_stable <= boot_phase(2); -- CPU-Release erst nach DIP-Read (Phase 1) + Info-Anzeige (Phase 2)
@@ -908,15 +929,13 @@ begin
 	end if;
 end process;
 
--- NMI-Blinker, Watchdog-Sticky, Power-on-Reset
+-- NMI-Blinker, Watchdog-Sticky (Diagnose; an reset_l_stable gekoppelt = zyklusfrei)
 process(clk_50)
 begin
 	if rising_edge(clk_50) then
 		if reset_l_stable = '0' then
 			nmi_blink_cnt <= (others => '0');
 			wd_seen       <= '0';
-			por_count     <= 0;
-			por_active    <= '1';
 		else
 			-- NMI-Flanken-Detect (nmi_level_d wird im clk_50-Hauptprozess gesetzt)
 			-- Zähler inkrementiert ~1953 NMI/s; Bit 11 → ~0.48 Hz Blinken auf LED_D3
@@ -927,13 +946,29 @@ begin
 			if wd_reset = '1' then
 				wd_seen <= '1';
 			end if;
-			-- Power-on-Reset: hält CPU für 50 000 Takte (1 ms) sicher im Reset
-			if por_count < 50000 then
-				por_count  <= por_count + 1;
-				por_active <= '1';
-			else
-				por_active <= '0';
-			end if;
+		end if;
+	end if;
+end process;
+
+-- Power-on-Reset: MUSS unabhängig von reset_l_stable laufen, sonst Boot-Deadlock.
+-- (reset_l_stable=boot_phase(2) steigt erst am Ende der Boot-Sequenz, die aber
+--  por_active='0' voraussetzt: read_the_dips wird über i_Rst_L=boot_phase(0) and
+--  not por_active im Reset gehalten. Koppelt man por_active an reset_l_stable,
+--  kann der Zähler nie herunterzählen → alles außer cpu_clk bleibt statisch.)
+-- Daher an boot_phase(0) (= synchronisiertes reset_sw, aktiv-low) gekoppelt:
+--  losgelassener Reset → einmalig ~1 ms hochzählen, dann por_active='0' (DIP-Read frei);
+--  Reset-Tastendruck → boot_phase(0)='0' → voller Reboot (DIP-Read + Info-Anzeige).
+process(clk_50)
+begin
+	if rising_edge(clk_50) then
+		if boot_phase(0) = '0' then          -- ext. Reset gedrückt / Config-Settle
+			por_count  <= 0;
+			por_active <= '1';
+		elsif por_count < 50000 then          -- ~1 ms @ 50 MHz
+			por_count  <= por_count + 1;
+			por_active <= '1';
+		else
+			por_active <= '0';
 		end if;
 	end if;
 end process;
