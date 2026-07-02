@@ -177,7 +177,14 @@ Umsetzungs-Ergebnis: **`doc/Speech_Boot_Feasibility.md`**.
   Wortanfang kappt → `--lead-ms` Vorlauf-Stille ins ROM legen (am echten Board testen).
 
 ## Bekannte HW-Feintuning-Stellen
-- Ziffernreihenfolge im Shadow-Buffer-Demux (case-Zweige in `AtariFA.vhd`) — PinMAME-Segment-Indizes sind absteigend, physische Verdrahtung muss auf Hardware geprüft werden. **Original-Scan-Reihenfolge der Digits = 0,2,4,6,1,3,5,7** (adr0 langsamstes Bit, aus LPF gemessen, siehe `doc/Display_Timing.md` §9); `display_control` zählt linear 0..7 — bei Bedarf hier oder im Demux anpassen.
+- **Ziffernreihenfolge — ✓ HW-korrigiert (2026-07-02, Prototyp):** Die Digit-Adresse ist gegenläufig
+  zur logischen Ziffernreihenfolge verdrahtet (**Adresse 0 = physisch RECHTS, Adresse 5 = LINKS**);
+  ohne Umkehr erschien die Version `   002` als `200   `. Fix **zentral in `display_control.vhd`** in den
+  Funktionen `display_nibble` (Score, Index 0..5 → `d(5-idx)`; LED-Slot 6 + unbenutzt 7 unverändert)
+  und `status_nibble` (Status, `s(3-idx)`). Wirkt für **Boot-Info UND Spielanzeige** (Shadow-Buffer).
+  *Status-Umkehr per Analogie gesetzt (Boot-Info-Status ist blank) — bei aktivem Spiel gegen Match/Credit
+  gegenprüfen.* Frühere Vermutung „0,2,4,6,1,3,5,7"/Demux-Anpassung damit hinfällig; `display_control`
+  zählt weiter linear 0..7, nur der Daten-Lookup ist umgekehrt.
 - Lampennummer↔Bit-Mapping im Lamp-Sniffer (`AtariFA.vhd`, derzeit linear) — PinMAME `col=(offset%4)*2+offset/8`, physische Zuordnung auf Hardware prüfen
 - TPIC6B595N nur ~150 mA Dauer/Ausgang — bei #44/#47-Glühlampen schwächer als ULN2003A (Paketverlustleistung prüfen), mit LEDs unkritisch
 
