@@ -107,9 +107,9 @@ entity AtariFA is
 		sw_com_in: in std_logic;
 		
 		-- 4) lamps
-		serin_595			: 	out 	std_logic; -- DIP strobe1 while boot_phase(1)='0' (DIP read window), else lamp serin
-		clk_595			: 	out 	std_logic; -- DIP strobe2 while boot_phase(1)='0' (DIP read window), else lamp clk
-		rclk_595			: 	out 	std_logic; -- DIP strobe3 while boot_phase(1)='0' (DIP read window), else lamp rclk
+		serin_595			: 	out 	std_logic; -- DIP strobe1 (dip_strobe(0)) while boot_phase(1)='0' (DIP read window), else lamp serin
+		clk_595			: 	out 	std_logic; -- DIP strobe3 (dip_strobe(2)) while boot_phase(1)='0' (DIP read window), else lamp clk
+		rclk_595			: 	out 	std_logic; -- DIP strobe2 (dip_strobe(1)) while boot_phase(1)='0' (DIP read window), else lamp rclk
 		oe_595			: 	out 	std_logic; -- active low
 		
 		-- 5) solenoids
@@ -406,9 +406,11 @@ LED_D3   <= not nmi_blink_cnt(11); -- NMI-Generator-Blinker ~0.48 Hz: blinkt = H
 -- (Gating on boot_phase(0) was wrong: boot_phase(0) is the synchronized reset_sw AND the
 --  FSM reset, so the FSM only runs when boot_phase(0)='1' -- exactly when the old mux routed
 --  g_*_595 instead of dip_strobe, so the strobes never reached the pins.)
+-- HW-Zuordnung (2026-07-02, Prototyp): clk_595 = Strobe3 (dip_strobe(2)),
+-- rclk_595 = Strobe2 (dip_strobe(1)) -- gegenueber der urspruenglichen Annahme getauscht.
 serin_595 <= dip_strobe(0) when boot_phase(1) = '0' else g_serin_595;
-clk_595 <= dip_strobe(1) when boot_phase(1) = '0' else g_clk_595;
-rclk_595 <= dip_strobe(2) when boot_phase(1) = '0' else g_rclk_595;
+clk_595 <= dip_strobe(2) when boot_phase(1) = '0' else g_clk_595;
+rclk_595 <= dip_strobe(1) when boot_phase(1) = '0' else g_rclk_595;
 options(3 to 6) <= dip_opt(1 to 4);
 RDIPS: entity work.read_the_dips
 port map(
