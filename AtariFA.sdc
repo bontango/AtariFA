@@ -37,6 +37,9 @@
 	set_output_delay -clock clk_50 0 [all_outputs]
 	# reset_sw goes only into a 2-flop synchronizer; exclude from timing analysis
 	set_false_path -from [get_ports reset_sw]
+	# sw_com_in is an asynchronous switch-matrix return; it only enters the 2-FF synchronizer
+	# in switch_matrix.vhd -> exclude from timing analysis (metastability handled there)
+	set_false_path -from [get_ports sw_com_in]
 	
 	#
 	# example second clock

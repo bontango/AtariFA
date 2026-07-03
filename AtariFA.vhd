@@ -142,11 +142,12 @@ end;
 
 architecture rtl of AtariFA is 
 
--- SW version (reserved): not yet read anywhere. Intended to be made readable later
--- (e.g. via a DIP/debug read address or the ESP32 link) so software can query the version.
+-- SW version SW_MAIN.SW_SUB1.SW_SUB2: shown on the boot info display (Display1 during the
+-- ~5 s version/config screen, boot_phase(2)). Not yet machine-readable by the game software;
+-- could later be exposed via a DIP/debug read address or the ESP32 link for a software query.
 constant SW_MAIN : std_logic_vector(3 downto 0) := x"0";
 constant SW_SUB1 : std_logic_vector(3 downto 0) := x"0";
-constant SW_SUB2 : std_logic_vector(3 downto 0) := x"2";
+constant SW_SUB2 : std_logic_vector(3 downto 0) := x"3";
 
 --internal signals via logic
 signal reset_h		: 	std_logic;
@@ -323,15 +324,12 @@ signal por_count      : integer range 0 to 50001 := 0;
 signal por_active     : std_logic := '1';
    -- Power-on-Reset: hält CPU für 50 000 clk_50-Takte (1 ms) nach Konfiguration im Reset
 
--- Taster-Synchronizer (2-FF, clk_50-Domäne) — adressiert B4 für die genutzten Eingänge
--- switch[1]=Test, switch[2]=Coin1, switch[3]=Coin2, switch[4]=Start (aktiv-LOW, Pull-up idle='1')
--- HINWEIS: Der 2-FF-Sync-Prozess (sw_meta->sw_sync aus den HW-Switch-Eingängen) ist in dieser
--- Version NICHT vorhanden -> sw_sync bleibt konstant auf Default (alle '1' = idle), die Switch-
--- Eingänge (Test/Coin1/Coin2/Start) sind damit aktuell wirkungslos (Quartus-Warning 10540).
--- Bewusst offen: das Switch-Design muss ohnehin an die neue AtariFA-HW angepasst werden (Phase B).
-signal sw_meta        : std_logic_vector(16 downto 1) := (others => '1');
-signal sw_sync        : std_logic_vector(16 downto 1) := (others => '1');
--- Dekodierter Switch-Matrix-Wert für cpu_din (gedrückt=0xFF, idle=0x00, non-inverted laut PinMAME swg1_r)
+-- Switch-Matrix (Phase B): reale 10x8-Matrix per switch_matrix.vhd gescannt.
+-- sw_state(offset) = entprellter Zustand je CPU-offset (addr-0x2000); '1' = geschlossen.
+-- Der 2-FF-Synchronizer (B4) liegt jetzt im Modul; die alten sw_meta/sw_sync (GottFA3-Erbe,
+-- dedizierte Switch-Pins) entfallen -- alle Schalter kommen ueber den einen sw_com_in-Rueckkanal.
+signal sw_state       : std_logic_vector(0 to 79);
+-- Dekodierter Switch-Matrix-Wert für cpu_din (geschlossen=0xFF, offen=0x00, laut PinMAME swg1_r)
 signal sw_value       : std_logic_vector(7 downto 0);
 
 -- ---------------------------------------------------------------------------
@@ -459,9 +457,7 @@ oe_595    <= '1';
 g_serin_595 <= '0';
 g_clk_595   <= '0';
 g_rclk_595  <= '0';
--- Switch-Matrix-Strobes (Phase B): Idle
-sw_strobe <= (others => '0');
-sw_com    <= (others => '0');
+-- Switch-Matrix-Strobes (Phase B): jetzt vom switch_matrix-Modul getrieben (s.u. SWM-Instanz).
 -- Aux-Board (ueber invertierenden 74HCT540, gated von solenoids_enable): solange der
 -- 540 disabled ist, definieren die aux-seitigen Pulls den Pegel; Werte hier nur Idle.
 aux_lamp_strobe <= (others => '0');
@@ -510,43 +506,47 @@ begin
 end process;
 
 ------------------------------------------------------------------------------
--- Boot-Info-Inhalt (kombinatorisch). Digit 0=links .. 5=rechts, x"F"=blank,
--- Digit 6 = Player-up-LED (hier aus = x"0"). Alles rechtsbuendig.
+-- Boot-Info-Inhalt (kombinatorisch). HW-Verdrahtung: Index 0 = physisch RECHTS,
+-- Index 5 = physisch LINKS (Digit-Adresse gegenlaeufig). display_control liest
+-- LINEAR (d(idx)) -> die Ziffern hier gespiegelt ablegen, damit die Info-Anzeige
+-- rechtsbuendig/richtig herum erscheint. (Die Umkehr sass frueher zentral in
+-- display_control.vhd, spiegelte aber die Spielanzeige doppelt -> jetzt nur hier.)
+-- x"F"=blank, Digit 6 = Player-up-LED (hier aus = x"0", nicht Teil der Ziffernfolge).
 ------------------------------------------------------------------------------
 boot_info : process(game_select, options, freeplay)
 begin
-	-- Display 1: Version SW_MAIN SW_SUB1 SW_SUB2
+	-- Display 1: Version SW_MAIN SW_SUB1 SW_SUB2 (rechtsbuendig: SUB2 ganz rechts = Index 0)
 	bi_display1 <= (others => x"F");
-	bi_display1(3) <= SW_MAIN;
-	bi_display1(4) <= SW_SUB1;
-	bi_display1(5) <= SW_SUB2;
+	bi_display1(2) <= SW_MAIN;
+	bi_display1(1) <= SW_SUB1;
+	bi_display1(0) <= SW_SUB2;
 	bi_display1(6) <= x"0";
 
 	-- Display 2: Game Select game_idx (0..7 = not game_select), 2-stellig dezimal
 	-- mit fuehrender 0. Wertebereich 0..7 -> Zehnerstelle stets 0, Einer = 0..7.
 	bi_display2 <= (others => x"F");
-	bi_display2(4) <= x"0";                       -- Zehnerstelle (immer 0)
-	bi_display2(5) <= '0' & (not game_select);    -- Einerstelle 0..7
+	bi_display2(1) <= x"0";                       -- Zehnerstelle (immer 0)
+	bi_display2(0) <= '0' & (not game_select);    -- Einerstelle 0..7 (ganz rechts)
 	bi_display2(6) <= x"0";
 
 	-- Display 3: options(1..6), ON wird als '0' gelesen -> '1' anzeigen.
-	-- Option 1 = Digit 0 (links) .. Option 6 = Digit 5 (rechts).
+	-- Option 1 = physisch links (Index 5) .. Option 6 = physisch rechts (Index 0).
 	bi_display3 <= (others => x"F");
 	for i in 1 to 6 loop
 		if options(i) = '0' then
-			bi_display3(i-1) <= x"1";
+			bi_display3(6-i) <= x"1";
 		else
-			bi_display3(i-1) <= x"0";
+			bi_display3(6-i) <= x"0";
 		end if;
 	end loop;
 	bi_display3(6) <= x"0";
 
-	-- Display 4: Freeplay (active-low) -> '1' wenn aktiv, sonst '0'
+	-- Display 4: Freeplay (active-low) -> '1' wenn aktiv, sonst '0' (ganz rechts = Index 0)
 	bi_display4 <= (others => x"F");
 	if freeplay = '0' then
-		bi_display4(5) <= x"1";
+		bi_display4(0) <= x"1";
 	else
-		bi_display4(5) <= x"0";
+		bi_display4(0) <= x"0";
 	end if;
 	bi_display4(6) <= x"0";
 
@@ -646,13 +646,14 @@ audio_clk <= dma_counter(2);  -- reserved for Phase C audio
 dma_int   <= not (dma_counter(7) and dma_counter(8));
 nmi_level <= dma_counter(7) and dma_counter(8);
 
--- DIP read: 0x2000 bit6 = dma_toggle (display-sync, polled at 0x78BE/0x78C9 in ROM1);
---   bit7=0 (BPL check at 0x721C passes), bits5-0=1 (active-low pull-ups).
--- 0x200B = Atari Test switch: idle sw_sync(1)='1'→0xFF (normal boot), gedrückt '0'→0x00 (888888-Test, 7F9C in ROM1).
--- 0x2001-0x200F (excl. 0x200B): all 1 = DIP switches open / switches not pressed (active-low).
-dip_value <= "0" & dma_toggle & "111111" when cpu_addr = x"2000" else
-             (others => sw_sync(1))      when cpu_addr = x"200B" else  -- Test-Taster: idle→FF, gedrückt→00
-             x"FF";
+-- DIP-Region 0x2000-0x200F: volles 1:1 aus der Matrix (SW1/SW2-Programmier-DIPs), zwei Ausnahmen:
+--   0x2000: kein DIP-Read, sondern DMA-Sync -> Bit7=0 (BPL-Check @0x721C), Bit6=dma_toggle
+--           (Display-Sync, ROM-Poll @0x78BE/0x78C9), Bit5..0=1.
+--   0x200B: Self-Test-Schalter invertiert (Boot: idle->0xFF=Normal, gedrueckt->0x00=888888-Test).
+--   sonst : DIP aus Matrix (ON/geschlossen -> 0xFF, wie PinMAME dipg1_r).
+dip_value <= ("0" & dma_toggle & "111111")                              when cpu_addr = x"2000" else
+             (others => not sw_state(conv_integer(cpu_addr(6 downto 0)))) when cpu_addr = x"200B" else
+             (others => sw_state(conv_integer(cpu_addr(6 downto 0))));
 
 ------------------------------
 -- Watchdog (0x4000 write)
@@ -666,6 +667,22 @@ port map(
 	rst_l    => reset_l_stable,
 	kick     => wd_kick,
 	wd_reset => wd_reset
+);
+
+------------------------------------------------------------------------------
+-- Switch-Matrix (Phase B): reale 10x8-Matrix scannen (switch_matrix.vhd).
+-- Freilaufend in clk_50; treibt sw_strobe/sw_com (durch inv. 74HCT540 -> 74LS42 + 74LS145),
+-- sampelt den einen Rueckkanal sw_com_in (durch inv. 74HC4049) und liefert sw_state(0..79)
+-- (offset = addr-0x2000; '1' = geschlossen). Reset an reset_l_stable gekoppelt.
+------------------------------------------------------------------------------
+SWM: entity work.switch_matrix
+port map(
+	clk_50    => clk_50,
+	reset     => not reset_l_stable,
+	sw_strobe => sw_strobe,
+	sw_com    => sw_com,
+	sw_com_in => sw_com_in,
+	sw_state  => sw_state
 );
 
 ----------------------
@@ -693,12 +710,11 @@ rom2_cs <= '1' when cpu_addr(15 downto 11) = "01110" and cpu_vma='1' else '0';
 -- sind write-only; das Spiel liest sie nicht als RAM zurueck, der redundante RAM-Write ist folgenlos.
 sound_cs <= '1' when cpu_addr(15 downto 4) = x"108" and cpu_vma='1' else '0';
 
--- sw_value: Switch-Matrix-Dekodierung (aktiv-low Taster invertiert auf PinMAME-Pegel gedrückt=0xFF/idle=0x00)
--- switch[2]=Coin1→$2010, switch[3]=Coin2→$2011, switch[4]=Start→$2013; übrige Rows idle=0x00.
-sw_value <= (others => not sw_sync(2)) when cpu_addr = x"2010" else  -- Coin1
-            (others => not sw_sync(3)) when cpu_addr = x"2011" else  -- Coin2
-            (others => not sw_sync(4)) when cpu_addr = x"2013" else  -- Start
-            x"00";                                                    -- alle übrigen SW-Rows idle
+-- sw_value: Switch-Matrix @0x2010-0x204F -> offset = cpu_addr(6 downto 0) (0x10..0x4F).
+-- sw_state(offset)='1' = geschlossen -> ganzes Byte 0xFF (PinMAME swg1_r), sonst 0x00.
+-- Mappt Coin1(0x2010)/Coin2(0x2011)/Start(0x2012)/Slam(0x2013), alle Playfield-Schalter und
+-- den Replay-Hex-Schalter (0x204C-0x204F) korrekt (frueherer Start@0x2013-Bug damit behoben).
+sw_value <= (others => sw_state(conv_integer(cpu_addr(6 downto 0))));
 
 -- Bus control
 cpu_din <=
@@ -762,6 +778,20 @@ end process;
 --   0x00-0x0F: Score; offset%4==3 (0x03/07/0B/0F): player-up light → display(6)
 --   0x1C-0x1D: Match/Credit → status_d. Range, player-up, match/credit ✓
 --   Segment-Reihenfolge: absteigend (30-offset*2) → HW-Feintuning Ziffernfolge noch offen
+--
+-- HW-VERIFIZIERT (2026-07-03, Prototyp): das Player-Select-Feld (disp_Adr(5..3)) ist
+-- gegenlaeufig verdrahtet — analog zur Ziffernreihenfolge. Ohne Umkehr erschien der
+-- Player-4-Score physisch auf Player 1 usw. Daher wird die PinMAME-RAM-Player-Nummer
+-- hier gespiegelt auf das Display-Signal gemappt: Player1→display4, Player2→display3,
+-- Player3→display2, Player4→display1 (display_control bleibt unveraendert; Boot-Info
+-- ist davon nicht betroffen und bleibt korrekt). RAM-Offsets folgen weiter PinMAME.
+--
+-- HW-VERIFIZIERT (2026-07-03, Prototyp): innerhalb jedes Score-Bytes sind die beiden
+-- BCD-Ziffern (High-/Low-Nibble) paarweise vertauscht — '200000' erschien als '020000',
+-- Selbsttest-Nr. '     1' als '    1 '. Daher: Low-Nibble (3..0) -> gerader/rechter Index,
+-- High-Nibble (7..4) -> ungerader/linker Index (LSD rechts). Betrifft NUR die 4 Player-
+-- Scores (Sniffer); Player-up-LED (Index 6), Status/Credit-Ball (0x1C/1D) und Boot-Info/
+-- Version bleiben unveraendert und korrekt.
 -- disabled when DISPLAY_TEST=true to avoid multiple-driver conflict with disp_test
 gen_gamedisp : if not DISPLAY_TEST generate
 process(clk_50)
@@ -769,27 +799,27 @@ begin
 	if rising_edge(clk_50) then
 		if ram_wren = '1' and cpu_addr(8 downto 5) = "0000" then
 			case cpu_addr(4 downto 0) is
-				-- Player 1 score: RAM 0x00, 0x01, 0x02
-				when "00000" => display1(0) <= cpu_dout(7 downto 4); display1(1) <= cpu_dout(3 downto 0);
-				when "00001" => display1(2) <= cpu_dout(7 downto 4); display1(3) <= cpu_dout(3 downto 0);
-				when "00010" => display1(4) <= cpu_dout(7 downto 4); display1(5) <= cpu_dout(3 downto 0);
-				when "00011" => display1(6) <= cpu_dout(3 downto 0);  -- Player 1 up LED (8=on,0=off)
-				-- Player 2 score: RAM 0x04, 0x05, 0x06
-				when "00100" => display2(0) <= cpu_dout(7 downto 4); display2(1) <= cpu_dout(3 downto 0);
-				when "00101" => display2(2) <= cpu_dout(7 downto 4); display2(3) <= cpu_dout(3 downto 0);
-				when "00110" => display2(4) <= cpu_dout(7 downto 4); display2(5) <= cpu_dout(3 downto 0);
-				when "00111" => display2(6) <= cpu_dout(3 downto 0);  -- Player 2 up LED
-				-- Player 3 score: RAM 0x08, 0x09, 0x0A
-				when "01000" => display3(0) <= cpu_dout(7 downto 4); display3(1) <= cpu_dout(3 downto 0);
-				when "01001" => display3(2) <= cpu_dout(7 downto 4); display3(3) <= cpu_dout(3 downto 0);
-				when "01010" => display3(4) <= cpu_dout(7 downto 4); display3(5) <= cpu_dout(3 downto 0);
-				when "01011" => display3(6) <= cpu_dout(3 downto 0);  -- Player 3 up LED
-				-- Player 4 score: RAM 0x0C, 0x0D, 0x0E
-				when "01100" => display4(0) <= cpu_dout(7 downto 4); display4(1) <= cpu_dout(3 downto 0);
-				when "01101" => display4(2) <= cpu_dout(7 downto 4); display4(3) <= cpu_dout(3 downto 0);
-				when "01110" => display4(4) <= cpu_dout(7 downto 4); display4(5) <= cpu_dout(3 downto 0);
-				when "01111" => display4(6) <= cpu_dout(3 downto 0);  -- Player 4 up LED
-				-- Match/Credit: RAM 0x1C, 0x1D
+				-- Player 1 score (RAM 0x00-0x03) -> display4 (HW: Player-Feld gespiegelt, Nibble-Paar getauscht)
+				when "00000" => display4(1) <= cpu_dout(7 downto 4); display4(0) <= cpu_dout(3 downto 0);
+				when "00001" => display4(3) <= cpu_dout(7 downto 4); display4(2) <= cpu_dout(3 downto 0);
+				when "00010" => display4(5) <= cpu_dout(7 downto 4); display4(4) <= cpu_dout(3 downto 0);
+				when "00011" => display4(6) <= cpu_dout(3 downto 0);  -- Player 1 up LED (8=on,0=off)
+				-- Player 2 score (RAM 0x04-0x07) -> display3
+				when "00100" => display3(1) <= cpu_dout(7 downto 4); display3(0) <= cpu_dout(3 downto 0);
+				when "00101" => display3(3) <= cpu_dout(7 downto 4); display3(2) <= cpu_dout(3 downto 0);
+				when "00110" => display3(5) <= cpu_dout(7 downto 4); display3(4) <= cpu_dout(3 downto 0);
+				when "00111" => display3(6) <= cpu_dout(3 downto 0);  -- Player 2 up LED
+				-- Player 3 score (RAM 0x08-0x0B) -> display2
+				when "01000" => display2(1) <= cpu_dout(7 downto 4); display2(0) <= cpu_dout(3 downto 0);
+				when "01001" => display2(3) <= cpu_dout(7 downto 4); display2(2) <= cpu_dout(3 downto 0);
+				when "01010" => display2(5) <= cpu_dout(7 downto 4); display2(4) <= cpu_dout(3 downto 0);
+				when "01011" => display2(6) <= cpu_dout(3 downto 0);  -- Player 3 up LED
+				-- Player 4 score (RAM 0x0C-0x0F) -> display1
+				when "01100" => display1(1) <= cpu_dout(7 downto 4); display1(0) <= cpu_dout(3 downto 0);
+				when "01101" => display1(3) <= cpu_dout(7 downto 4); display1(2) <= cpu_dout(3 downto 0);
+				when "01110" => display1(5) <= cpu_dout(7 downto 4); display1(4) <= cpu_dout(3 downto 0);
+				when "01111" => display1(6) <= cpu_dout(3 downto 0);  -- Player 4 up LED
+				-- Match/Credit: RAM 0x1C, 0x1D (korrekt, NICHT getauscht — Status-Konvention weicht ab)
 				when "11100" => status_d(0) <= cpu_dout(7 downto 4); status_d(1) <= cpu_dout(3 downto 0);
 				when "11101" => status_d(2) <= cpu_dout(7 downto 4); status_d(3) <= cpu_dout(3 downto 0);
 				when others => null;

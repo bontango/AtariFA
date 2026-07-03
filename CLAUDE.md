@@ -76,12 +76,16 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
 - **Synchroner 9-Bit-Zähler** statt 3× SN7493-Ripple-Kaskade; NMI-Periode = 512 cpu_clk = 512 µs
 
 ## Offene Bugs (bewusst zurückgestellt)
-- **B4**: Async-Inputs ohne Synchronizer — `sw_meta`/`sw_sync` (2-FF, clk_50) sind deklariert und werden
-  gelesen (Test/Coin1/Coin2/Start), aber der **Sync-Prozess fehlt aktuell** → `sw_sync` bleibt konstant
-  `'1'` (idle), Switch-Eingänge wirkungslos (Warning 10540, nur als Kommentar vermerkt). Switch-Design
-  wird ohnehin an die neue AtariFA-HW angepasst (Phase B); `switch[5..16]`/`options[]`/`dip_*` ebenfalls offen.
+- **B4**: ✓ behoben (2026-07-02) — der 2-FF-Synchronizer liegt jetzt im **`switch_matrix.vhd`**-Scan
+  (alle Matrix-Schalter über `sw_com_in`); die toten `sw_meta`/`sw_sync` (GottFA3-Erbe) sind entfernt,
+  Warning 10540 ist weg. Noch offen nur `options[]`/`dip_*`-SDC-Feinheiten (Phase D).
 - **B5**: ✓ adressiert — alle unimplementierten Ausgänge auf sicheren Inaktiv-Pegel getrieben (s.o. „Sichere Inaktiv-Pegel"). Offen nur noch echte Logik in Phase B/C.
 - **B10–B12**: ✓ Teil-Cleanup — `DIAG_SEL`+`hex7seg` (GottFA3-SEG7-Reste) entfernt, `cpu_clk_gen.vhd` aus `.qsf` (toter Code; PLL `cpu_clock` wird genutzt). Display-Signal-Ownership noch offen.
+- **B13 — Switch-Test ROM-abhängig (offen, 2026-07-03):** Mit **Middle-Earth**-ROM ist der Switch-Test
+  instabil — 1. Test-Schalter-Druck lässt **alle Displaysegmente** aufleuchten, erst 2. Druck betritt
+  den Test (nicht zuverlässig). Mit **Airborne-Avenger**-ROM problemlos → Bring-up läuft vorerst mit
+  Airborne Avenger weiter. Verdacht: game-/ROM-spezifische Test-Switch-/Display-Routine oder Zusammen-
+  spiel Switch-Matrix-Scan ↔ Display/DMA. Später prüfen (ROM-Disassembly Test-Einsprung / Switch-Debounce).
 
 ## Watchdog-Status (offen)
 - `reset_h` enthält **kein** `wd_reset` (bewusst entfernt): Game kickt 0x4000 nicht im Attract Mode → WD würde CPU resetten
@@ -98,11 +102,20 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
   - AN447 / 3,3-V-Interfacing: `sw_com_in` über **74HC4049 @ 3,3 V** = Level-Shifter (HC4049 hat keine Input-Clamp gegen VCC, 5-V-Eingang zulässig) ✅. `reset_l`/`game_select`/`options`: je **10 K Pull-up an 3,3 V, gegen GND geschaltet** (active-low) → reine 3,3-V-Domäne, kein 5-V-Pfad ✅. Damit alle FPGA-Eingänge ≤ VCCIO (10CL006 nicht 5-V-tolerant).
 
 ## Noch nicht implementiert (Roadmap)
-- **Phase B**: Switch-Matrix real (0x2010–0x204F), Solenoid-Latches (0x1080/84/88/8C), Lamp-Matrix (RAM 0x30–0x3F)
-  - ✓ 4 Switch-Eingänge verdrahtet (Commit `2d3cdd1`): `switch[1]`=Test→$200B, `[2]`=Coin1→$2010, `[3]`=Coin2→$2011, `[4]`=Start→$2013; auf GottFA3-Testboard verifiziert (Test/Coin1/Coin2 ✅, Start braucht Kugel-Erkennung)
+- **Phase B**: ✓ **Switch-Matrix implementiert** (2026-07-02, `switch_matrix.vhd`); offen: Solenoid-Latches
+  (0x1080/84/88/8C), Lamp-Matrix (RAM 0x30–0x3F).
+  - **Switch-Matrix real** (`switch_matrix.vhd`): freilaufender Scan der 10×8-Matrix (CPU 0x2000–0x204F,
+    offset 0..79) @clk_50; treibt `sw_strobe`/`sw_com` → inv. 74HCT540 → E11a 74LS42 (Spalte) + 10×
+    SN74LS145N (Zeile), liest den einen Rückkanal `sw_com_in` (inv. 74HC4049), 2-FF-Sync (B4) + 2-Pass-
+    Debounce → `sw_state(0..79)` (`'1'`=geschlossen). Codierung **schaltplan-verifiziert** aus
+    `../doc/AtariFA_07_Final_Switches_SCH.PDF` (Eltern-Ordner `N:\Projekte\FPGA Atari\doc\`, Geschwister: Main/Lamps/Solenoids) (s. „Bekannte HW-Feintuning-Stellen"). CPU-Read: `sw_value`
+    @0x2010–0x204F (PinMAME swg1_r, geschlossen=0xFF), `dip_value` @0x2000–0x200F volles 1:1 aus Matrix
+    (SW1/SW2-Programmier-DIPs + Replay-Hex) — **Ausnahmen** 0x2000 (DMA-Sync/BPL, synthetisiert) und
+    0x200B (Test invertiert). **Start-Bug behoben** (war 0x2013, korrekt **0x2012**). Compile 0 Fehler/
+    0 Critical, Timing ok (Setup ≈+2,8 ns / Hold ≈+0,45 ns), LE 36 %, BRAM unverändert. **HW-Test ausstehend.**
   - ✓ Lamp-Driver gebaut: `lamp_driver.vhd` (84 Lampen → 11× TPIC6B595N, statisch gelatcht, Double-Buffer + Shift-FSM @ clk_50, ersetzt 9334+ULN2003A). RAM-0x30–0x3F-Sniffer analog Display-Shadow-Buffer.
-  - Lamp-Driver in `AtariFA.vhd` noch **komplett auskommentiert** (Ports, `lamp_state`-Signal, Sniffer-Prozess, `LD`-Instanz) — auf Prototyp-HW gemeinsam mit vollständiger Switch-Matrix aktivieren + Pins in `.qsf`.
-  - Noch offen: restliche Switch-Matrix (0x2014–0x204F), Solenoid-Latches
+  - Lamp-Driver in `AtariFA.vhd` noch **komplett auskommentiert** (Ports, `lamp_state`-Signal, Sniffer-Prozess, `LD`-Instanz) — auf Prototyp-HW aktivieren + Pins in `.qsf`.
+  - Noch offen: Solenoid-Latches
   - **Achtung Sound-Überlappung:** 0x1080/84/88 sind geteilte Latches — **Bits 0–3 = Sound**
     (bereits implementiert, s. „Sound"), **Bits 4–7 = Solenoide** (noch offen). Solenoid-Logik
     nur auf die oberen Nibbles legen, Sound-Decode (`sound_cs`) nicht doppelt treiben.
@@ -177,14 +190,40 @@ Umsetzungs-Ergebnis: **`doc/Speech_Boot_Feasibility.md`**.
   Wortanfang kappt → `--lead-ms` Vorlauf-Stille ins ROM legen (am echten Board testen).
 
 ## Bekannte HW-Feintuning-Stellen
-- **Ziffernreihenfolge — ✓ HW-korrigiert (2026-07-02, Prototyp):** Die Digit-Adresse ist gegenläufig
+- **Switch-Matrix-Codierung — schaltplan-verifiziert (2026-07-02, `switch_matrix.vhd`):** aus
+  `../doc/AtariFA_07_Final_Switches_SCH.PDF` (Eltern-Ordner `N:\Projekte\FPGA Atari\doc\`, Geschwister: Main/Lamps/Solenoids). 74HCT540 invertiert alle Ausgänge; E11a 74LS42-Spalten-Map
+  `SW_Strobe` 0→F3,1→F5,2→F7,3→F6,4→F8,5→F9,6→F10,7→F11,8→F12,9→F13 (reproduziert Original-Ā3-Swap);
+  74HC4049 invertiert den Rückkanal (`sw_com_in='1'`=geschlossen). Ergibt (offset=addr−0x2000):
+  `sw_strobe(0)=offset(3)`, `sw_strobe(1)=¬offset(4)`, `sw_strobe(2)=¬offset(5)`, `sw_strobe(3)=¬offset(6)`;
+  `sw_com(0)=offset(0)`, `sw_com(1)=offset(1)`, `sw_com(2)=¬offset(2)`. **Einzige Rest-Annahme
+  (First-Boot-Check):** Netz `F_SW_Strobe_A..D`/`F_SW_COM_A..C` ↔ Port-Index `sw_strobe(0..3)`/`sw_com(0..2)`
+  (A=Bit0). Falls Spalten/Zeilen im Switch-Test daneben → nur diese Bit-Index-Zuordnung 1-zeilig tauschen
+  (Codierung selbst sicher). Debounce/Scan-Rate via Generic `DWELL_CYCLES` (~1 ms/Pass @640).
+- **Ziffernreihenfolge — ✓ HW-korrigiert (2026-07-03, Prototyp):** Die Digit-Adresse ist gegenläufig
   zur logischen Ziffernreihenfolge verdrahtet (**Adresse 0 = physisch RECHTS, Adresse 5 = LINKS**);
-  ohne Umkehr erschien die Version `   002` als `200   `. Fix **zentral in `display_control.vhd`** in den
-  Funktionen `display_nibble` (Score, Index 0..5 → `d(5-idx)`; LED-Slot 6 + unbenutzt 7 unverändert)
-  und `status_nibble` (Status, `s(3-idx)`). Wirkt für **Boot-Info UND Spielanzeige** (Shadow-Buffer).
-  *Status-Umkehr per Analogie gesetzt (Boot-Info-Status ist blank) — bei aktivem Spiel gegen Match/Credit
-  gegenprüfen.* Frühere Vermutung „0,2,4,6,1,3,5,7"/Demux-Anpassung damit hinfällig; `display_control`
-  zählt weiter linear 0..7, nur der Daten-Lookup ist umgekehrt.
+  ohne Umkehr erschien die Version `   002` als `200   `. **Wichtig:** Die Umkehr sitzt **nur** in der
+  **Boot-Info-Erzeugung** (`boot_info`-Prozess in `AtariFA.vhd`), **nicht** zentral in `display_control.vhd`.
+  Grund (HW-Test 2026-07-03): der **Spiel-Shadow-Buffer** (`display1..4`/`status_d`, RAM-Sniffer) liegt
+  bereits in HW-Adressreihenfolge vor (Index 0 = rechts); eine zentrale Umkehr in `display_control`
+  **spiegelte die Spielanzeige doppelt** (Scores verkehrt herum, sobald Atari die Displaykontrolle
+  übernimmt). Daher: `display_nibble`/`status_nibble` **linear** (`d(idx)`/`s(idx)`, Revert von `ddc27e8`);
+  in `boot_info` werden nur die Boot-Info-Ziffern gespiegelt abgelegt (Version/Game/Options rechtsbündig
+  auf Index 0..2 bzw. Options-Loop `bi_display3(6-i)`). `display_control` zählt weiter linear 0..7.
+  *Boot-Info-Status ist blank; Spiel-Status (`status_nibble` linear) bei aktivem Spiel gegen Match/Credit
+  gegenprüfen — falls doch gespiegelt, separat behandeln.*
+- **Player-Reihenfolge — ✓ HW-korrigiert (2026-07-03, Prototyp):** Auch das **Player-Select-Feld**
+  (`disp_Adr(5..3)` in `display_control.vhd`) ist gegenläufig verdrahtet — analog zur Ziffernreihenfolge.
+  Ohne Umkehr erschien der **Player-4-Score physisch auf Player 1** (alle 4 Player-Displays spiegel-
+  verschoben). Fix **nur im Spiel-Shadow-Buffer-Sniffer** (`AtariFA.vhd`): PinMAME-RAM-Player gespiegelt
+  aufs Display-Signal gemappt (**Player1→display4, P2→display3, P3→display2, P4→display1**); RAM-Offsets
+  folgen weiter PinMAME. `display_control` **und** `boot_info` bleiben unverändert (Boot-Info war korrekt
+  und ist nicht betroffen). Status/Credit-Ball (Select `"111"`) unberührt.
+- **Nibble-Paar-Tausch je Score-Byte — ✓ HW-korrigiert (2026-07-03, Prototyp):** Innerhalb jedes
+  Score-Bytes sind die 2 BCD-Ziffern paarweise vertauscht (`200000`→`020000`, Selbsttest-Nr. `     1`
+  →`    1 `). Fix **nur im Spiel-Sniffer** (`AtariFA.vhd`): **Low-Nibble (3..0) → gerader/rechter Index,
+  High-Nibble (7..4) → ungerader/linker Index** (LSD rechts) für alle 4 Player-Scores. **NICHT** getauscht:
+  Player-up-LED (Index 6), **Status/Credit-Ball** (0x1C/1D — dort ist die HW-Darstellung bereits korrekt,
+  Status-Konvention weicht also vom Score ab) und **Boot-Info/Version** (unberührt, bleibt korrekt).
 - Lampennummer↔Bit-Mapping im Lamp-Sniffer (`AtariFA.vhd`, derzeit linear) — PinMAME `col=(offset%4)*2+offset/8`, physische Zuordnung auf Hardware prüfen
 - TPIC6B595N nur ~150 mA Dauer/Ausgang — bei #44/#47-Glühlampen schwächer als ULN2003A (Paketverlustleistung prüfen), mit LEDs unkritisch
 

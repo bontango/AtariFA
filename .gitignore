@@ -36,3 +36,6 @@ desktop.ini
 
 # Local tools / binaries
 tools/
+
+# Local audio sources (speech ROM is regenerated from these; see CLAUDE.md)
+*.wav

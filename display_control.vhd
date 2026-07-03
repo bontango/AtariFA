@@ -73,34 +73,36 @@ use work.instruction_buffer_type.all;
 		constant C_SHOW       : integer := 381;  -- Display AN              -> Show        ~383 us
 		constant C_LAST_DIGIT : integer := 7;    -- 8 Runden (0..7); 6 setzen => 7 Runden (alt)
 
-		-- ----- index-sichere Nibble-Zugriffe + HW-Ziffernreihenfolge ---------------
+		-- ----- index-sichere Nibble-Zugriffe (LINEAR) -----------------------------
 		-- DISPLAY_T  hat nur 0..6, DISPLAY_TS nur 0..3. Der laufende 'digit'-Index geht
 		-- bis 7 -> Index klemmen und ausserhalb des gueltigen Bereichs leer (x"F") liefern.
 		-- (entschaerft zugleich den frueheren latenten status_d(digit>3)-Ueberlauf)
 		--
-		-- HW-VERIFIZIERT (2026-07-02, Prototyp): die Digit-Adresse ist gegenlaeufig zur
-		-- logischen Ziffernreihenfolge verdrahtet -> Adresse 0 = physisch RECHTS, Adresse 5
-		-- = physisch LINKS. Ohne Umkehr erschien die Version '   002' als '200   '.
-		-- Daher hier die Score-Ziffern (0..5) und Status-Ziffern (0..3) umkehren; der
-		-- Player-up-LED-Slot (Index 6) und der unbenutzte Slot 7 bleiben unveraendert.
-		-- Zentral hier korrigiert -> gilt fuer Boot-Info UND Spielanzeige (Shadow-Buffer).
+		-- HW-Ziffernreihenfolge: die Digit-Adresse ist gegenlaeufig verdrahtet
+		-- (Adresse 0 = physisch RECHTS, Adresse 5 = physisch LINKS). Diese Umkehr wird
+		-- NICHT mehr hier zentral gemacht (das spiegelte die Spielanzeige doppelt), sondern
+		-- ausschliesslich in der Boot-Info-Erzeugung (`boot_info`-Prozess in AtariFA.vhd).
+		-- Der Spiel-Shadow-Buffer (display1..4/status_d, RAM-Sniffer) liegt bereits in
+		-- HW-Adressreihenfolge vor -> hier LINEAR (d(idx)/s(idx)) durchreichen.
 		function display_nibble(d : DISPLAY_T; idx : integer) return std_logic_vector is
+			variable i : integer range 0 to 6;
 		begin
 			if idx > 6 then
 				return "1111";          -- digit 7: unbenutzter 8. Scan-Slot -> blank
-			elsif idx = 6 then
-				return d(6);            -- digit 6 = player-up LED (nicht Teil der Ziffernfolge)
 			else
-				return d(5 - idx);      -- 6 Score-Ziffern: HW-Reihenfolge umgekehrt
+				i := idx;
+				return d(i);
 			end if;
 		end function;
 
 		function status_nibble(s : DISPLAY_TS; idx : integer) return std_logic_vector is
+			variable i : integer range 0 to 3;
 		begin
 			if idx > 3 then
 				return "1111";          -- Status-Display hat nur 4 Ziffern (0..3) -> blank
 			else
-				return s(3 - idx);      -- 4 Status-Ziffern: HW-Reihenfolge umgekehrt
+				i := idx;
+				return s(i);
 			end if;
 		end function;
 
