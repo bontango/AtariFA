@@ -7,10 +7,10 @@ MC6800-compatible soft core (John Kent's `cpu68`). It is designed as a "piggy-ba
 replacement that plugs into the original Atari edge connectors and replaces the CPU, RAM,
 ROMs and TTL glue logic, while a single FPGA bitstream supports the whole Gen1 generation.
 
-> Status: hardware design verified, prototype-ready. The CPU core, clocking, memory map,
-> game selection, free-play option, sound and a boot speech announcement are implemented and
-> compile clean; switch matrix, lamps and solenoids are being added step by step (see
-> [Roadmap](#roadmap)).
+> Status: running on prototype hardware. The CPU core, clocking, memory map, game selection,
+> free-play option, sound, a boot speech announcement, the switch matrix and the solenoid
+> drivers are implemented and hardware-tested; the lamp driver is present and being activated
+> (see [Roadmap](#roadmap)).
 
 ## Supported games
 
@@ -86,6 +86,24 @@ The output path is switchable live via `options(3)` (DIP, active-low):
 The implementation is intentionally simplified (synchronous counters, sigma-delta DAC) — see
 [`doc/Sound_Emulation.md`](doc/Sound_Emulation.md) for the full schematic analysis and model.
 
+## Solenoids
+
+The 20 playfield solenoids (IRL540 MOSFETs via inverting 74HCT540 drivers) and the two coin-door
+coils (coin counter, coin lockout) are driven by [`solenoid_driver.vhd`](solenoid_driver.vhd). It
+latches the four original solenoid latches — high nibble of `0x1080/84/88` plus all of `0x108C`
+(20 bits) — while the low nibbles of `0x1080/84/88` stay with the sound path:
+
+| Latch | Bits | Function |
+|---|---|---|
+| `0x1080` | 4 / 5 | coin counter / coin lockout (coin door, via aux board) |
+| `0x1080` | 6–7 | solenoids |
+| `0x1084` / `0x1088` | 4–7 | solenoids |
+| `0x108C` | 0–7 | solenoids |
+
+The bit-to-output mapping is taken from the AtariFA board schematic (two board positions are
+unpopulated). Outputs are held off on reset and during boot, and `solenoids_enable` releases the
+drivers only once the CPU is running — so the coils are safe before and during power-up.
+
 ## Boot speech
 
 At power-up the board speaks a short word ("Lisü", a retro robot voice) once, during the ~5 s
@@ -106,7 +124,7 @@ and reusable across boards: it needs only a clock, a reset and a start trigger.
 - Displays driven via 74HCT540, lamps via TPIC6B595N, solenoids via IRL540 MOSFETs through
   74HCT540 drivers, I²C FRAM (FM24CL64B) for high-score storage, optional ESP32-C3 link
 
-Resource usage (full compile): logic 30 %, block RAM 26/30 M9K (87 %), 1/2 PLL, timing met.
+Resource usage (full compile): logic 36 %, block RAM 26/30 M9K (87 %), 1/2 PLL, timing met.
 
 ## Architecture highlights
 
@@ -117,7 +135,7 @@ Resource usage (full compile): logic 30 %, block RAM 26/30 M9K (87 %), 1/2 PLL, 
   ~1:3 blank:show duty) is matched to the original hardware — measured from a logic-analyzer
   capture of a real board, see [`doc/Display_Timing.md`](doc/Display_Timing.md).
 - **Memory map:** RAM `0x0000–0x01FF` (+ mirror `0x1000`); sound latches `0x1080/84/88`
-  (low nibble; high nibble reserved for solenoids); ROM2 `0x7000`, ROM1 `0x7800`/`0xF800`
+  (low nibble); solenoid latches `0x1080/84/88` (high nibble) + `0x108C`; ROM2 `0x7000`, ROM1 `0x7800`/`0xF800`
   (reset/IRQ vectors); DIP/DMA `0x2000`; switch matrix `0x2010–0x204F`; watchdog `0x4000`.
   Open-bus default `0xFF`. Consistent with PinMAME `src/wpc/atari.c`.
 - **ROMs:** generic `game_rom.vhd` wrapper (`altsyncram`, 2 K×8, init file as a generic),
@@ -150,6 +168,7 @@ written to `output_files/`.
 | `watchdog.vhd`, `slow_to_fast_clock.vhd`, `display_control.vhd` | Support modules |
 | `sound.vhd` | Sound emulation (PROM playback + pitch divider + sigma-delta DAC) |
 | `speech.vhd` / `speech_rom.vhd` | Boot speech ("Lisü"): 8-bit PCM player + 4096×8 ROM |
+| `solenoid_driver.vhd` | Solenoid + coin-door latches (20 IRL540 via 74HCT540) |
 | `lamp_driver.vhd` | Lamp matrix driver (TPIC6B595N) — present, activated in Phase B |
 | `AtariFA.qsf` / `AtariFA.sdc` | Pin/assignment and timing constraints |
 | `rom/` | Game ROM images (Intel HEX) + `82s130` sound PROM |
@@ -161,9 +180,9 @@ written to `output_files/`.
 - **Implemented:** CPU integration, clocking, NMI/DMA, memory map, display routines,
   5-game selection, free-play option, boot configuration display, boot speech announcement,
   4 test-board inputs, safe driver default levels, sound emulation (switchable original aux
-  board / on-board card).
-- **Phase B:** full switch matrix (`0x2010–0x204F`), solenoid latches (high nibble of
-  `0x1080/84/88`), lamp matrix (`lamp_driver.vhd` activation).
+  board / on-board card), switch matrix, solenoid + coin-door drivers.
+- **Phase B:** ✓ switch matrix (`0x2010–0x204F`), ✓ solenoid latches (high nibble of
+  `0x1080/84/88` + `0x108C`, `solenoid_driver.vhd`); remaining: lamp matrix (`lamp_driver.vhd` activation).
 - **Phase C:** ✓ audio done (`sound.vhd`); remaining: generic per-game configuration.
 - **Phase D:** cleanup, SDC completion, input synchronizers.
 - Watchdog reset is intentionally decoupled until the in-game `0x4000` kick is characterized.

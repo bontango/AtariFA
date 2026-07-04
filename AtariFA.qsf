@@ -69,8 +69,6 @@ set_location_assignment PIN_133 -to aux_audio[3]
 set_location_assignment PIN_128 -to aux_audio[2]
 set_location_assignment PIN_135 -to aux_audio[1]
 set_location_assignment PIN_129 -to aux_audio[0]
-set_location_assignment PIN_127 -to aux_audio_latch[5]
-set_location_assignment PIN_136 -to aux_audio_latch[4]
 set_location_assignment PIN_141 -to aux_audio_latch[3]
 set_location_assignment PIN_137 -to aux_audio_latch[2]
 set_location_assignment PIN_138 -to aux_audio_latch[1]
@@ -152,6 +150,7 @@ set_location_assignment PIN_90 -to dip_opt[3]
 set_location_assignment PIN_88 -to dip_opt[4]
 set_global_assignment -name VHDL_FILE read_the_dips.vhd
 set_global_assignment -name VHDL_FILE switch_matrix.vhd
+set_global_assignment -name VHDL_FILE solenoid_driver.vhd
 set_global_assignment -name SDC_FILE AtariFA.sdc
 set_global_assignment -name VHDL_FILE display_test.vhd
 set_global_assignment -name VHDL_FILE slow_to_fast_clock.vhd
@@ -166,4 +165,6 @@ set_global_assignment -name VHDL_FILE watchdog.vhd
 set_global_assignment -name VHDL_FILE AtariFA.vhd
 set_global_assignment -name QIP_FILE cpu_clock.qip
 set_global_assignment -name QIP_FILE sound_rom.qip
+set_location_assignment PIN_136 -to aux_sol_latch[0]
+set_location_assignment PIN_127 -to aux_sol_latch[1]
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

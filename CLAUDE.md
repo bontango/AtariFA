@@ -66,7 +66,7 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
 - RAM-Write-Strobe immer in `clk_50`-Domain (fallende cpu_clk-Flanke per Edge-Detect auf `cpu_clk_d1/d2`)
 - Open-Bus-Default: `cpu_din <= x"FF"` wenn keine CS aktiv
 - Display-Outputs sind **invertiert** wegen 74HCT540-Treiber: `disp_* <= not i_disp_*`
-- **Sichere Inaktiv-Pegel:** noch nicht implementierte Ausgänge werden in `AtariFA.vhd` **explizit** getrieben (nicht undriven lassen!) — Quartus-Default `'0'` würde über den invertierenden 74HCT540 die Solenoide EINschalten. Kern: `solenoids <= (others => '1')` (= MOSFET AUS), `oe_595 <= '1'` (aktiv-low). Block direkt nach den `disp_*`-Zuweisungen.
+- **Sichere Inaktiv-Pegel:** noch nicht implementierte Ausgänge werden in `AtariFA.vhd` **explizit** getrieben (nicht undriven lassen!) — Quartus-Default `'0'` würde über den invertierenden 74HCT540 die Solenoide EINschalten. Kern noch für Lampen: `oe_595 <= '1'` (aktiv-low), `aux_lamp_strobe <= (others=>'0')`. Solenoide/`solenoids_enable`/`aux_sol_latch` sind seit 2026-07-04 vom `solenoid_driver` getrieben (bei Reset/Boot ebenfalls sicher AUS: `solenoids <= not sol_ah` mit `sol_ah=0`). Block direkt nach den `disp_*`-Zuweisungen.
 - **FRAM:** `fram_i2c_sda` ist `inout` (open-drain, idle `'Z'`, externer Pull-up) — I2C braucht bidirektionale SDA für ACK/Read; `fram_i2c_scl` bleibt `out`.
 - SDC-Datei: `AtariFA.sdc`; `cpu_clk` (PLL clk[0]) wird als Datensignal in `clk_50` gesampled → `set_false_path` auf `cpu_clk_d1` (verhindert falsche Hold-Violations durch „clock-used-as-data")
 
@@ -79,7 +79,7 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
 - **B4**: ✓ behoben (2026-07-02) — der 2-FF-Synchronizer liegt jetzt im **`switch_matrix.vhd`**-Scan
   (alle Matrix-Schalter über `sw_com_in`); die toten `sw_meta`/`sw_sync` (GottFA3-Erbe) sind entfernt,
   Warning 10540 ist weg. Noch offen nur `options[]`/`dip_*`-SDC-Feinheiten (Phase D).
-- **B5**: ✓ adressiert — alle unimplementierten Ausgänge auf sicheren Inaktiv-Pegel getrieben (s.o. „Sichere Inaktiv-Pegel"). Offen nur noch echte Logik in Phase B/C.
+- **B5**: ✓ adressiert — unimplementierte Ausgänge auf sicheren Inaktiv-Pegel getrieben (s.o. „Sichere Inaktiv-Pegel"). Solenoide/Münztür/`solenoids_enable` haben jetzt **echte Logik** (`solenoid_driver.vhd`, 2026-07-04); Rest (Lampen) noch Safe-Default.
 - **B10–B12**: ✓ Teil-Cleanup — `DIAG_SEL`+`hex7seg` (GottFA3-SEG7-Reste) entfernt, `cpu_clk_gen.vhd` aus `.qsf` (toter Code; PLL `cpu_clock` wird genutzt). Display-Signal-Ownership noch offen.
 - **B13 — Switch-Test ROM-abhängig (offen, 2026-07-03):** Mit **Middle-Earth**-ROM ist der Switch-Test
   instabil — 1. Test-Schalter-Druck lässt **alle Displaysegmente** aufleuchten, erst 2. Druck betritt
@@ -102,8 +102,8 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
   - AN447 / 3,3-V-Interfacing: `sw_com_in` über **74HC4049 @ 3,3 V** = Level-Shifter (HC4049 hat keine Input-Clamp gegen VCC, 5-V-Eingang zulässig) ✅. `reset_l`/`game_select`/`options`: je **10 K Pull-up an 3,3 V, gegen GND geschaltet** (active-low) → reine 3,3-V-Domäne, kein 5-V-Pfad ✅. Damit alle FPGA-Eingänge ≤ VCCIO (10CL006 nicht 5-V-tolerant).
 
 ## Noch nicht implementiert (Roadmap)
-- **Phase B**: ✓ **Switch-Matrix implementiert** (2026-07-02, `switch_matrix.vhd`); offen: Solenoid-Latches
-  (0x1080/84/88/8C), Lamp-Matrix (RAM 0x30–0x3F).
+- **Phase B**: ✓ **Switch-Matrix** (2026-07-02, `switch_matrix.vhd`) + ✓ **Solenoide** (2026-07-04,
+  `solenoid_driver.vhd`, HW-getestet OK) implementiert; offen: Lamp-Matrix (RAM 0x30–0x3F).
   - **Switch-Matrix real** (`switch_matrix.vhd`): freilaufender Scan der 10×8-Matrix (CPU 0x2000–0x204F,
     offset 0..79) @clk_50; treibt `sw_strobe`/`sw_com` → inv. 74HCT540 → E11a 74LS42 (Spalte) + 10×
     SN74LS145N (Zeile), liest den einen Rückkanal `sw_com_in` (inv. 74HC4049), 2-FF-Sync (B4) + 2-Pass-
@@ -115,10 +115,10 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
     0 Critical, Timing ok (Setup ≈+2,8 ns / Hold ≈+0,45 ns), LE 36 %, BRAM unverändert. **HW-Test ausstehend.**
   - ✓ Lamp-Driver gebaut: `lamp_driver.vhd` (84 Lampen → 11× TPIC6B595N, statisch gelatcht, Double-Buffer + Shift-FSM @ clk_50, ersetzt 9334+ULN2003A). RAM-0x30–0x3F-Sniffer analog Display-Shadow-Buffer.
   - Lamp-Driver in `AtariFA.vhd` noch **komplett auskommentiert** (Ports, `lamp_state`-Signal, Sniffer-Prozess, `LD`-Instanz) — auf Prototyp-HW aktivieren + Pins in `.qsf`.
-  - Noch offen: Solenoid-Latches
-  - **Achtung Sound-Überlappung:** 0x1080/84/88 sind geteilte Latches — **Bits 0–3 = Sound**
-    (bereits implementiert, s. „Sound"), **Bits 4–7 = Solenoide** (noch offen). Solenoid-Logik
-    nur auf die oberen Nibbles legen, Sound-Decode (`sound_cs`) nicht doppelt treiben.
+  - ✓ **Solenoide implementiert** (`solenoid_driver.vhd`, s. eigener Abschnitt „Solenoids").
+  - **Sound-Überlappung (erledigt):** 0x1080/84/88 sind geteilte Latches — **Bits 0–3 = Sound**
+    (s. „Sound"), **Bits 4–7 = Solenoide** + **0x108C voll = Solenoide** (s. „Solenoids"). Sound- und
+    Solenoid-Decode teilen sich den `sound_cs`-Write-Strobe (untere vs. obere Nibbles), kein Doppel-Treiben.
 - **Phase C**: ✓ **Audio implementiert** (`sound.vhd`, s. eigener Abschnitt); offen: generische
   Spiel-Konfiguration per Generic. *(Roadmap nannte früher 0x3000/0x6000 — falsch; schaltplan-
   verifiziert sind die Sound-Latches **0x1080/1084/1088**.)*
@@ -136,7 +136,7 @@ index-sichere Funktionen `display_nibble/status_nibble` (entschärfen latenten `
 ## Sound (sound.vhd, 2026-06-21)
 Digitale Nachbildung der Original-Tonerzeugung (Prozessor-PCB Sheet 15B + Aux-PCB), aus den
 Schaltplänen `doc/Display_Logic.png` + `doc/Auxiliary_PCB.png` verifiziert. **Drei geteilte
-Latches (Bits 0–3, Bits 4–7 = Solenoide/Phase B):**
+Latches (Bits 0–3 = Sound; Bits 4–7 = Solenoide, s. „Solenoids"):**
 - **0x1080 = Wellenform-Auswahl** → D12-ROM Adr A5–A8 (16 Wellenformen).
 - **0x1088 = Tonhöhe** → D13 (74LS9316) Teiler `(16 − wert)` von AUDIO CLK (≈ cpu_clk/2 = 500 kHz).
 - **0x1084 = Lautstärke** → Aux-PCB CD4016-Attenuator (gewichtete R 68/33/18/8.2 K ≈ linear).
@@ -158,6 +158,29 @@ D12). Warnung 14320 (ROM `q[7:4]` wegoptimiert) harmlos. **HW-Vorbehalte (im Cod
 (1) Original-Pfad erreicht das Aux-Board erst mit aktivem 74HCT540 (`solenoids_enable`, Phase B/C);
 (2) `aux_audio_latch` Bit 5/4 auf Idle '0' (HW-Zuordnung der oberen 2 Bit prüfen);
 (3) Adress-/Volume-Bit-Reihenfolge bei „falschem" Klang 1-zeilig tauschbar.
+
+## Solenoids (solenoid_driver.vhd, 2026-07-04, HW-getestet OK)
+20 Solenoide + 2 Münztür-Spulen. Statische Latches (wie Original 74LS175), @clk_50. Latch-Adressen
+schaltplan-verifiziert (`doc/Switch_Sol_Logic.png` Sheet 15C + `doc/Auxiliary_PCB.png` Sheet 10A):
+- **Solenoid-Bits:** `0x1080[7:4]` + `0x1084[7:4]` + `0x1088[7:4]` + `0x108C[7:0]` = **20 Bits**
+  (untere Nibbles 1080/84/88 = Sound). **Münztür (Aux-PCB):** `COIN_CNTREN=0x1080 bit4`,
+  `LOCKOUT_EN=0x1080 bit5` (→ `aux_sol_latch(0/1)`).
+- **Integration `AtariFA.vhd`:** Instanz `SOL`; Write-Strobe `sol_wr` = `sound_cs`-Edge (derselbe
+  Write-Prozess wie die Sound-Latches, obere vs. untere Nibbles); `latch_sel=cpu_addr(3:2)`.
+  Ausgänge invertiert (74HCT540): `solenoids <= not sol_ah`, `aux_sol_latch(0/1) <= not coin/lockout`.
+  `solenoids_enable <= not reset_l_stable` (Freigabe erst mit CPU; Boot/Reset disabled=sicher; gibt
+  auch den Original-Audio-Aux-Pfad frei, da am selben 540). `reset/enable => reset_l_stable`.
+- **Sicherheit:** bei Reset ODER `enable=0` alle Solenoide/Münztür AUS (Defense-in-depth + physisches
+  540-Gate). Kein Auto-Timeout (LOCKOUT ist Dauerstrom-Coil; Puls-Timing macht der Game-Code).
+- **Bit→Ausgang-Zuordnung nutzer-vorgegeben** (aus AtariFA-Schaltplan, `solenoid_mapping.txt`),
+  Doppelbelegung geprüft (keine): Münztür (1080 bit4/5) disjunkt vom Playfield (nutzt 1080 nur bit6/7);
+  **`F_Q14`/`F_Q18` unbestückt** (`sol_i(14)/(18)='0'`, passt zu Doc „Q14,Q18 fehlen je nach Spiel").
+  **HW-tunbar:** bei falscher Reihenfolge NUR den Zuordnungsblock in `solenoid_driver.vhd` anpassen.
+- **Compile:** 0 Fehler/0 Critical, LE 36 %, BRAM 26/30 unverändert, Timing ok. Warnungen
+  `solenoids[14]/[18] stuck at VCC` = erwartet (unbestückt, AUS).
+- **OFFEN (bei Time-2000-Test klären):** PinMAME modelliert `0x508C` als separates Zusatz-Latch
+  (8 Solenoide, „Time 2000 only"), aber der Time-2000-Schaltplan zeigt das laut Nutzer nicht →
+  evtl. Mirror/Alias von 0x108C. Board hat nur 20 MOSFETs; ein evtl. 0x508C ist unabgedeckt.
 
 ## Boot-Sprachausgabe „Lisü" (speech.vhd, 2026-06-22)
 Beim Boot wird einmalig das Wort „Lisü" (deutsche Roboterstimme) über die vorhandene Onboard-

@@ -1,0 +1,55 @@
+# =====================================================================
+# AtariFA  -  Solenoid Latch-Bit  ->  Ausgang  Zuordnung  (Phase B)
+# =====================================================================
+#
+# BITTE AUSFUELLEN / KORRIGIEREN:
+#   Trage rechts vom "=" die Latch-Adresse und das Bit ein, das den
+#   jeweiligen Ausgang treiben soll.  Format:  <0xADRESSE> bit<N>
+#   - Adresse: eine von  0x1080  0x1084  0x1088  0x108C
+#   - Bit:     bit0 .. bit7   (bit4..bit7 = obere Nibbles; 0x108C nutzt bit0..bit7)
+#   Alles hinter '#' ist Kommentar und wird ignoriert.
+#   Wenn ein Ausgang NICHT bestueckt/ungenutzt ist -> schreibe:  unused
+#
+# Die Werte unten sind nur der DEFAULT (natuerliche Reihenfolge) als
+# Startpunkt - bitte gegen den AtariFA-Schaltplan pruefen und anpassen.
+#
+# Schaltplan-Kontext (fix, nicht zu aendern):
+#   * Untere Nibbles 0x1080/1084/1088 bit0..bit3 = SOUND (schon in sound.vhd) - NICHT hier verwenden.
+#   * Solenoid-Bits gesamt = 0x1080[7:4] + 0x1084[7:4] + 0x1088[7:4] + 0x108C[7:0] = 20 Bits.
+#   * Aux-Schaltplan: COIN_CNTREN = 0x1080 bit4,  LOCKOUT_EN = 0x1080 bit5.
+#   * solenoids(N) = F_Q(N) -> invertierender 74HCT540 -> IRL540-MOSFET.
+#
+# ---------------------------------------------------------------------
+# 20 Playfield-Solenoide  (solenoids(1..20) = F_Q1..F_Q20)
+# ---------------------------------------------------------------------
+solenoids(1)   = 0x1084 bit7     #  F_Q1
+solenoids(2)   = 0x1084 bit5     #  F_Q2
+solenoids(3)   = 0x1084 bit6     #  F_Q3
+solenoids(4)   = 0x1088 bit5     #  F_Q4
+solenoids(5)   = 0x108C bit6     #  F_Q5
+solenoids(6)   = 0x1088 bit7     #  F_Q6
+solenoids(7)   = 0x1088 bit4     #  F_Q7
+solenoids(8)   = 0x1084 bit4     #  F_Q8
+solenoids(9)   = 0x108C bit3     #  F_Q9
+solenoids(10)  = 0x108C bit0     #  F_Q10
+solenoids(11)  = 0x1080 bit7     #  F_Q11
+solenoids(12)  = 0x1088 bit6     #  F_Q12
+solenoids(13)  = 0x1080 bit6     #  F_Q13
+solenoids(14)  = unused          #  F_Q14
+solenoids(15)  = 0x108C bit5     #  F_Q15
+solenoids(16)  = 0x108C bit7     #  F_Q16
+solenoids(17)  = 0x108C bit4     #  F_Q17
+solenoids(18)  = unused          #  F_Q18
+solenoids(19)  = 0x108C bit2     #  F_Q19
+solenoids(20)  = 0x108C bit1     #  F_Q20
+
+# ---------------------------------------------------------------------
+# 2 Muenztuer-Spulen  (Aux-Board, via aux_sol_latch)
+# ---------------------------------------------------------------------
+COIN_CNTREN    = 0x1080 bit4     # aux_sol_latch(0)
+LOCKOUT_EN     = 0x1080 bit5     # aux_sol_latch(1)
+
+# =====================================================================
+# Fertig?  -> Datei speichern und mir Bescheid geben ("passt so" reicht,
+# wenn der Default stimmt).  Ich baue daraus solenoid_driver.vhd.
+# =====================================================================

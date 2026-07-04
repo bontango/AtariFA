@@ -119,7 +119,8 @@ entity AtariFA is
 		-- 6) auxilary board interface
 		aux_lamp_strobe: out 	std_logic_vector(1 downto 0);
 		aux_audio: out 	std_logic_vector(3 downto 0);
-		aux_audio_latch: out 	std_logic_vector(5 downto 0);
+		aux_audio_latch: out 	std_logic_vector(3 downto 0);
+		aux_sol_latch: out 	std_logic_vector(1 downto 0);
 		
 		-- 7) FRAM
 		fram_i2c_sda		: inout std_logic;  -- I2C SDA: bidirektional/open-drain (ACK + Read-Back)
@@ -147,7 +148,7 @@ architecture rtl of AtariFA is
 -- could later be exposed via a DIP/debug read address or the ESP32 link for a software query.
 constant SW_MAIN : std_logic_vector(3 downto 0) := x"0";
 constant SW_SUB1 : std_logic_vector(3 downto 0) := x"0";
-constant SW_SUB2 : std_logic_vector(3 downto 0) := x"3";
+constant SW_SUB2 : std_logic_vector(3 downto 0) := x"4";
 
 --internal signals via logic
 signal reset_h		: 	std_logic;
@@ -177,6 +178,12 @@ signal snd_volume	: std_logic_vector(3 downto 0) := (others => '0');  -- Latch 1
 signal snd_sample	: std_logic_vector(3 downto 0);  -- roher 4-Bit ROM-Nibble (Aux-Pfad)
 signal snd_pwm		: std_logic;                     -- 1-Bit Sigma-Delta (Onboard-Pfad)
 signal sound_cs		: std_logic;
+-- Solenoid-Steuerung (Phase B, solenoid_driver.vhd): Write-Strobe + Modul-Ausgaenge (aktiv-high).
+-- sol_ah/coin_cntr_ah/lockout_ah werden im Top invertiert (74HCT540) auf die Ports gelegt.
+signal sol_wr		: std_logic := '0';
+signal sol_ah		: std_logic_vector(1 to 20);
+signal coin_cntr_ah	: std_logic;
+signal lockout_ah	: std_logic;
 -- Boot-Sprachausgabe ("Lisy", speech.vhd): eigener 1-Bit-Sigma-Delta-Strom + busy.
 -- Start an Vorderflanke boot_phase(1); Ausgabe ueber SB_Sound-Mux (Vorrang vor Sound).
 signal speech_pwm	: std_logic;                     -- 1-Bit Sigma-Delta der Sprachausgabe
@@ -445,13 +452,18 @@ disp_Anode_blank <= not i_disp_Anode_blank;
 -- jeden ungenutzten Ausgang explizit inaktiv treiben, damit die Platine schon
 -- vor der Phase-B/C-Verdrahtung sicher ist.
 ------------------------------------------------------------------------------
--- Solenoide: invertierender 74HCT540 -> FPGA '1' => 540-Ausgang '0' => Gate low => MOSFET AUS.
--- Das ist der harte Sicherheitsnetz-Pegel, unabhaengig vom Enable.
-solenoids        <= (others => '1');
--- solenoids_enable: laeuft ueber den NICHT invertierenden 74HCT541 an die active-low
--- /OE der 74HCT540 (Solenoid-MOSFETs UND Aux-Board). '1' => /OE high => 540 disabled
--- (hochohmig) => Gate-Pulldowns halten MOSFETs AUS, Aux-Ausgaenge inaktiv.
-solenoids_enable <= '1';
+-- Solenoide (Phase B): getrieben vom solenoid_driver (Instanz SOL, s.u.). sol_ah ist aktiv-high
+-- ('1'=bestromt); invertierender 74HCT540 -> FPGA '1' => 540-Ausgang '0' => Gate low => MOSFET AUS.
+-- Das Modul haelt bei Reset/enable=0 alles auf 0 (AUS) -> hier '1' am Port (sicher).
+solenoids        <= not sol_ah;
+-- Muenztuer-Spulen ueber Aux-Board (invertierender 74HCT540): aktiv-high coin_cntr/lockout -> invertiert.
+aux_sol_latch(0) <= not coin_cntr_ah;   -- COIN_CNTREN (0x1080 bit4)
+aux_sol_latch(1) <= not lockout_ah;     -- LOCKOUT_EN  (0x1080 bit5)
+-- solenoids_enable: laeuft ueber den NICHT invertierenden 74HCT541 an die active-low /OE der
+-- 74HCT540 (Solenoid-MOSFETs UND Aux-Board). '0' => 540 freigegeben, '1' => disabled (sicher).
+-- Freigabe erst mit CPU (reset_l_stable = boot_phase(2)); Boot/Reset = '1' = disabled.
+-- Achtung: gibt auch den Original-Audio-Aux-Pfad frei (aux-Signale am selben 540, beabsichtigt).
+solenoids_enable <= not reset_l_stable;
 -- Lampentreiber (TPIC6B595): oe_595 ist aktiv-low -> '1' = Ausgaenge disabled.
 oe_595    <= '1';
 g_serin_595 <= '0';
@@ -466,9 +478,9 @@ aux_lamp_strobe <= (others => '0');
 --   '0' (DIP ON)  = Emulation: 1-Bit Sigma-Delta ueber SB_Sound (Onboard RC + TDA7267)
 -- Aux-Datenleitungen invertiert wegen 74HCT540 (Konvention wie disp_*); HW-Vorbehalt: der
 -- Original-Pfad erreicht das Aux-Board erst, wenn der 74HCT540 enabled ist (solenoids_enable,
--- Phase B/C). aux_audio_latch ist 6 Bit: Volume auf Bit 3..0, Bit 5..4 Idle (HW-Zuordnung pruefen).
+-- Phase B/C). aux_audio_latch ist 4 Bit: Volume auf Bit 3..0
 aux_audio       <= not snd_sample                      when options(3) = '1' else (others => '0');
-aux_audio_latch <= ("00" & not snd_volume)             when options(3) = '1' else (others => '0');
+aux_audio_latch <= (not snd_volume)             when options(3) = '1' else (others => '0');
 -- Boot-Sprache hat Vorrang: waehrend speech_busy spricht das Sprachmodul ueber SB_Sound,
 -- danach (im Spiel) normaler Emulations-Sound bei options(3)=ON. Faellt ins Info-Fenster.
 SB_Sound        <= speech_pwm                           when speech_busy = '1'
@@ -685,6 +697,25 @@ port map(
 	sw_state  => sw_state
 );
 
+------------------------------------------------------------------------------
+-- Solenoid-Steuerung (Phase B): solenoid_driver.vhd latcht die vier Sol-Latches
+-- 0x1080/1084/1088/108C (Write-Strobe sol_wr, latch_sel = cpu_addr(3:2)) und treibt
+-- sol_ah(1..20) + Muenztuer (coin_cntr_ah/lockout_ah), oben invertiert auf die Ports.
+-- reset/enable an reset_l_stable gekoppelt (AUS im Boot/Reset, live sobald CPU laeuft).
+------------------------------------------------------------------------------
+SOL: entity work.solenoid_driver
+port map(
+	clk_50    => clk_50,
+	reset     => not reset_l_stable,
+	wr        => sol_wr,
+	latch_sel => cpu_addr(3 downto 2),
+	data      => cpu_dout,
+	enable    => reset_l_stable,
+	sol       => sol_ah,
+	coin_cntr => coin_cntr_ah,
+	lockout   => lockout_ah
+);
+
 ----------------------
 -- address decoding
 ----------------------
@@ -737,6 +768,8 @@ begin
 		ram_wren  <= ram_cs  and (not cpu_rw) and (cpu_clk_d2 and not cpu_clk_d1);
 		wd_kick   <= wd_cs   and (not cpu_rw) and (cpu_clk_d2 and not cpu_clk_d1);
 		nvram_wren <= nvram_cs and (not cpu_rw) and (cpu_clk_d2 and not cpu_clk_d1);
+		-- Solenoid-Latch-Write (0x108x): 1-clk-Puls, analog ram_wren -> solenoid_driver
+		sol_wr    <= sound_cs and (not cpu_rw) and (cpu_clk_d2 and not cpu_clk_d1);
 		-- NVRAM latch: 1-Byte-Register, schreibbar analog RAM-Write-Strobe
 		if nvram_cs = '1' and cpu_rw = '0' and (cpu_clk_d2 = '1' and cpu_clk_d1 = '0') then
 			nvram_dout <= cpu_dout;
