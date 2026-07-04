@@ -66,7 +66,7 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
 - RAM-Write-Strobe immer in `clk_50`-Domain (fallende cpu_clk-Flanke per Edge-Detect auf `cpu_clk_d1/d2`)
 - Open-Bus-Default: `cpu_din <= x"FF"` wenn keine CS aktiv
 - Display-Outputs sind **invertiert** wegen 74HCT540-Treiber: `disp_* <= not i_disp_*`
-- **Sichere Inaktiv-Pegel:** noch nicht implementierte Ausgänge werden in `AtariFA.vhd` **explizit** getrieben (nicht undriven lassen!) — Quartus-Default `'0'` würde über den invertierenden 74HCT540 die Solenoide EINschalten. Kern noch für Lampen: `oe_595 <= '1'` (aktiv-low), `aux_lamp_strobe <= (others=>'0')`. Solenoide/`solenoids_enable`/`aux_sol_latch` sind seit 2026-07-04 vom `solenoid_driver` getrieben (bei Reset/Boot ebenfalls sicher AUS: `solenoids <= not sol_ah` mit `sol_ah=0`). Block direkt nach den `disp_*`-Zuweisungen.
+- **Sichere Inaktiv-Pegel:** noch nicht implementierte Ausgänge werden in `AtariFA.vhd` **explizit** getrieben (nicht undriven lassen!) — Quartus-Default `'0'` würde über den invertierenden 74HCT540 die Solenoide EINschalten. Solenoide/`solenoids_enable`/`aux_sol_latch` sind seit 2026-07-04 vom `solenoid_driver` getrieben; **Lampen** (`oe_595`/`serin_595`/`clk_595`/`rclk_595`/`aux_lamp_strobe`) seit 2026-07-04 vom `lamp_matrix` (bei Reset/Boot sicher AUS: `enable=0` → `oe_595='1'`). Block direkt nach den `disp_*`-Zuweisungen.
 - **FRAM:** `fram_i2c_sda` ist `inout` (open-drain, idle `'Z'`, externer Pull-up) — I2C braucht bidirektionale SDA für ACK/Read; `fram_i2c_scl` bleibt `out`.
 - SDC-Datei: `AtariFA.sdc`; `cpu_clk` (PLL clk[0]) wird als Datensignal in `clk_50` gesampled → `set_false_path` auf `cpu_clk_d1` (verhindert falsche Hold-Violations durch „clock-used-as-data")
 
@@ -79,7 +79,7 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
 - **B4**: ✓ behoben (2026-07-02) — der 2-FF-Synchronizer liegt jetzt im **`switch_matrix.vhd`**-Scan
   (alle Matrix-Schalter über `sw_com_in`); die toten `sw_meta`/`sw_sync` (GottFA3-Erbe) sind entfernt,
   Warning 10540 ist weg. Noch offen nur `options[]`/`dip_*`-SDC-Feinheiten (Phase D).
-- **B5**: ✓ adressiert — unimplementierte Ausgänge auf sicheren Inaktiv-Pegel getrieben (s.o. „Sichere Inaktiv-Pegel"). Solenoide/Münztür/`solenoids_enable` haben jetzt **echte Logik** (`solenoid_driver.vhd`, 2026-07-04); Rest (Lampen) noch Safe-Default.
+- **B5**: ✓ adressiert — unimplementierte Ausgänge auf sicheren Inaktiv-Pegel getrieben (s.o. „Sichere Inaktiv-Pegel"). Solenoide/Münztür/`solenoids_enable` haben jetzt **echte Logik** (`solenoid_driver.vhd`, 2026-07-04); Lampen jetzt ebenfalls echte Logik (`lamp_matrix.vhd`, 2026-07-04).
 - **B10–B12**: ✓ Teil-Cleanup — `DIAG_SEL`+`hex7seg` (GottFA3-SEG7-Reste) entfernt, `cpu_clk_gen.vhd` aus `.qsf` (toter Code; PLL `cpu_clock` wird genutzt). Display-Signal-Ownership noch offen.
 - **B13 — Switch-Test ROM-abhängig (offen, 2026-07-03):** Mit **Middle-Earth**-ROM ist der Switch-Test
   instabil — 1. Test-Schalter-Druck lässt **alle Displaysegmente** aufleuchten, erst 2. Druck betritt
@@ -103,7 +103,8 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
 
 ## Noch nicht implementiert (Roadmap)
 - **Phase B**: ✓ **Switch-Matrix** (2026-07-02, `switch_matrix.vhd`) + ✓ **Solenoide** (2026-07-04,
-  `solenoid_driver.vhd`, HW-getestet OK) implementiert; offen: Lamp-Matrix (RAM 0x30–0x3F).
+  `solenoid_driver.vhd`, HW-getestet OK) + ✓ **Lamp-Matrix** (2026-07-04, `lamp_matrix.vhd`,
+  HW-Test ausstehend) implementiert.
   - **Switch-Matrix real** (`switch_matrix.vhd`): freilaufender Scan der 10×8-Matrix (CPU 0x2000–0x204F,
     offset 0..79) @clk_50; treibt `sw_strobe`/`sw_com` → inv. 74HCT540 → E11a 74LS42 (Spalte) + 10×
     SN74LS145N (Zeile), liest den einen Rückkanal `sw_com_in` (inv. 74HC4049), 2-FF-Sync (B4) + 2-Pass-
@@ -113,8 +114,9 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
     (SW1/SW2-Programmier-DIPs + Replay-Hex) — **Ausnahmen** 0x2000 (DMA-Sync/BPL, synthetisiert) und
     0x200B (Test invertiert). **Start-Bug behoben** (war 0x2013, korrekt **0x2012**). Compile 0 Fehler/
     0 Critical, Timing ok (Setup ≈+2,8 ns / Hold ≈+0,45 ns), LE 36 %, BRAM unverändert. **HW-Test ausstehend.**
-  - ✓ Lamp-Driver gebaut: `lamp_driver.vhd` (84 Lampen → 11× TPIC6B595N, statisch gelatcht, Double-Buffer + Shift-FSM @ clk_50, ersetzt 9334+ULN2003A). RAM-0x30–0x3F-Sniffer analog Display-Shadow-Buffer.
-  - Lamp-Driver in `AtariFA.vhd` noch **komplett auskommentiert** (Ports, `lamp_state`-Signal, Sniffer-Prozess, `LD`-Instanz) — auf Prototyp-HW aktivieren + Pins in `.qsf`.
+  - ✓ **Lamp-Matrix implementiert** (`lamp_matrix.vhd`, 2026-07-04, s. eigener Abschnitt „Lamps"):
+    21×4-Multiplex (84 Lampen), 12× ULN2003A + drei 74HC595 + 4 Aux-Strobes; RAM-0x30–0x3F-Sniffer
+    → `lamp_state`. Der alte `lamp_driver.vhd` (TPIC6B595-Entwurf) wurde **gelöscht**.
   - ✓ **Solenoide implementiert** (`solenoid_driver.vhd`, s. eigener Abschnitt „Solenoids").
   - **Sound-Überlappung (erledigt):** 0x1080/84/88 sind geteilte Latches — **Bits 0–3 = Sound**
     (s. „Sound"), **Bits 4–7 = Solenoide** + **0x108C voll = Solenoide** (s. „Solenoids"). Sound- und
@@ -158,6 +160,33 @@ D12). Warnung 14320 (ROM `q[7:4]` wegoptimiert) harmlos. **HW-Vorbehalte (im Cod
 (1) Original-Pfad erreicht das Aux-Board erst mit aktivem 74HCT540 (`solenoids_enable`, Phase B/C);
 (2) `aux_audio_latch` Bit 5/4 auf Idle '0' (HW-Zuordnung der oberen 2 Bit prüfen);
 (3) Adress-/Volume-Bit-Reihenfolge bei „falschem" Klang 1-zeilig tauschbar.
+
+## Lamps (lamp_matrix.vhd, 2026-07-04, HW-Test ausstehend)
+84 Lampen als **21×4-Multiplex-Matrix** (ersetzt den gelöschten `lamp_driver.vhd`/TPIC6B595-Entwurf).
+Reale Prototyp-HW: 12× **ULN2003A** (A20…B15; A14/B14/A13/B13/A12/B12 unbestückt) als Zeilen/Sink,
+getrieben von einer **Kaskade aus drei 74HC595** (24 Bit, 21 genutzt) = 21 „Lampengruppen"; die
+4 Strobes SA/SB/SC/SD (Spalten, +20 V) erzeugt das **Aux-Board** aus 2 Bit (`aux_lamp_strobe`, extern
+7402-NOR+MC14xx 1-of-4-dekodiert). Schaltplan: `doc/Lamp_Logic.png` (18D) + `doc/Lamp_Logic2.png`
+(18A, 9334-Decode) + `doc/Auxiliary_PCB.png` (10A) + `doc/AtariFA_Lamps.xlsx`.
+- **Datenquelle:** RAM **0x30–0x3F**-Write-Sniffer → `lamp_state(127:0)` (in `AtariFA.vhd`, Prozess
+  `lamp_sniffer`, analog Display-Shadow-Buffer; nur Page-0, nicht der Mirror). Die CPU schreibt Lampen
+  nach 0x30–0x3F — **nicht** 0x1000–0x100C (das ist RAM-Mirror → Score-Bytes, würde sonst korrumpieren).
+- **Mapping (HW-abgeleitet):** 595-Gruppe `N = 4*b + L + 1` (Excel; `L`=Latch 0=1000..3=100C, `b`=Bit),
+  RAM-Offset `= L*4 + s` (aus 9334-Adressbits A2/A3/A7 beim DMA-Read von 0x30–0x3F: A7=0=Lampen,
+  `offset[3:2]`=Latch, `offset[1:0]`=Strobe s) ⇒ `ser_bit(N,s) = lamp_state[(L*4+s)*8 + b]`.
+  84 unabhängige Lampen (21 Gruppen × 4 Strobes).
+- **Scan-FSM (`lamp_matrix.vhd`, @clk_50):** je Strobe-Phase: blanken (`oe_595`='1') → 24 Bit MSB-first
+  in die Kaskade schieben → `rclk`-Latch → `aux_lamp_strobe`=enc(s) → `oe_595`='0' → Dwell
+  (`DWELL_CYCLES`≈250 µs → ~1 kHz Frame, native ~25 % Duty wie Original). Blank-während-Umschalten =
+  Anti-Ghost. **595-Signale über 74HCT541 (NICHT invertiert)**; `aux_lamp_strobe` über **74HCT540
+  (invertiert)** → Top: `aux_lamp_strobe <= not lamp_strobe_sel`.
+- **Integration:** Instanz `LAMP`; `reset/enable => reset_l_stable` (Lampen erst mit CPU live,
+  Boot/Reset sicher AUS: `enable=0` → `oe_595='1'`). Ersetzt die früheren Safe-Defaults.
+- **Compile (2026-07-04):** 0 Fehler/0 Critical, Timing ok (Setup ≈+2,94 ns / Hold ≈+0,45 ns),
+  LE 40 %, BRAM unverändert (73 %; `lamp_state` sind Register, kein M9K). Lamp-Pins nicht „stuck".
+- **HW-TUNBAR (bei falscher Lampe/Strobe am Prototyp NUR in `lamp_matrix.vhd`):** `STROBE_ENC`
+  (Strobe-Code ↔ SA/SB/SC/SD-Permutation, deckt auch die 540-Invertierung), `offset[3:2]=Latch`/
+  `offset[1:0]=Strobe`, 595-Shift-Reihenfolge (welcher 74HC595 zuerst / vec(23)=MSB).
 
 ## Solenoids (solenoid_driver.vhd, 2026-07-04, HW-getestet OK)
 20 Solenoide + 2 Münztür-Spulen. Statische Latches (wie Original 74LS175), @clk_50. Latch-Adressen
@@ -247,8 +276,12 @@ Umsetzungs-Ergebnis: **`doc/Speech_Boot_Feasibility.md`**.
   High-Nibble (7..4) → ungerader/linker Index** (LSD rechts) für alle 4 Player-Scores. **NICHT** getauscht:
   Player-up-LED (Index 6), **Status/Credit-Ball** (0x1C/1D — dort ist die HW-Darstellung bereits korrekt,
   Status-Konvention weicht also vom Score ab) und **Boot-Info/Version** (unberührt, bleibt korrekt).
-- Lampennummer↔Bit-Mapping im Lamp-Sniffer (`AtariFA.vhd`, derzeit linear) — PinMAME `col=(offset%4)*2+offset/8`, physische Zuordnung auf Hardware prüfen
-- TPIC6B595N nur ~150 mA Dauer/Ausgang — bei #44/#47-Glühlampen schwächer als ULN2003A (Paketverlustleistung prüfen), mit LEDs unkritisch
+- **Lamp-Matrix-Zuordnung** (`lamp_matrix.vhd`, s. Abschnitt „Lamps"): 595-Gruppe↔(Latch,Bit) aus
+  `AtariFA_Lamps.xlsx` fix; **HW-tunbar am Prototyp NUR dort:** `STROBE_ENC` (2-Bit-Code ↔ SA/SB/SC/SD +
+  540-Invertierung), `offset[3:2]=Latch`/`offset[1:0]=Strobe`, 595-Shift-Reihenfolge. Im Lampen-Selbsttest
+  prüfen, welche physische Lampe/Strobe aufleuchtet.
+- Treiber sind **ULN2003A** (Original-Design, kein TPIC): nur die 12 bestückten ICs A20…B15 genutzt;
+  #44/#47-Glühlampen unkritisch (Original-Auslegung).
 
 ## Referenz
 - PinMAME `src/wpc/atari.c`: maßgeblich für Speicher-Map, Display-Mapping, Switch/DIP-Handler

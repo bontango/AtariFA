@@ -151,6 +151,7 @@ set_location_assignment PIN_88 -to dip_opt[4]
 set_global_assignment -name VHDL_FILE read_the_dips.vhd
 set_global_assignment -name VHDL_FILE switch_matrix.vhd
 set_global_assignment -name VHDL_FILE solenoid_driver.vhd
+set_global_assignment -name VHDL_FILE lamp_matrix.vhd
 set_global_assignment -name SDC_FILE AtariFA.sdc
 set_global_assignment -name VHDL_FILE display_test.vhd
 set_global_assignment -name VHDL_FILE slow_to_fast_clock.vhd

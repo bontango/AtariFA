@@ -9,8 +9,8 @@ ROMs and TTL glue logic, while a single FPGA bitstream supports the whole Gen1 g
 
 > Status: running on prototype hardware. The CPU core, clocking, memory map, game selection,
 > free-play option, sound, a boot speech announcement, the switch matrix and the solenoid
-> drivers are implemented and hardware-tested; the lamp driver is present and being activated
-> (see [Roadmap](#roadmap)).
+> drivers are implemented and hardware-tested; the lamp matrix is implemented and compiles
+> clean, with hardware bring-up pending (see [Roadmap](#roadmap)).
 
 ## Supported games
 
@@ -104,6 +104,23 @@ The bit-to-output mapping is taken from the AtariFA board schematic (two board p
 unpopulated). Outputs are held off on reset and during boot, and `solenoids_enable` releases the
 drivers only once the CPU is running — so the coils are safe before and during power-up.
 
+## Lamps
+
+The 84 playfield lamps are driven as a **21 × 4 multiplexed matrix** by
+[`lamp_matrix.vhd`](lamp_matrix.vhd), reproducing the original Atari scheme: twelve ULN2003A sink
+drivers (rows) fed by a cascade of **three 74HC595** shift registers (21 used outputs = 21 "lamp
+groups"), and four column strobes SA–SD generated on the auxiliary board from a 2-bit select
+(`aux_lamp_strobe`, decoded 1-of-4 there). Lamp state is sniffed from CPU writes to RAM `0x30–0x3F`
+into a 128-bit shadow buffer (analogous to the display) and scanned out continuously.
+
+The group/strobe assignment is derived from the board schematics — the 9334 addressable-latch decode
+([`doc/Lamp_Logic2.png`](doc/Lamp_Logic2.png)) plus the 74HC595 wiring table (`doc/AtariFA_Lamps.xlsx`):
+lamp group `N = 4·b + L + 1` and RAM offset `= L·4 + s`. The scanner blanks the outputs (`oe_595`)
+while shifting and switching strobes to avoid ghosting, giving the native ~25 % per-lamp duty of a
+4-way multiplex. The 595 control lines run through a non-inverting 74HCT541; the strobe select runs
+through the inverting 74HCT540 and is enabled with the CPU, so the lamps are safely off during boot
+and reset.
+
 ## Boot speech
 
 At power-up the board speaks a short word ("Lisü", a retro robot voice) once, during the ~5 s
@@ -121,10 +138,11 @@ and reusable across boards: it needs only a clock, a reset and a start trigger.
 - **FPGA:** Intel/Altera Cyclone 10 LP **10CL006YE144C8G** (E144 package)
 - **Board:** AtariFA-PCB — replacement CPU with RAM/ROM + TTL substitutes, parallel to the
   Atari edge connectors plus "box connectors" for bench testing
-- Displays driven via 74HCT540, lamps via TPIC6B595N, solenoids via IRL540 MOSFETs through
-  74HCT540 drivers, I²C FRAM (FM24CL64B) for high-score storage, optional ESP32-C3 link
+- Displays driven via 74HCT540, lamps via 12× ULN2003A (three 74HC595 shift registers), solenoids
+  via IRL540 MOSFETs through 74HCT540 drivers, I²C FRAM (FM24CL64B) for high-score storage, optional
+  ESP32-C3 link
 
-Resource usage (full compile): logic 36 %, block RAM 26/30 M9K (87 %), 1/2 PLL, timing met.
+Resource usage (full compile): logic 40 %, block RAM 26/30 M9K (87 %), 1/2 PLL, timing met.
 
 ## Architecture highlights
 
@@ -134,15 +152,16 @@ Resource usage (full compile): logic 36 %, block RAM 26/30 M9K (87 %), 1/2 PLL, 
 - **Display:** multiplexed refresh whose timing (blank/show phases, ~512 µs/digit, ~244 Hz,
   ~1:3 blank:show duty) is matched to the original hardware — measured from a logic-analyzer
   capture of a real board, see [`doc/Display_Timing.md`](doc/Display_Timing.md).
-- **Memory map:** RAM `0x0000–0x01FF` (+ mirror `0x1000`); sound latches `0x1080/84/88`
-  (low nibble); solenoid latches `0x1080/84/88` (high nibble) + `0x108C`; ROM2 `0x7000`, ROM1 `0x7800`/`0xF800`
-  (reset/IRQ vectors); DIP/DMA `0x2000`; switch matrix `0x2010–0x204F`; watchdog `0x4000`.
-  Open-bus default `0xFF`. Consistent with PinMAME `src/wpc/atari.c`.
+- **Memory map:** RAM `0x0000–0x01FF` (+ mirror `0x1000`); lamp RAM `0x30–0x3F` (sniffed to the
+  lamp matrix); sound latches `0x1080/84/88` (low nibble); solenoid latches `0x1080/84/88` (high
+  nibble) + `0x108C`; ROM2 `0x7000`, ROM1 `0x7800`/`0xF800` (reset/IRQ vectors); DIP/DMA `0x2000`;
+  switch matrix `0x2010–0x204F`; watchdog `0x4000`. Open-bus default `0xFF`. Consistent with
+  PinMAME `src/wpc/atari.c`.
 - **ROMs:** generic `game_rom.vhd` wrapper (`altsyncram`, 2 K×8, init file as a generic),
   instantiated per game/slot and muxed by `game_select`.
-- **Safe inactive levels:** all not-yet-implemented outputs are driven to their inactive
-  level explicitly so the solenoid/lamp drivers stay off before the corresponding logic is
-  wired up.
+- **Safe inactive levels:** every output is driven to a defined inactive level explicitly
+  (rather than left undriven), so the solenoid and lamp drivers stay off before and during
+  boot — released only once the CPU is running.
 
 ## Building
 
@@ -169,7 +188,7 @@ written to `output_files/`.
 | `sound.vhd` | Sound emulation (PROM playback + pitch divider + sigma-delta DAC) |
 | `speech.vhd` / `speech_rom.vhd` | Boot speech ("Lisü"): 8-bit PCM player + 4096×8 ROM |
 | `solenoid_driver.vhd` | Solenoid + coin-door latches (20 IRL540 via 74HCT540) |
-| `lamp_driver.vhd` | Lamp matrix driver (TPIC6B595N) — present, activated in Phase B |
+| `lamp_matrix.vhd` | Lamp matrix scanner (21×4 multiplex: 12× ULN2003A + three 74HC595 + aux strobes) |
 | `AtariFA.qsf` / `AtariFA.sdc` | Pin/assignment and timing constraints |
 | `rom/` | Game ROM images (Intel HEX) + `82s130` sound PROM |
 | `rom/freeplay/` | Free-play ROM variants (reference) + `gen_patches.py` |
@@ -180,9 +199,10 @@ written to `output_files/`.
 - **Implemented:** CPU integration, clocking, NMI/DMA, memory map, display routines,
   5-game selection, free-play option, boot configuration display, boot speech announcement,
   4 test-board inputs, safe driver default levels, sound emulation (switchable original aux
-  board / on-board card), switch matrix, solenoid + coin-door drivers.
+  board / on-board card), switch matrix, solenoid + coin-door drivers, lamp matrix.
 - **Phase B:** ✓ switch matrix (`0x2010–0x204F`), ✓ solenoid latches (high nibble of
-  `0x1080/84/88` + `0x108C`, `solenoid_driver.vhd`); remaining: lamp matrix (`lamp_driver.vhd` activation).
+  `0x1080/84/88` + `0x108C`, `solenoid_driver.vhd`), ✓ lamp matrix (`lamp_matrix.vhd`, 21×4
+  multiplex, hardware bring-up pending).
 - **Phase C:** ✓ audio done (`sound.vhd`); remaining: generic per-game configuration.
 - **Phase D:** cleanup, SDC completion, input synchronizers.
 - Watchdog reset is intentionally decoupled until the in-game `0x4000` kick is characterized.

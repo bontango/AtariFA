@@ -148,7 +148,7 @@ architecture rtl of AtariFA is
 -- could later be exposed via a DIP/debug read address or the ESP32 link for a software query.
 constant SW_MAIN : std_logic_vector(3 downto 0) := x"0";
 constant SW_SUB1 : std_logic_vector(3 downto 0) := x"0";
-constant SW_SUB2 : std_logic_vector(3 downto 0) := x"4";
+constant SW_SUB2 : std_logic_vector(3 downto 0) := x"5";
 
 --internal signals via logic
 signal reset_h		: 	std_logic;
@@ -194,6 +194,13 @@ signal dip_strobe  : std_logic_vector(2 downto 0);
 signal g_serin_595 : std_logic := '0';
 signal g_clk_595 : std_logic := '0';
 signal g_rclk_595 : std_logic := '0';
+-- Lamp-Matrix (Phase B, lamp_matrix.vhd): RAM-0x30-0x3F-Shadow + Modul-Ausgaenge.
+signal lamp_state      : std_logic_vector(127 downto 0) := (others => '0');
+signal lamp_ser        : std_logic;
+signal lamp_srck       : std_logic;
+signal lamp_rck        : std_logic;
+signal lamp_oe_n       : std_logic;
+signal lamp_strobe_sel : std_logic_vector(1 downto 0);
 signal boot_phase	: 	std_logic_vector(3 downto 0) := "0000";
 signal game_select : std_logic_vector(2 downto 0);
 signal freeplay 	 : std_logic;
@@ -464,15 +471,18 @@ aux_sol_latch(1) <= not lockout_ah;     -- LOCKOUT_EN  (0x1080 bit5)
 -- Freigabe erst mit CPU (reset_l_stable = boot_phase(2)); Boot/Reset = '1' = disabled.
 -- Achtung: gibt auch den Original-Audio-Aux-Pfad frei (aux-Signale am selben 540, beabsichtigt).
 solenoids_enable <= not reset_l_stable;
--- Lampentreiber (TPIC6B595): oe_595 ist aktiv-low -> '1' = Ausgaenge disabled.
-oe_595    <= '1';
-g_serin_595 <= '0';
-g_clk_595   <= '0';
-g_rclk_595  <= '0';
--- Switch-Matrix-Strobes (Phase B): jetzt vom switch_matrix-Modul getrieben (s.u. SWM-Instanz).
--- Aux-Board (ueber invertierenden 74HCT540, gated von solenoids_enable): solange der
--- 540 disabled ist, definieren die aux-seitigen Pulls den Pegel; Werte hier nur Idle.
-aux_lamp_strobe <= (others => '0');
+-- Lamp-Matrix (Phase B, lamp_matrix.vhd, Instanz LAMP): treibt die 74HC595-Kaskade ueber den
+-- NICHT-invertierenden 74HCT541. oe_595 aktiv-low ('0'=Ausgaenge frei). Bei Boot/Reset haelt
+-- das Modul (enable='0') oe_595='1' => Lampen sicher AUS.
+oe_595      <= lamp_oe_n;
+g_serin_595 <= lamp_ser;
+g_clk_595   <= lamp_srck;
+g_rclk_595  <= lamp_rck;
+-- Aux-Board Lamp-Strobe (ueber INVERTIERENDEN 74HCT540, gated von solenoids_enable): 2-Bit-Select
+-- -> dortiger 1-of-4-Decoder (SA/SB/SC/SD). Invertiert wg. 74HCT540 (Konvention wie disp_*).
+-- Waehrend Boot (540 disabled) definieren die aux-seitigen Pulls den Pegel; Wert hier nur wirksam
+-- sobald solenoids_enable freigibt (= CPU laeuft).
+aux_lamp_strobe <= not lamp_strobe_sel;
 -- Sound-Ausgabe-Mux (options(3), active-low; dynamisch im Spiel umschaltbar):
 --   '1' (DIP OFF) = Original : AUDIO 0..3 + Volume-Latch ans Aux-Board (dortiger DAC/4016/Amp)
 --   '0' (DIP ON)  = Emulation: 1-Bit Sigma-Delta ueber SB_Sound (Onboard RC + TDA7267)
@@ -716,6 +726,25 @@ port map(
 	lockout   => lockout_ah
 );
 
+------------------------------------------------------------------------------
+-- Lamp-Matrix (Phase B, lamp_matrix.vhd): scannt die 21x4-Multiplex-Matrix (84 Lampen)
+-- aus dem RAM-0x30-0x3F-Shadow (lamp_state, s. lamp_sniffer) und treibt die 74HC595-Kaskade
+-- (ser/srck/rck/oe_n) + 2-Bit-Strobe-Select. reset/enable an reset_l_stable gekoppelt
+-- (AUS im Boot/Reset, live sobald CPU laeuft -- analog Solenoide).
+------------------------------------------------------------------------------
+LAMP: entity work.lamp_matrix
+port map(
+	clk_50     => clk_50,
+	reset      => not reset_l_stable,
+	enable     => reset_l_stable,
+	lamp_state => lamp_state,
+	ser        => lamp_ser,
+	srck       => lamp_srck,
+	rck        => lamp_rck,
+	oe_n       => lamp_oe_n,
+	strobe_sel => lamp_strobe_sel
+);
+
 ----------------------
 -- address decoding
 ----------------------
@@ -861,6 +890,21 @@ begin
 	end if;
 end process;
 end generate gen_gamedisp;
+
+-- lamp shadow buffer: sniff CPU writes to lamp RAM (0x30-0x3F) into lamp_state.
+-- 16 Byte = 128 Bit; Bit-Index = offset*8 + b (offset = cpu_addr(3:0)). Das Multiplex-/
+-- Physik-Mapping (Latch/Bit/Strobe -> 595-Gruppe) macht lamp_matrix.vhd. Laeuft unabhaengig
+-- von DISPLAY_TEST. Nur Page-0-Schreibzugriffe (cpu_addr(15:4)=0x003), nicht der RAM-Mirror.
+lamp_sniffer : process(clk_50)
+begin
+	if rising_edge(clk_50) then
+		if ram_wren = '1' and cpu_addr(15 downto 4) = x"003" then
+			for i in 0 to 7 loop
+				lamp_state(conv_integer(cpu_addr(3 downto 0)) * 8 + i) <= cpu_dout(i);
+			end loop;
+		end if;
+	end if;
+end process;
 
 
 -- RAM -- 0x0000-0x01FF (512 Byte); 0x0200 ist 1-Byte-NVRAM-Register (s.o., nvram_dout)

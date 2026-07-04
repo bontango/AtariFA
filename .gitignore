@@ -34,6 +34,9 @@ greybox_tmp/
 Thumbs.db
 desktop.ini
 
+# Office lock/temp files (e.g. ~$AtariFA_Lamps.xlsx while open in Excel)
+~$*
+
 # Local tools / binaries
 tools/
 
