@@ -8,9 +8,8 @@ replacement that plugs into the original Atari edge connectors and replaces the 
 ROMs and TTL glue logic, while a single FPGA bitstream supports the whole Gen1 generation.
 
 > Status: running on prototype hardware. The CPU core, clocking, memory map, game selection,
-> free-play option, sound, a boot speech announcement, the switch matrix and the solenoid
-> drivers are implemented and hardware-tested; the lamp matrix is implemented and compiles
-> clean, with hardware bring-up pending (see [Roadmap](#roadmap)).
+> free-play option, sound, a boot speech announcement, the switch matrix, the solenoid drivers
+> and the lamp matrix are implemented and hardware-tested (see [Roadmap](#roadmap)).
 
 ## Supported games
 
@@ -202,7 +201,7 @@ written to `output_files/`.
   board / on-board card), switch matrix, solenoid + coin-door drivers, lamp matrix.
 - **Phase B:** ✓ switch matrix (`0x2010–0x204F`), ✓ solenoid latches (high nibble of
   `0x1080/84/88` + `0x108C`, `solenoid_driver.vhd`), ✓ lamp matrix (`lamp_matrix.vhd`, 21×4
-  multiplex, hardware bring-up pending).
+  multiplex) — all hardware-tested. **Phase B complete.**
 - **Phase C:** ✓ audio done (`sound.vhd`); remaining: generic per-game configuration.
 - **Phase D:** cleanup, SDC completion, input synchronizers.
 - Watchdog reset is intentionally decoupled until the in-game `0x4000` kick is characterized.

@@ -104,7 +104,7 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
 ## Noch nicht implementiert (Roadmap)
 - **Phase B**: ✓ **Switch-Matrix** (2026-07-02, `switch_matrix.vhd`) + ✓ **Solenoide** (2026-07-04,
   `solenoid_driver.vhd`, HW-getestet OK) + ✓ **Lamp-Matrix** (2026-07-04, `lamp_matrix.vhd`,
-  HW-Test ausstehend) implementiert.
+  HW-getestet OK, Lampen-Selbsttest) implementiert. **Phase B damit abgeschlossen.**
   - **Switch-Matrix real** (`switch_matrix.vhd`): freilaufender Scan der 10×8-Matrix (CPU 0x2000–0x204F,
     offset 0..79) @clk_50; treibt `sw_strobe`/`sw_com` → inv. 74HCT540 → E11a 74LS42 (Spalte) + 10×
     SN74LS145N (Zeile), liest den einen Rückkanal `sw_com_in` (inv. 74HC4049), 2-FF-Sync (B4) + 2-Pass-
@@ -161,7 +161,7 @@ D12). Warnung 14320 (ROM `q[7:4]` wegoptimiert) harmlos. **HW-Vorbehalte (im Cod
 (2) `aux_audio_latch` Bit 5/4 auf Idle '0' (HW-Zuordnung der oberen 2 Bit prüfen);
 (3) Adress-/Volume-Bit-Reihenfolge bei „falschem" Klang 1-zeilig tauschbar.
 
-## Lamps (lamp_matrix.vhd, 2026-07-04, HW-Test ausstehend)
+## Lamps (lamp_matrix.vhd, 2026-07-04, HW-getestet OK)
 84 Lampen als **21×4-Multiplex-Matrix** (ersetzt den gelöschten `lamp_driver.vhd`/TPIC6B595-Entwurf).
 Reale Prototyp-HW: 12× **ULN2003A** (A20…B15; A14/B14/A13/B13/A12/B12 unbestückt) als Zeilen/Sink,
 getrieben von einer **Kaskade aus drei 74HC595** (24 Bit, 21 genutzt) = 21 „Lampengruppen"; die
