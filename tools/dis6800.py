@@ -493,13 +493,33 @@ def trace_boot(mem, reset_pc, labels, max_insn=8000):
 # ──────────────────────────────────────────────────────────────────────────────
 def main():
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    hex609 = os.path.join(base, "rom", "609.hex")
-    hex608 = os.path.join(base, "rom", "608.hex")
-    out    = os.path.join(base, "tools", "listing.txt")
+
+    # CLI: [rom_at_7000 rom_at_7800] [--out FILE] [--name NAME]
+    #   rom_at_7000 = ROM2 / E00 (CPU 0x7000-0x77FF), rom_at_7800 = ROM1 / E0 (CPU 0x7800-0x7FFF)
+    # Defaults reproduce the original Middle Earth behaviour.
+    positionals = [a for a in sys.argv[1:] if not a.startswith("--")]
+    def opt(flag, default):
+        if flag in sys.argv:
+            i = sys.argv.index(flag)
+            if i + 1 < len(sys.argv):
+                return sys.argv[i + 1]
+        return default
+
+    if len(positionals) >= 2:
+        rom_lo = positionals[0] if os.path.isabs(positionals[0]) else os.path.join(base, "rom", positionals[0])
+        rom_hi = positionals[1] if os.path.isabs(positionals[1]) else os.path.join(base, "rom", positionals[1])
+    else:
+        rom_lo = os.path.join(base, "rom", "609.hex")   # ROM2 (609) @0x7000
+        rom_hi = os.path.join(base, "rom", "608.hex")    # ROM1 (608) @0x7800
+
+    name = opt("--name", "Middle Earth 608/609")
+    out  = opt("--out", os.path.join(base, "tools", "listing.txt"))
+    if not os.path.isabs(out):
+        out = os.path.join(base, "tools", out)
 
     mem = bytearray(0x10000)
-    load_hex(hex609, mem, base=0x7000)   # ROM2 (609): CPU addr 0x7000–0x77FF
-    load_hex(hex608, mem, base=0x7800)   # ROM1 (608): CPU addr 0x7800–0x7FFF
+    load_hex(rom_lo, mem, base=0x7000)   # ROM2 / E00: CPU addr 0x7000–0x77FF
+    load_hex(rom_hi, mem, base=0x7800)   # ROM1 / E0 : CPU addr 0x7800–0x7FFF
 
     # Read vectors from end of ROM1 (608 is at 0x7800–0x7FFF)
     vec_nmi   = (mem[0x7FFC] << 8) | mem[0x7FFD]
@@ -522,7 +542,7 @@ def main():
 
     lines = []
     lines.append("=" * 78)
-    lines.append("AtariFA — Middle Earth 608/609 — 6800 Disassembly")
+    lines.append(f"AtariFA — {name} — 6800 Disassembly")
     lines.append("=" * 78)
     lines.append(f"  ROM2 (609): 0x7000–0x77FF   ROM1 (608): 0x7800–0x7FFF")
     lines.append(f"  RESET={vec_reset:04X}  NMI={vec_nmi:04X}  IRQ={vec_irq:04X}  SWI={vec_swi:04X}")

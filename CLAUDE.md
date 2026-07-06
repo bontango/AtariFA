@@ -73,7 +73,10 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
 ## Architektur-Entscheidungen (nicht rückgängig machen ohne Grund)
 - **Shadow-Buffer statt Dual-Port-RAM**: Schreibzugriffe auf RAM 0x00–0x1F werden per Write-Sniffer in `display1..4`/`status_d` kopiert (Single-Port-RAM bleibt für CPU)
 - **DMA-Toggle**: `dma_toggle` flippt alle 2 NMI-Pulse (Edge-Detect auf `nmi_level`, Modulo-2 in clk_50-Prozess); Bit 6 von 0x2000 — Game-Code braucht diesen Wechsel zum Fortlaufen
-- **Synchroner 9-Bit-Zähler** statt 3× SN7493-Ripple-Kaskade; NMI-Periode = 512 cpu_clk = 512 µs
+- **Synchroner 12-Bit-Zähler** statt 3× SN7493-Ripple-Kaskade; NMI-Periode = 4096 cpu_clk = 4096 µs
+  = **244 Hz** (PinMAME `ATARI_NMIFREQ=244`, entspricht der gemessenen Frame-Periode, s. `doc/Display_Timing.md`).
+  **War früher 9-Bit ÷512 = 1953 Hz (8× zu schnell)** → Switch-Scan im NMI-Handler registrierte jeden Tastendruck
+  mehrfach; 2026-07-06 auf ÷4096 korrigiert (`dma_counter(11 downto 0)`, `nmi_level = Bit10 and Bit11`).
 
 ## Offene Bugs (bewusst zurückgestellt)
 - **B4**: ✓ behoben (2026-07-02) — der 2-FF-Synchronizer liegt jetzt im **`switch_matrix.vhd`**-Scan
@@ -81,11 +84,19 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
   Warning 10540 ist weg. Noch offen nur `options[]`/`dip_*`-SDC-Feinheiten (Phase D).
 - **B5**: ✓ adressiert — unimplementierte Ausgänge auf sicheren Inaktiv-Pegel getrieben (s.o. „Sichere Inaktiv-Pegel"). Solenoide/Münztür/`solenoids_enable` haben jetzt **echte Logik** (`solenoid_driver.vhd`, 2026-07-04); Lampen jetzt ebenfalls echte Logik (`lamp_matrix.vhd`, 2026-07-04).
 - **B10–B12**: ✓ Teil-Cleanup — `DIAG_SEL`+`hex7seg` (GottFA3-SEG7-Reste) entfernt, `cpu_clk_gen.vhd` aus `.qsf` (toter Code; PLL `cpu_clock` wird genutzt). Display-Signal-Ownership noch offen.
-- **B13 — Switch-Test ROM-abhängig (offen, 2026-07-03):** Mit **Middle-Earth**-ROM ist der Switch-Test
-  instabil — 1. Test-Schalter-Druck lässt **alle Displaysegmente** aufleuchten, erst 2. Druck betritt
-  den Test (nicht zuverlässig). Mit **Airborne-Avenger**-ROM problemlos → Bring-up läuft vorerst mit
-  Airborne Avenger weiter. Verdacht: game-/ROM-spezifische Test-Switch-/Display-Routine oder Zusammen-
-  spiel Switch-Matrix-Scan ↔ Display/DMA. Später prüfen (ROM-Disassembly Test-Einsprung / Switch-Debounce).
+- **B13 — Switch-Test ROM-abhängig (✓ behoben 2026-07-06, HW-getestet alle 5 Spiele):** Ursache waren
+  **zwei Fehler** (Root-Cause via ROM-Disassembly, `tools/dis6800.py` + `doc/Switch_Reading_Analysis.md`):
+  **(1) NMI 8× zu schnell** (÷512=1953 Hz statt ÷4096=244 Hz) → Switch-Scan registrierte jeden Druck
+  mehrfach; auf 244 Hz korrigiert (s.o. „Architektur-Entscheidungen"). **(2) 0x200B-Testschalter war
+  invertiert:** ME @7F9C und Airborne @7AB4 werten **Bit7=1 = Test gedrückt**; unser `not sw_state(11)`
+  ließ den Ruhezustand wie „gedrückt" aussehen → Level-Spiele booteten sofort in den Selbsttest, ME
+  reagierte spurious. **Fix:** 0x200B **nicht** invertieren (fällt mit allg. DIP-Zweig zusammen); ME
+  (`game_idx=3`, PinMAME ATARI1A `testSwBits=0x0F`) = Basis XOR 0x0F.
+  **HW-Test 2026-07-06 (alle 5 Spiele):** booten normal, Credits aufbuchbar, Spiel startbar; Freispiel-
+  ROMs starten ohne Credit. Testschalter betritt Selbsttest auf Druck, Werte korrekt angezeigt, **keine
+  Phantomschalter**. **Ausnahme Atarians:** keine Reaktion auf den Testschalter — Atarians (Ataris erstes
+  Spiel) hat laut Manual **keinen dokumentierten Selbsttest** (vermutlich gar keiner vorhanden). Nur als
+  Kommentar festgehalten, kein Defekt. **Grundfunktionen aller 5 Spiele abgehakt; nur Soundtest steht noch aus.**
 
 ## Watchdog-Status (offen)
 - `reset_h` enthält **kein** `wd_reset` (bewusst entfernt): Game kickt 0x4000 nicht im Attract Mode → WD würde CPU resetten
@@ -112,8 +123,11 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
     `../doc/AtariFA_07_Final_Switches_SCH.PDF` (Eltern-Ordner `N:\Projekte\FPGA Atari\doc\`, Geschwister: Main/Lamps/Solenoids) (s. „Bekannte HW-Feintuning-Stellen"). CPU-Read: `sw_value`
     @0x2010–0x204F (PinMAME swg1_r, geschlossen=0xFF), `dip_value` @0x2000–0x200F volles 1:1 aus Matrix
     (SW1/SW2-Programmier-DIPs + Replay-Hex) — **Ausnahmen** 0x2000 (DMA-Sync/BPL, synthetisiert) und
-    0x200B (Test invertiert). **Start-Bug behoben** (war 0x2013, korrekt **0x2012**). Compile 0 Fehler/
-    0 Critical, Timing ok (Setup ≈+2,8 ns / Hold ≈+0,45 ns), LE 36 %, BRAM unverändert. **HW-Test ausstehend.**
+    0x200B (Testschalter, **NICHT** invertiert; ME `game_idx=3` = Basis XOR 0x0F, s. B13/`doc/Switch_Reading_Analysis.md`).
+    **Start-Bug behoben** (war 0x2013, korrekt **0x2012**). Compile 0 Fehler/
+    0 Critical, Timing ok (Setup ≈+2,8 ns / Hold ≈+0,45 ns), LE 36 %, BRAM unverändert. **HW-getestet OK
+    alle 5 Spiele (2026-07-06, SW 0.0.6)** — Selbsttest/Switch-Werte korrekt, keine Phantomschalter (außer
+    Atarians: kein Selbsttest im Manual dokumentiert, s. B13).
   - ✓ **Lamp-Matrix implementiert** (`lamp_matrix.vhd`, 2026-07-04, s. eigener Abschnitt „Lamps"):
     21×4-Multiplex (84 Lampen), 12× ULN2003A + drei 74HC595 + 4 Aux-Strobes; RAM-0x30–0x3F-Sniffer
     → `lamp_state`. Der alte `lamp_driver.vhd` (TPIC6B595-Entwurf) wurde **gelöscht**.
@@ -285,6 +299,9 @@ Umsetzungs-Ergebnis: **`doc/Speech_Boot_Feasibility.md`**.
 
 ## Referenz
 - PinMAME `src/wpc/atari.c`: maßgeblich für Speicher-Map, Display-Mapping, Switch/DIP-Handler
+  (Referenzkopien der PinMAME-Quellen liegen zur Analyse in `doc/atari.c`/`doc/atari.h`/`doc/atarigames.c`)
 - **Display-Timing-Analyse: `doc/Display_Timing.md`** (gemessen aus Original-Board, Schaltbild Sheet 15B)
+- **Switch-Reading-Analyse: `doc/Switch_Reading_Analysis.md`** (0x200B-Testschalter-Polarität, ROM-Disassembly ME/Airborne)
 - **Boot-Sprachausgabe: `doc/Speech_Boot_Feasibility.md`** (Codec-Analyse + Umsetzung PCM 8 kHz)
+- ROM-Disassembler `tools/dis6800.py` (game-parametrierbar: `<rom@0x7000> <rom@0x7800> --name --out`)
 - Vollständiger Code-Review: `N:\Projekte\FPGA Atari\AtariFA_Code_Review.md`

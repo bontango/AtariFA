@@ -9,7 +9,10 @@ ROMs and TTL glue logic, while a single FPGA bitstream supports the whole Gen1 g
 
 > Status: running on prototype hardware. The CPU core, clocking, memory map, game selection,
 > free-play option, sound, a boot speech announcement, the switch matrix, the solenoid drivers
-> and the lamp matrix are implemented and hardware-tested (see [Roadmap](#roadmap)).
+> and the lamp matrix are implemented and hardware-tested (see [Roadmap](#roadmap)). All five games
+> boot, accept credits, start a game (including from the free-play ROMs) and — except Atarians,
+> which has no documented self-test — enter the self-test and report switches correctly. Only the
+> sound bench test is still outstanding.
 
 ## Supported games
 
@@ -146,8 +149,9 @@ Resource usage (full compile): logic 40 %, block RAM 26/30 M9K (87 %), 1/2 PLL, 
 ## Architecture highlights
 
 - **Clocking:** 50 MHz system clock; 1 MHz CPU clock via PLL (`cpu_clock`, ÷50).
-- **NMI/DMA:** synchronous 9-bit counter, 512 µs NMI period; DMA toggle on bit 6 of `0x2000`
-  (the game code requires this display-sync handshake).
+- **NMI/DMA:** synchronous 12-bit counter, 4096 µs NMI period (**244 Hz**, matching PinMAME's
+  `ATARI_NMIFREQ` and the measured display frame rate); DMA toggle on bit 6 of `0x2000` (the game
+  code requires this display-sync handshake).
 - **Display:** multiplexed refresh whose timing (blank/show phases, ~512 µs/digit, ~244 Hz,
   ~1:3 blank:show duty) is matched to the original hardware — measured from a logic-analyzer
   capture of a real board, see [`doc/Display_Timing.md`](doc/Display_Timing.md).

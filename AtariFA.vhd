@@ -148,7 +148,7 @@ architecture rtl of AtariFA is
 -- could later be exposed via a DIP/debug read address or the ESP32 link for a software query.
 constant SW_MAIN : std_logic_vector(3 downto 0) := x"0";
 constant SW_SUB1 : std_logic_vector(3 downto 0) := x"0";
-constant SW_SUB2 : std_logic_vector(3 downto 0) := x"5";
+constant SW_SUB2 : std_logic_vector(3 downto 0) := x"6";
 
 --internal signals via logic
 signal reset_h		: 	std_logic;
@@ -262,7 +262,7 @@ signal wd_cs		: std_logic;
 signal wd_kick		: std_logic := '0';
 signal wd_reset		: std_logic;
 
-signal dma_counter		: std_logic_vector(8 downto 0) := (others => '0');
+signal dma_counter		: std_logic_vector(11 downto 0) := (others => '0');
 signal nmi_level		: std_logic := '0';
 signal nmi_level_d		: std_logic := '0';
 signal dma_count2		: std_logic := '0';
@@ -356,7 +356,7 @@ begin
 --  [1] cpu_vma    CPU-Buszugriffe     — dauerhaft 0: CPU halted/hängt
 --  [2] cpu_rw     Read(1)/Write(0)    — zeigt Lese-/Schreibphasen
 --  [3] ram_wren   RAM-Schreibstrobe   — nie: CPU schreibt nichts
---  [4] NMI-Puls   alle 512 µs        — fehlt: Attract-Timer zählt nie (Ursache 1)
+--  [4] NMI-Puls   alle 4096 µs (244 Hz) — fehlt: Attract-Timer zählt nie (Ursache 1)
 --  [5] wd_reset   Watchdog-Reset      — pulst periodisch: Watchdog-Loop (Ursache 3)
 --  [6] dma_toggle DMA-Toggle-Bit      — steht: Game hängt am DMA-Toggle (Ursache 2)
 --  [7] ROM-CS     CPU in ROM          — wechselt mit RAM/IO: CPU läuft
@@ -409,8 +409,8 @@ reset_h <= (not reset_l_stable) or por_active;
 LED_D1   <= not wd_seen;           -- Watchdog-Sticky: leuchtet wenn WD mind. 1x resettet hat
 LED_D2   <= not cpu_fetch_cnt(20); -- CPU-Fetch-Blinker ~0.6 Hz: blinkt = cpu68 fetcht ROM-Befehle
                                     -- (steht dauerhaft: CPU halted oder hängt ohne ROM-Zugriff)
-LED_D3   <= not nmi_blink_cnt(11); -- NMI-Generator-Blinker ~0.48 Hz: blinkt = HW-NMI-Takt läuft
-                                    -- (unabhängig von CPU; Freilauf aus dma_counter)
+LED_D3   <= not nmi_blink_cnt(8);  -- NMI-Generator-Blinker ~0.48 Hz: blinkt = HW-NMI-Takt läuft
+                                    -- (unabhängig von CPU; Freilauf aus dma_counter; 244 NMI/s -> Bit8 ~0.48 Hz)
 
 -- use some IOs to read dips at start
 -- Route the matrix strobes to the lamp IOs only DURING the DIP read window.
@@ -660,21 +660,29 @@ port map(
 --                       GND
 
 ------------------------------
--- DMA interrupt counter (9-bit synchronous, replaces 3x SN7493 ripple chain)
--- counts cpu_clk rising edges in clk_50 domain; NMI period = 512 cpu_clk = 512 us
+-- DMA interrupt counter (12-bit synchronous, entspricht der 3x SN7493 Ripple-Kette = /4096)
+-- counts cpu_clk rising edges in clk_50 domain; NMI-Periode = 4096 cpu_clk = 4096 us = 244 Hz
+-- (PinMAME ATARI_NMIFREQ=244; gemessene Frame-Periode 4096 us, s. doc/Display_Timing.md).
+-- War frueher /512 (9-Bit, 1953 Hz = 8x zu schnell -> Switch-Mehrfach-Registrierung).
 ------------------------------
 dma_clk   <= dma_counter(0);  -- reserved
 audio_clk <= dma_counter(2);  -- reserved for Phase C audio
-dma_int   <= not (dma_counter(7) and dma_counter(8));
-nmi_level <= dma_counter(7) and dma_counter(8);
+dma_int   <= not (dma_counter(10) and dma_counter(11));
+nmi_level <= dma_counter(10) and dma_counter(11);
 
 -- DIP-Region 0x2000-0x200F: volles 1:1 aus der Matrix (SW1/SW2-Programmier-DIPs), zwei Ausnahmen:
 --   0x2000: kein DIP-Read, sondern DMA-Sync -> Bit7=0 (BPL-Check @0x721C), Bit6=dma_toggle
 --           (Display-Sync, ROM-Poll @0x78BE/0x78C9), Bit5..0=1.
---   0x200B: Self-Test-Schalter invertiert (Boot: idle->0xFF=Normal, gedrueckt->0x00=888888-Test).
+--   0x200B: Testschalter-Leitung, NICHT invertiert (wie jede DIP-Position: gedrueckt/geschlossen
+--           -> 0xFF, Bit7=1). ROM-verifiziert (doc/Switch_Reading_Analysis.md): Middle Earth @7F9C
+--           und Airborne @7AB4 werten Bit7 aus und erwarten Bit7=1 = Test gedrueckt. Frueher faelschlich
+--           invertiert -> andere Spiele booteten in den Selbsttest. Faellt fuer non-ME mit dem
+--           allgemeinen DIP-Zweig zusammen.
+--           Middle Earth (game_idx=3, PinMAME MACHINE_INIT ATARI1A): testSwBits=0x0F -> unteres Nibble
+--           invertiert (dipg1_r: 0x200B ^= 0x0F) auf der NICHT-invertierten Basis -> offen 0x0F, gedrueckt 0xF0.
 --   sonst : DIP aus Matrix (ON/geschlossen -> 0xFF, wie PinMAME dipg1_r).
 dip_value <= ("0" & dma_toggle & "111111")                              when cpu_addr = x"2000" else
-             (others => not sw_state(conv_integer(cpu_addr(6 downto 0)))) when cpu_addr = x"200B" else
+             (7 downto 4 => sw_state(11), 3 downto 0 => not sw_state(11)) when (cpu_addr = x"200B" and game_idx = 3) else
              (others => sw_state(conv_integer(cpu_addr(6 downto 0))));
 
 ------------------------------
@@ -1047,7 +1055,7 @@ begin
 			wd_seen       <= '0';
 		else
 			-- NMI-Flanken-Detect (nmi_level_d wird im clk_50-Hauptprozess gesetzt)
-			-- Zähler inkrementiert ~1953 NMI/s; Bit 11 → ~0.48 Hz Blinken auf LED_D3
+			-- Zähler inkrementiert ~244 NMI/s; Bit 8 → ~0.48 Hz Blinken auf LED_D3
 			if nmi_level = '1' and nmi_level_d = '0' then
 				nmi_blink_cnt <= nmi_blink_cnt + 1;
 			end if;
