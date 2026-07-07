@@ -28,9 +28,12 @@ use ieee.numeric_std.all;
 
 entity speech is
     generic(
-        INIT_FILE : string  := "./rom/lisy.mif"; -- 8-Bit-PCM (make_speech_mif.py --pcm)
-        N_SAMPLES : integer := 3687;             -- aktive Wortlaenge in Samples (<= 4096); "Lisy"@8kHz
-        CLK_DIV   : integer := 6250              -- clk_50 / SAMPLE_HZ  (50e6/8e3 = 6250)
+        INIT_FILE   : string  := "./rom/lisy.mif"; -- 8-Bit-PCM (make_speech_mif.py --pcm)
+        N_SAMPLES   : integer := 3687;             -- aktive Wortlaenge in Samples (<= 4096); "Lisy"@8kHz
+        CLK_DIV     : integer := 6250;             -- clk_50 / SAMPLE_HZ  (50e6/8e3 = 6250)
+        START_DELAY : integer := 0                 -- clk_50-Takte Wartezeit nach der Start-Flanke,
+                                                   -- bevor abgespielt wird (0 = sofort). Umgeht z.B.
+                                                   -- die Einschalt-/Mute-Phase eines Endverstaerkers.
     );
     port(
         clk_50  : in  std_logic;
@@ -53,6 +56,8 @@ architecture rtl of speech is
 
     signal playing  : std_logic := '0';
     signal start_d  : std_logic := '0';
+    signal waiting  : std_logic := '0';                        -- '1' waehrend START_DELAY-Wartezeit
+    signal delay_cnt: integer range 0 to START_DELAY := 0;     -- Zaehler der Start-Verzoegerung
 
     signal sd_acc   : unsigned(8 downto 0) := (others => '0');  -- Sigma-Delta-Akku
 begin
@@ -95,14 +100,31 @@ begin
     begin
         if rising_edge(clk_50) then
             if reset = '1' then
-                playing <= '0';
-                addr    <= (others => '0');
-                start_d <= '0';
+                playing   <= '0';
+                waiting   <= '0';
+                delay_cnt <= 0;
+                addr      <= (others => '0');
+                start_d   <= '0';
             else
                 start_d <= start;
-                if start = '1' and start_d = '0' and playing = '0' then
-                    playing <= '1';
-                    addr    <= (others => '0');
+                if start = '1' and start_d = '0' and playing = '0' and waiting = '0' then
+                    -- Start-Flanke: bei START_DELAY=0 sofort abspielen, sonst erst warten.
+                    if START_DELAY = 0 then
+                        playing <= '1';
+                        addr    <= (others => '0');
+                    else
+                        waiting   <= '1';
+                        delay_cnt <= 0;
+                    end if;
+                elsif waiting = '1' then
+                    -- Start-Verzoegerung herunterzaehlen, dann Wiedergabe ausloesen.
+                    if delay_cnt = START_DELAY-1 then
+                        waiting <= '0';
+                        playing <= '1';
+                        addr    <= (others => '0');
+                    else
+                        delay_cnt <= delay_cnt + 1;
+                    end if;
                 elsif playing = '1' and tick = '1' then
                     if addr = to_unsigned(N_SAMPLES-1, ADDR_W) then
                         playing <= '0';

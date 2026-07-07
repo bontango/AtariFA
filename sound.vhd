@@ -12,8 +12,9 @@
 -- Adresse D12 = "0" & snd_select(4) & sample_cnt(5)   (16 x 32 = 512 Worte)
 -- Tonfrequenz ~ AUDIO_CLK / ((16 - snd_pitch) * 32)
 --
--- Vereinfachung (siehe Plan): synchrone Zaehler statt 74163/7493-Ripple; AUDIO ENABLE/RESET
---   modelliert als "Dauerton, Wellenform-Neustart bei Auswahl-Wechsel". "Aus" via snd_volume=0.
+-- Vereinfachung (siehe Plan): synchrone Zaehler statt 74163/7493-Ripple; Wellenform-Neustart bei
+--   Auswahl-Wechsel. AUDIO ENABLE/RESET real: snd_enable-Eingang (im Top aus 0x3000/0x6000
+--   dekodiert, PinMAME atari.c) -> stumm wenn '0' (sonst Dauerton: Ton stoppt erst mit Enable-Aus).
 --
 -- Zwei Ausgaben (Auswahl per options(3) im Top, nicht hier):
 --   sample : roher 4-Bit ROM-Nibble                 -> Aux-Board DAC          (Original-Pfad)
@@ -35,6 +36,7 @@ entity sound is
         snd_select : in  std_logic_vector(3 downto 0);  -- Latch 1080: Wellenform
         snd_pitch  : in  std_logic_vector(3 downto 0);  -- Latch 1088: Tonhoehe
         snd_volume : in  std_logic_vector(3 downto 0);  -- Latch 1084: Lautstaerke
+        snd_enable : in  std_logic;                      -- AUDIO ENABLE (0x3000/0x6000): '0' = stumm
         sample     : out std_logic_vector(3 downto 0);  -- roher ROM-Nibble (Aux-Pfad)
         sb_pwm     : out std_logic                      -- Sigma-Delta (Onboard-Pfad)
     );
@@ -55,7 +57,12 @@ architecture rtl of sound is
     signal nibble     : std_logic_vector(3 downto 0);
 
     signal sd_acc     : unsigned(8 downto 0) := (others => '0');  -- Sigma-Delta-Akku
+
+    -- AUDIO ENABLE: disabled -> effektive Lautstaerke 0 -> Stille (PCM bleibt 128)
+    signal eff_volume : std_logic_vector(3 downto 0);
 begin
+
+    eff_volume <= snd_volume when snd_enable = '1' else "0000";
 
     --------------------------------------------------------------------------
     -- D12 Sound-ROM
@@ -140,7 +147,7 @@ begin
                 sd_acc <= (others => '0');
             else
                 centered := signed(resize(unsigned(nibble), 6)) - to_signed(8, 6);
-                scaled   := resize(centered * signed('0' & unsigned(snd_volume)), 11);
+                scaled   := resize(centered * signed('0' & unsigned(eff_volume)), 11);
                 pcm      := 128 + to_integer(scaled);
                 sd_acc   <= ('0' & sd_acc(7 downto 0)) + ('0' & to_unsigned(pcm, 8));
             end if;

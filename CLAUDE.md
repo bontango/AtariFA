@@ -243,7 +243,9 @@ Umsetzungs-Ergebnis: **`doc/Speech_Boot_Feasibility.md`**.
   (= synchronisiertes reset_sw; **NICHT `por_active`/`reset_h`** — die sind über `if reset_l_stable='0'`
   während des GANZEN Info-Fensters aktiv und würden Speech bei der Wiedergabe im Reset halten!).
   `start => boot_phase(1)` (Pegel; internes `start_d`-Edge-Detect in speech.vhd löst Einmal-Wiedergabe aus).
-  Ausgabe-Mux mit **Vorrang**: `SB_Sound <= speech_pwm when speech_busy='1' else snd_pwm when options(3)='0' else '0'`.
+  **`generic map( START_DELAY => 100000000 )`** = ~2s Wartezeit nach der Start-Flanke (100e6 clk_50 @50MHz),
+  damit „Lisü" NICHT ins TDA7267-Einschalt/Mute-Fenster fällt (s. HW-Test unten). Ausgabe-Mux mit **Vorrang**:
+  `SB_Sound <= speech_pwm when speech_busy='1' else snd_pwm when options(3)='0' else '0'`.
   Fällt komplett ins vorhandene ~5s-Info-Fenster (`boot_phase(2)`), kein zusätzliches Boot-Delay.
 - **Encoder `tools/make_speech_mif.py`** (pure stdlib, **gitignored** wie ganzes `tools/`): erzeugt das
   `.mif` aus einer WAV. Optionen u.a. `--pcm` (8-Bit-PCM statt Delta), `--fade-out-ms`, `--smooth`
@@ -252,8 +254,13 @@ Umsetzungs-Ergebnis: **`doc/Speech_Boot_Feasibility.md`**.
   Finaler Aufruf steht im `speech.vhd`-Header. ROM-Neu-Erzeugung: Quelle `speech_source_shortU.wav`
   (lokal, untracked) durch den Encoder.
 - **Compile (2026-06-22):** 0 Fehler/0 Critical, **BRAM 26/30 M9K** (−1 Delta +4 PCM), LE 30 % (sogar
-  weniger als Delta), Timing ok. **HW-Vorbehalt:** falls TDA7267 eine Mute-/Einschaltphase hat und den
-  Wortanfang kappt → `--lead-ms` Vorlauf-Stille ins ROM legen (am echten Board testen).
+  weniger als Delta), Timing ok.
+- **✓ HW-getestet OK (2026-07-07, SW 0.0.7):** „Lisü" war zunächst **komplett stumm** (LED1-Diagnose zeigte:
+  FSM lief durch, ROM ok, Ausgabepfad durch Töne bewiesen) — Ursache war das **TDA7267-Einschalt/Mute-Fenster**:
+  das 0,46-s-Wort spielte ~0,3s nach Power-on und lag damit voll im Totfenster (kein FPGA-Mute-Pin vorhanden →
+  nur Timing steuerbar). **Fix = `START_DELAY` (speech.vhd, Generic)** statt `--lead-ms` (0 ROM/BRAM statt +4 M9K):
+  bei ~2,5s hörbar bestätigt, final auf **~2s** (`100000000`) gesetzt. Der `--lead-ms`-Weg bleibt Alternative,
+  ist aber unterlegen (nur ~50ms passen in die 4096-Wort-Tiefe). **Tunbar:** knackiger ~1,2s = `60000000`.
 
 ## Bekannte HW-Feintuning-Stellen
 - **Switch-Matrix-Codierung — schaltplan-verifiziert (2026-07-02, `switch_matrix.vhd`):** aus

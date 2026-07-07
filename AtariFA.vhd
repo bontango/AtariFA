@@ -148,7 +148,7 @@ architecture rtl of AtariFA is
 -- could later be exposed via a DIP/debug read address or the ESP32 link for a software query.
 constant SW_MAIN : std_logic_vector(3 downto 0) := x"0";
 constant SW_SUB1 : std_logic_vector(3 downto 0) := x"0";
-constant SW_SUB2 : std_logic_vector(3 downto 0) := x"6";
+constant SW_SUB2 : std_logic_vector(3 downto 0) := x"7";
 
 --internal signals via logic
 signal reset_h		: 	std_logic;
@@ -178,6 +178,11 @@ signal snd_volume	: std_logic_vector(3 downto 0) := (others => '0');  -- Latch 1
 signal snd_sample	: std_logic_vector(3 downto 0);  -- roher 4-Bit ROM-Nibble (Aux-Pfad)
 signal snd_pwm		: std_logic;                     -- 1-Bit Sigma-Delta (Onboard-Pfad)
 signal sound_cs		: std_logic;
+-- AUDIO ENABLE/RESET (PinMAME atari.c: 0x3000 soundg1_w, 0x6000-0x6FFF audiog1_w) -> Gate fuer sound.vhd.
+-- Ohne Enable-Gatterung bleibt ein gestarteter Ton als Dauerton stehen (HW-Symptom 2026-07-06).
+signal audio_enable	: std_logic := '0';              -- '1' = Ton freigegeben, '0' = stumm
+signal audio_en_cs	: std_logic;                     -- Write 0x3000 (AUDIO ENABLE)
+signal audio_rst_cs	: std_logic;                     -- Write 0x6000-0x6FFF (AUDIO RESET)
 -- Solenoid-Steuerung (Phase B, solenoid_driver.vhd): Write-Strobe + Modul-Ausgaenge (aktiv-high).
 -- sol_ah/coin_cntr_ah/lockout_ah werden im Top invertiert (74HCT540) auf die Ports gelegt.
 signal sol_wr		: std_logic := '0';
@@ -406,7 +411,7 @@ reset_h <= (not reset_l_stable) or por_active;
    -- Reaktivieren (or wd_reset) sobald Kick-Bedingung aus Schaltplan/ROM-Disassembly bekannt.
 
 -- LEDs (Schnell-Diagnose ohne LA) — Board-LEDs aktiv-LOW (gegen VCC, Pin nach GND => leuchten bei '0')
-LED_D1   <= not wd_seen;           -- Watchdog-Sticky: leuchtet wenn WD mind. 1x resettet hat
+LED_D1   <= not wd_seen;           -- Watchdog-Sticky: leuchtet, wenn der WD mind. einmal resettet hat
 LED_D2   <= not cpu_fetch_cnt(20); -- CPU-Fetch-Blinker ~0.6 Hz: blinkt = cpu68 fetcht ROM-Befehle
                                     -- (steht dauerhaft: CPU halted oder hängt ohne ROM-Zugriff)
 LED_D3   <= not nmi_blink_cnt(8);  -- NMI-Generator-Blinker ~0.48 Hz: blinkt = HW-NMI-Takt läuft
@@ -631,6 +636,7 @@ port map(
 	snd_select	=> snd_select,
 	snd_pitch	=> snd_pitch,
 	snd_volume	=> snd_volume,
+	snd_enable	=> audio_enable,
 	sample		=> snd_sample,
 	sb_pwm		=> snd_pwm
 	);
@@ -644,6 +650,13 @@ port map(
 --   speech.vhd loest die einmalige Wiedergabe an der 0->1-Flanke aus.
 -- Ausgabe ueber SB_Sound-Mux (speech_busy hat Vorrang, siehe oben).
 SPEECH_INST: entity work.speech
+generic map(
+	-- Startverzoegerung: "Lisü" erst ~2 s in den Boot abspielen (100e6 clk_50 @50MHz),
+	-- damit das 0,46-s-Wort NICHT ins Einschalt-/Mute-Fenster des TDA7267 faellt (es gibt
+	-- keinen FPGA-Mute-Pin; HW-bestaetigt 2026-07-07: bei ~2,5 s hoerbar, dann auf 2 s gekuerzt).
+	-- Wort spielt 2,0–2,46 s; Info-Fenster endet erst bei 5 s (boot_phase(2), CPU-Release). Tunbar.
+	START_DELAY => 100000000
+	)
 port map(
 	clk_50  => clk_50,
 	reset   => not boot_phase(0),
@@ -778,6 +791,11 @@ rom2_cs <= '1' when cpu_addr(15 downto 11) = "01110" and cpu_vma='1' else '0';
 -- sind write-only; das Spiel liest sie nicht als RAM zurueck, der redundante RAM-Write ist folgenlos.
 sound_cs <= '1' when cpu_addr(15 downto 4) = x"108" and cpu_vma='1' else '0';
 
+-- AUDIO ENABLE (0x3000, PinMAME soundg1_w) und AUDIO RESET (0x6000-0x6FFF, audiog1_w).
+-- Steuern das Ein-/Ausschalten des Tongenerators (audio_enable -> sound.vhd). Bisher freie Adressen.
+audio_en_cs  <= '1' when cpu_addr = x"3000" and cpu_vma='1' else '0';
+audio_rst_cs <= '1' when cpu_addr(15 downto 12) = x"6" and cpu_vma='1' else '0';  -- 0x6000-0x6FFF
+
 -- sw_value: Switch-Matrix @0x2010-0x204F -> offset = cpu_addr(6 downto 0) (0x10..0x4F).
 -- sw_state(offset)='1' = geschlossen -> ganzes Byte 0xFF (PinMAME swg1_r), sonst 0x00.
 -- Mappt Coin1(0x2010)/Coin2(0x2011)/Start(0x2012)/Slam(0x2013), alle Playfield-Schalter und
@@ -819,6 +837,31 @@ begin
 				when x"8" => snd_pitch  <= cpu_dout(3 downto 0);  -- 0x1088 Tonhoehe
 				when others => null;
 			end case;
+		end if;
+		-- AUDIO ENABLE/RESET (PinMAME atari.c). Ohne diese Gatterung bleibt ein gestarteter
+		-- Ton als Dauerton stehen. Per-Spiel-Semantik (doc/atarigames.c sndType = gameSpecific1):
+		--   Middle Earth / Space Riders (game_idx 3/4, gameSpecific1 & 2): 0x3000 -> EIN,
+		--     jedes 0x6000 -> AUS (Reset).
+		--   Atarians / Time 2000 / Airborne (idx 0/1/2): 0x6000 datenabhaengig (Daten/=0 -> EIN,
+		--     =0 -> AUS); 0x3000 ohne Wirkung.
+		if reset_l_stable = '0' then
+			audio_enable <= '0';                          -- Boot/Reset: stumm
+		elsif cpu_rw = '0' and (cpu_clk_d2 = '1' and cpu_clk_d1 = '0') then
+			if game_idx = 3 or game_idx = 4 then
+				if audio_en_cs = '1' then
+					audio_enable <= '1';
+				elsif audio_rst_cs = '1' then
+					audio_enable <= '0';
+				end if;
+			else
+				if audio_rst_cs = '1' then
+					if cpu_dout /= x"00" then
+						audio_enable <= '1';
+					else
+						audio_enable <= '0';
+					end if;
+				end if;
+			end if;
 		end if;
 		if reset_l_stable = '0' then
 			dma_counter <= (others => '0');
