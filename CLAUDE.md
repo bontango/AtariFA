@@ -262,6 +262,38 @@ Umsetzungs-Ergebnis: **`doc/Speech_Boot_Feasibility.md`**.
   bei ~2,5s hörbar bestätigt, final auf **~2s** (`100000000`) gesetzt. Der `--lead-ms`-Weg bleibt Alternative,
   ist aber unterlegen (nur ~50ms passen in die 4096-Wort-Tiefe). **Tunbar:** knackiger ~1,2s = `60000000`.
 
+## FRAM-Persistenz — Credits/Highscore (fram_i2c.vhd + Injection-FSM, 2026-07-09)
+Rettet **Credits + Scores des letzten Spiels** über Power-Cycle im externen I²C-FRAM (Atari Gen1 hat
+**kein natives NVRAM**). **Ausführliche Doku: `doc/FRAM_Persistence.md`** (RE-Adressen, Mechanik,
+Atari-Verhalten). Bisher nur **Airborne** (`game_idx=2`). SW-Version **0.0.9**.
+- **`fram_i2c.vhd`:** Bit-Banging-I²C-Master @clk_50 für **FM24CL64B** (Slave **0x51**, A0=3V/A1=A2=GND;
+  `CLK_DIV=125`≈100 kHz; Block-Read/Write; SDA open-drain `inout` / SCL out). **Read-Bug-Fix (wichtig):**
+  `P_RX` sampelt `shreg` jetzt **genau 1×/Bit** (`if phase_last then …`) statt `CLK_DIV`× (las sonst nur
+  8×-LSB → 0x42→0x00). HW-bestätigt (Loopback byte-exakt; FRAM ACKt an 0x51, /WP=GND, Vdd 3,3V, 4k7-PU).
+- **FRAM-Record @Adr0:** `[0]`Magic 0xA5, `[1]`game_idx, `[2]`Credit(`$D5`), `[3..12]`Scores(`$81–$8A`).
+  Gültig wenn Magic==0xA5 **und** game_idx==aktuelles Spiel (`restore_valid`).
+- **Airborne-Adressen (RE):** Credits `$D5`, Player-Scores `$81–$8A` (BCD), Outhole-Latch `0x2043`
+  → `sw_state`-Offset **67**. (Outhole andere Spiele: Atarians 19, Time 53, ME 56, Space 56.)
+- **Stufe 1 (Save/Restore ins FRAM, HW-OK):** `save_trig` = Outhole-Flanke armiert → Scores
+  `STABLE_CYCLES`(~3 s) stabil + `game_played` + `game_idx=2` + `options(1)=ON` → `save_request` →
+  FRAM-Write von `persist_buf` (Page-0-Sniffer `$D5`/`$81–$8A`). `fram_ctrl`-FSM beim Boot
+  (`boot_phase(1)`): ON=Read→`fram_shadow`+`restore_valid`, OFF=Erase. Boot-Info zeigt Valid+Credit+`$81`.
+  **Status-Display-Dreher „24↔42":** Status-/Credit-Ball-Display läuft in Digit-Reihenfolge
+  **entgegengesetzt** zu Display 1–4 → in `bi_status` hi→Idx2/lo→Idx3 (rein kosmetisch). CD4511 nur 0–9.
+- **Stufe 2 (Bus-Injection-Restore ins Spiel-RAM):** `injection`-FSM + RAM-Port-Mux (`ram_p_*`) +
+  cpu68-`halt` (`cpu_halt`). Ablauf `INJ_ARM`(reset_h=0 + restore_valid + game_idx=2) → `INJ_WAIT_CLEAR`
+  (`DELAY_CLEAR`≈20 ms, Boot-Clear abwarten) → `INJ_HALT`(`HALT_SETTLE`≈82 µs) → `INJ_WRITE`
+  (`inj_active` muxt Port, Bytes aus `fram_shadow`) → `INJ_DONE` (One-Shot `injected`). **Credit-Restore
+  HW-verifiziert** (2 Credits restauriert, Coin→3; CPU läuft sauber weiter).
+- **⚠ Score-Anzeige ZURÜCKGESTELLT** (`INJ_SCORES := false`, Mechanik bleibt, `true` reaktiviert):
+  Atari zeigt nach dem Boot **fix `888888` ~20–30 s** und **blankt dann die Player-Displays**; **Scores
+  erst nach dem ersten Spiel**, Status wechselt von `8888` erst bei Coin/Start. Die injizierten
+  `$81–$8A` sind daher im Cold-Boot-Attract **unsichtbar** (Credit-Restore ist NICHT betroffen, wird beim
+  Coin/Start aus `$D5` angezeigt). Sichtbar erst mit dem **„Spiel-gespielt"-Flag** (ROM-RE offen) →
+  mit-injizieren; alternativ Display-Region `$05/$06/$09/$0A/$0D/$0E` direkt (fragil).
+- **HW-Tuning-Hebel (`AtariFA.vhd`):** `DELAY_CLEAR`, `HALT_SETTLE`, `INJ_SCORES`, `INJ_DEBUG_LED`
+  (LED_D1 = `injected` statt `save_seen`).
+
 ## Bekannte HW-Feintuning-Stellen
 - **Switch-Matrix-Codierung — schaltplan-verifiziert (2026-07-02, `switch_matrix.vhd`):** aus
   `../doc/AtariFA_07_Final_Switches_SCH.PDF` (Eltern-Ordner `N:\Projekte\FPGA Atari\doc\`, Geschwister: Main/Lamps/Solenoids). 74HCT540 invertiert alle Ausgänge; E11a 74LS42-Spalten-Map
@@ -310,5 +342,7 @@ Umsetzungs-Ergebnis: **`doc/Speech_Boot_Feasibility.md`**.
 - **Display-Timing-Analyse: `doc/Display_Timing.md`** (gemessen aus Original-Board, Schaltbild Sheet 15B)
 - **Switch-Reading-Analyse: `doc/Switch_Reading_Analysis.md`** (0x200B-Testschalter-Polarität, ROM-Disassembly ME/Airborne)
 - **Boot-Sprachausgabe: `doc/Speech_Boot_Feasibility.md`** (Codec-Analyse + Umsetzung PCM 8 kHz)
+- **FRAM-Persistenz: `doc/FRAM_Persistence.md`** (Credits/Highscore-Save/Restore, RE-Adressen Airborne,
+  Bus-Injection-Mechanik, Atari-Attract-Anzeigeverhalten, zurückgestellte Score-Anzeige)
 - ROM-Disassembler `tools/dis6800.py` (game-parametrierbar: `<rom@0x7000> <rom@0x7800> --name --out`)
 - Vollständiger Code-Review: `N:\Projekte\FPGA Atari\AtariFA_Code_Review.md`

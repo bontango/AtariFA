@@ -149,7 +149,7 @@ architecture rtl of AtariFA is
 -- could later be exposed via a DIP/debug read address or the ESP32 link for a software query.
 constant SW_MAIN : std_logic_vector(3 downto 0) := x"0";
 constant SW_SUB1 : std_logic_vector(3 downto 0) := x"0";
-constant SW_SUB2 : std_logic_vector(3 downto 0) := x"8";
+constant SW_SUB2 : std_logic_vector(3 downto 0) := x"9";
 
 --internal signals via logic
 signal reset_h		: 	std_logic;
@@ -412,6 +412,37 @@ signal fram_ack_ok   : std_logic;
 signal fram_scl_dbg  : std_logic;
 signal fram_dbg_state : std_logic_vector(2 downto 0);
 
+-- ============================================================
+-- Stufe 2: Bus-Injection-Restore ins Spiel-RAM (Airborne).
+-- Nach dem Boot-RAM-Clear haelt der FPGA die CPU per 'halt' an, muxt den RAM-Port und schreibt die
+-- restaurierten Bytes ($D5=Credits, $81-$8A=Scores) aus fram_shadow direkt ins RAM. Danach laeuft die
+-- CPU weiter, die Attract-Routine kopiert die Scores selbst auf die Displays -> Staende erscheinen im Spiel.
+-- Einmalig pro Boot, nur bei restore_valid='1' (= ON-Boot mit gueltigen Daten fuers aktuelle Spiel).
+constant DELAY_CLEAR   : integer := 1000000;   -- ~20 ms @50 MHz: Boot-RAM-Clear abwarten (HW-tunbar)
+constant HALT_SETTLE   : integer := 4096;      -- ~82 us: CPU sicher im halt_state, bevor der Port gemuxt wird
+-- Score-Injektion ($81-$8A) vorerst DEAKTIVIERT (verschoben): der Credit-Restore ($D5) ist HW-verifiziert,
+-- aber Atari zeigt im Cold-Boot-Attract keine Scores an (blankt die Player-Displays bis zum ersten Spiel,
+-- s. doc/FRAM_Persistence.md). Score-Anzeige braucht zusaetzlich das "Spiel-gespielt"-Flag im RAM
+-- (ROM-RE noch offen). Mechanik bleibt erhalten -> true reaktiviert die Score-Injektion.
+constant INJ_SCORES    : boolean := false;
+-- Diagnose: LED_D1 = 'injected' (sticky) zeigt am Board, dass die Injection gefeuert hat.
+-- false -> LED_D1 = 'save_seen' (Stufe-1-Save-Anzeige, Normalbetrieb).
+constant INJ_DEBUG_LED : boolean := false;
+type inj_state_t is (INJ_ARM, INJ_WAIT_CLEAR, INJ_HALT, INJ_WRITE, INJ_DONE);
+signal inj_st       : inj_state_t := INJ_ARM;
+signal inj_cnt      : integer range 0 to DELAY_CLEAR := 0;
+signal inj_byte     : integer range 0 to 10 := 0;   -- 0=Credit, 1..10=Scores $81..$8A
+signal cpu_halt     : std_logic := '0';
+signal inj_active   : std_logic := '0';              -- '1' = RAM-Port auf Injektor gemuxt
+signal inj_addr     : std_logic_vector(8 downto 0) := (others => '0');
+signal inj_data     : std_logic_vector(7 downto 0) := (others => '0');
+signal inj_wren     : std_logic := '0';
+signal injected     : std_logic := '0';              -- sticky One-Shot: pro Boot nur einmal injizieren
+-- RAM-Port-Mux (CPU vs. Injektor)
+signal ram_p_addr   : std_logic_vector(8 downto 0);
+signal ram_p_data   : std_logic_vector(7 downto 0);
+signal ram_p_wren   : std_logic;
+
 -- ---------------------------------------------------------------------------
 
 begin
@@ -491,7 +522,9 @@ reset_h <= (not reset_l_stable) or por_active;
 -- LEDs (Schnell-Diagnose ohne LA) — Board-LEDs aktiv-LOW (gegen VCC, Pin nach GND => leuchten bei '0')
 -- FRAM Stufe 1 (2026-07-08): LED_D1 = sticky 'save_seen' (Save-Trigger gefeuert). Im I2C-Self-Test
 --   (FRAM_SELFTEST=true) stattdessen 'selftest_pass' (Loopback OK). Rueckbau spaeter: LED_D1 <= not wd_seen;
-LED_D1   <= (not selftest_pass) when FRAM_SELFTEST else (not save_seen);
+LED_D1   <= (not selftest_pass) when FRAM_SELFTEST
+            else (not injected)  when INJ_DEBUG_LED   -- Stufe-2-Diagnose: leuchtet nach erfolgter Injection
+            else (not save_seen);
 LED_D2   <= not cpu_fetch_cnt(20); -- CPU-Fetch-Blinker ~0.6 Hz: blinkt = cpu68 fetcht ROM-Befehle
                                     -- (steht dauerhaft: CPU halted oder hängt ohne ROM-Zugriff)
 -- FRAM-Diagnose: LED_D3 = fram_ack_ok (leuchtet, wenn der FRAM im letzten Transfer geantwortet hat
@@ -1234,6 +1267,78 @@ begin
 	end if;
 end process;
 
+-- Stufe 2: Bus-Injection-Restore. Nach dem Boot-RAM-Clear die CPU per halt anhalten, RAM-Port muxen
+-- und die restaurierten Bytes ($D5 + $81-$8A) aus fram_shadow direkt ins Spiel-RAM schreiben.
+-- Reset an boot_phase(0); One-Shot pro Boot; nur bei restore_valid (ON-Boot mit gueltigen Daten).
+injection : process(clk_50)
+begin
+	if rising_edge(clk_50) then
+		inj_wren <= '0';                           -- Default: 1-clk-Schreibpuls
+		if boot_phase(0) = '0' then                -- Board-Reset
+			inj_st     <= INJ_ARM;
+			inj_cnt    <= 0;
+			inj_byte   <= 0;
+			cpu_halt   <= '0';
+			inj_active <= '0';
+			injected   <= '0';
+		else
+			case inj_st is
+			when INJ_ARM =>
+				-- CPU released (reset_h=0) + gueltiger Restore fuers aktuelle Spiel (Airborne) + nicht injiziert
+				if reset_h = '0' and restore_valid = '1' and game_idx = 2 and injected = '0' then
+					inj_cnt <= 0;
+					inj_st  <= INJ_WAIT_CLEAR;
+				end if;
+			when INJ_WAIT_CLEAR =>
+				-- Boot-RAM-Clear (0x00-0xD8) abwarten, bevor injiziert wird (HW-tunbar via DELAY_CLEAR)
+				if inj_cnt >= DELAY_CLEAR then
+					inj_cnt  <= 0;
+					cpu_halt <= '1';               -- CPU anhalten (halt wird im Fetch-Zyklus honoriert)
+					inj_st   <= INJ_HALT;
+				else
+					inj_cnt <= inj_cnt + 1;
+				end if;
+			when INJ_HALT =>
+				-- warten bis die CPU sicher im halt_state (Idle-Bus) ist, dann RAM-Port muxen
+				if inj_cnt >= HALT_SETTLE then
+					inj_cnt    <= 0;
+					inj_byte   <= 0;
+					inj_active <= '1';
+					inj_st     <= INJ_WRITE;
+				else
+					inj_cnt <= inj_cnt + 1;
+				end if;
+			when INJ_WRITE =>
+				-- je Byte: Adresse/Daten setzen + 1-clk inj_wren (RAM schreibt auf naechster clk_50-Flanke),
+				-- dann 1 Takt Pause (inj_cnt als 2-Takt-Rhythmus). 11 Bytes: 0=Credit, 1..10=Scores $81..$8A.
+				if inj_cnt = 0 then
+					if inj_byte = 0 then
+						inj_addr <= '0' & ADDR_CREDIT;                       -- $0D5
+						inj_data <= fram_shadow(REC_CREDIT);
+					else
+						inj_addr <= ('0' & ADDR_SCORE_LO) + (inj_byte - 1);  -- $081..$08A
+						inj_data <= fram_shadow(REC_SCORE0 + inj_byte - 1);
+					end if;
+					inj_wren <= '1';
+					inj_cnt  <= 1;
+				else
+					inj_cnt <= 0;
+					-- Abbruch nach Credit (Byte 0), wenn Score-Injektion deaktiviert; sonst nach $8A (Byte 10)
+					if inj_byte = 10 or (inj_byte = 0 and not INJ_SCORES) then
+						inj_st <= INJ_DONE;
+					else
+						inj_byte <= inj_byte + 1;
+					end if;
+				end if;
+			when INJ_DONE =>
+				inj_active <= '0';
+				cpu_halt   <= '0';                 -- CPU resumt transparent aus halt_state -> fetch
+				injected   <= '1';                 -- kein Re-Inject bis zum naechsten Board-Reset
+			end case;
+		end if;
+	end if;
+end process;
+
 FRAM: entity work.fram_i2c
 generic map(
 	DEV_ADDR => "1010001",   -- 0x51 (A0=3V, A1=A2=GND)
@@ -1259,12 +1364,19 @@ port map(
 );
 
 -- RAM -- 0x0000-0x01FF (512 Byte); 0x0200 ist 1-Byte-NVRAM-Register (s.o., nvram_dout)
+-- RAM-Port-Mux: waehrend der Stufe-2-Injection (inj_active) treibt der Injektor Adresse/Daten/wren,
+-- sonst die CPU. Die CPU ist dabei per halt angehalten (ram_wren=0), der Mux ist Defense-in-depth.
+-- Sniffer (Display/persist) beobachten weiter ram_wren = CPU-Writes, nicht inj_wren.
+ram_p_addr <= inj_addr             when inj_active = '1' else cpu_addr(8 downto 0);
+ram_p_data <= inj_data             when inj_active = '1' else cpu_dout(7 downto 0);
+ram_p_wren <= inj_wren             when inj_active = '1' else ram_wren;
+
 RAM: entity work.RAM --512byte
 port map(
-	address	=> cpu_addr(8 downto 0),
+	address	=> ram_p_addr,
 	clock		=> clk_50,
-	data		=>  cpu_dout (7 DOWNTO 0),
-	wren 		=> ram_wren,
+	data		=> ram_p_data,
+	wren 		=> ram_p_wren,
 	q			=> ram_dout
 );
 
@@ -1339,7 +1451,7 @@ port map(
 	data_in => cpu_din,
 	data_out => cpu_dout,
 	hold => '0',
-	halt => '0',
+	halt => cpu_halt,
 	irq => '0',
 	nmi => not dma_int
 );

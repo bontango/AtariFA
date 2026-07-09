@@ -8,8 +8,9 @@ replacement that plugs into the original Atari edge connectors and replaces the 
 ROMs and TTL glue logic, while a single FPGA bitstream supports the whole Gen1 generation.
 
 > Status: running on prototype hardware. The CPU core, clocking, memory map, game selection,
-> free-play option, sound, a boot speech announcement, the switch matrix, the solenoid drivers
-> and the lamp matrix are implemented and hardware-tested (see [Roadmap](#roadmap)). All five games
+> free-play option, sound, a boot speech announcement, the switch matrix, the solenoid drivers,
+> the lamp matrix and FRAM credit persistence are implemented and hardware-tested (see
+> [Roadmap](#roadmap)). All five games
 > boot, accept credits, start a game (including from the free-play ROMs) and — except Atarians,
 > which has no documented self-test — enter the self-test and report switches correctly. Only the
 > sound bench test is still outstanding.
@@ -135,6 +136,30 @@ the full codec rationale — why PCM rather than 1-bit delta — are in
 [`doc/Speech_Boot_Feasibility.md`](doc/Speech_Boot_Feasibility.md)). The module is self-contained
 and reusable across boards: it needs only a clock, a reset and a start trigger.
 
+## FRAM persistence (credits / high score)
+
+Atari Gen1 has **no native NVRAM** — RAM `0x0000–0x01FF` is cleared on boot, so credits and the last
+game's scores are lost on power-down. AtariFA persists them in an external I²C FRAM (**FM24CL64B**,
+slave `0x51`) driven by [`fram_i2c.vhd`](fram_i2c.vhd), a bit-banging I²C master. Currently implemented
+for **Airborne Avenger** only; enabled via `options(1)` (ON = restore, OFF = erase on boot).
+
+- **Stage 1 — save/restore to FRAM (hardware-tested):** the game-end is detected from the **outhole
+  switch**; once the scores have been stable for ~3 s (bonus count finished), credits (`$D5`) and player
+  scores (`$81–$8A`) are written to the FRAM together with a validity signature. On the next boot they
+  are read back into an FPGA shadow and shown in the boot-info window for verification.
+- **Stage 2 — bus-injection restore (credit restore hardware-verified):** to make the restored values
+  take effect *in the game*, the FPGA briefly asserts the CPU core's `halt`, muxes the RAM port and
+  writes the shadow bytes straight into game RAM just after the boot clear, then resumes the CPU.
+  Credit restore is confirmed on hardware (two restored credits, coin → three).
+
+**Score display is intentionally deferred:** after a cold boot Atari shows `888888` on all displays for
+~20–30 s and then blanks the player displays — scores are only shown *after a game has been played*.
+The restored scores are correctly injected into RAM but stay invisible in the cold-boot attract until
+Atari is also put into its "game played" state (a RAM flag, found via ROM disassembly — not yet done).
+Score injection is therefore switched off by default (`INJ_SCORES = false`; the mechanism remains in
+place). See [`doc/FRAM_Persistence.md`](doc/FRAM_Persistence.md) for the reverse-engineered addresses,
+the injection mechanism and the full Atari attract-display analysis.
+
 ## Target hardware
 
 - **FPGA:** Intel/Altera Cyclone 10 LP **10CL006YE144C8G** (E144 package)
@@ -192,10 +217,11 @@ written to `output_files/`.
 | `speech.vhd` / `speech_rom.vhd` | Boot speech ("Lisü"): 8-bit PCM player + 4096×8 ROM |
 | `solenoid_driver.vhd` | Solenoid + coin-door latches (20 IRL540 via 74HCT540) |
 | `lamp_matrix.vhd` | Lamp matrix scanner (21×4 multiplex: 12× ULN2003A + three 74HC595 + aux strobes) |
+| `fram_i2c.vhd` | I²C master for the FM24CL64B FRAM (credit / high-score persistence) |
 | `AtariFA.qsf` / `AtariFA.sdc` | Pin/assignment and timing constraints |
 | `rom/` | Game ROM images (Intel HEX) + `82s130` sound PROM |
 | `rom/freeplay/` | Free-play ROM variants (reference) + `gen_patches.py` |
-| `doc/` | Schematics (`Display_Logic.png` Sheet 15B, `Auxiliary_PCB.png` Sheet 15A) + analyses (`Display_Timing.md`, `Sound_Emulation.md`, `Speech_Boot_Feasibility.md`) |
+| `doc/` | Schematics (`Display_Logic.png` Sheet 15B, `Auxiliary_PCB.png` Sheet 15A) + analyses (`Display_Timing.md`, `Sound_Emulation.md`, `Speech_Boot_Feasibility.md`, `Switch_Reading_Analysis.md`, `FRAM_Persistence.md`) |
 
 ## Roadmap
 
@@ -207,6 +233,9 @@ written to `output_files/`.
   `0x1080/84/88` + `0x108C`, `solenoid_driver.vhd`), ✓ lamp matrix (`lamp_matrix.vhd`, 21×4
   multiplex) — all hardware-tested. **Phase B complete.**
 - **Phase C:** ✓ audio done (`sound.vhd`); remaining: generic per-game configuration.
+- **FRAM persistence:** ✓ credit save/restore hardware-verified (`fram_i2c.vhd` + injection FSM,
+  Airborne). Deferred: making restored **scores** visible in attract (needs the "game played" RAM flag)
+  and extending the addresses to the other four games.
 - **Phase D:** cleanup, SDC completion, input synchronizers.
 - Watchdog reset is intentionally decoupled until the in-game `0x4000` kick is characterized.
 
