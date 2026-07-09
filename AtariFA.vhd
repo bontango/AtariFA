@@ -77,6 +77,7 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
 use work.instruction_buffer_type.all;
+use work.fram_types.all;   -- FRAM-Byte-Array (fram_data_t), s. fram_i2c.vhd
 
 entity AtariFA is
 	port(		
@@ -148,7 +149,7 @@ architecture rtl of AtariFA is
 -- could later be exposed via a DIP/debug read address or the ESP32 link for a software query.
 constant SW_MAIN : std_logic_vector(3 downto 0) := x"0";
 constant SW_SUB1 : std_logic_vector(3 downto 0) := x"0";
-constant SW_SUB2 : std_logic_vector(3 downto 0) := x"7";
+constant SW_SUB2 : std_logic_vector(3 downto 0) := x"8";
 
 --internal signals via logic
 signal reset_h		: 	std_logic;
@@ -326,7 +327,8 @@ constant DISPLAY_TEST : boolean := false;
 --   2 = cpu_addr(15:8) — PC-High-Byte; steht → hängt in dieser ROM/RAM-Page
 --   3 = Boot-Trace (cpu_clk/boot_phase0/por_active/boot_phase1/boot_phase2/reset_h/
 --       dip_strobe0/i_disp_Load) — zeigt Fortschritt der Power-on-/Boot-Sequenz
-constant DBG_MODE : integer range 0 to 3 := 0;
+--   4 = FRAM-I2C-Trace (scl/sda/fram_go/fram_busy/fram_done/ack/cmd_read/selftest_pass) — LA am FRAM-Bus
+constant DBG_MODE : integer range 0 to 4 := 0;   -- Standard-LA-Mix (FRAM-Diagnose 4 nur temporaer)
 signal heartbeat_div  : std_logic_vector(24 downto 0) := (others => '0');
    -- Bit 24 toggelt alle 2^24/50e6 ≈ 0.67s → ~0.75 Hz Heartbeat; nur als FPGA-Takt-Fallback genutzt
 signal cpu_fetch_cnt  : std_logic_vector(20 downto 0) := (others => '0');
@@ -350,6 +352,65 @@ signal por_active     : std_logic := '1';
 signal sw_state       : std_logic_vector(0 to 79);
 -- Dekodierter Switch-Matrix-Wert für cpu_din (geschlossen=0xFF, offen=0x00, laut PinMAME swg1_r)
 signal sw_value       : std_logic_vector(7 downto 0);
+
+-- ---------------------------------------------------------------------------
+-- FRAM-Persistenz (Stufe 1, s. fram_i2c.vhd): Scores + Credits ueber Power-Cycle sichern.
+-- Atari Gen1 hat kein natives NVRAM; RAM 0x00-0x01FF wird beim Boot geleert. options(1) (ON='0')
+-- schaltet Save/Restore frei; OFF loescht das FRAM beim Boot. Stufe 1 nur Airborne (game_idx=2):
+-- Save-Trigger + FRAM-Read/Write + Rueckanzeige im Boot-Info-Fenster. Der eigentliche Restore ins
+-- Spiel-RAM (Bus-Injection) kommt als Stufe 2 -- der Shadow liegt darum in FPGA-Registern.
+-- ---------------------------------------------------------------------------
+constant FRAM_N        : integer := 16;                              -- Bytes je FRAM-Block
+constant FRAM_MAGIC    : std_logic_vector(7 downto 0) := x"A5";      -- Gueltig-Signatur
+constant REC_MAGIC     : integer := 0;                               -- Record-Layout im FRAM
+constant REC_GAME      : integer := 1;                               --   [0]=Magic [1]=game_idx
+constant REC_CREDIT    : integer := 2;                               --   [2]=Credits ($D5)
+constant REC_SCORE0    : integer := 3;                               --   [3..12]=Scores ($81..$8A)
+-- Airborne-spezifische Quell-Adressen im Spiel-RAM (Page 0). HW/RE: doc/atari.c + tools/listing_aav.txt.
+constant ADDR_CREDIT   : std_logic_vector(7 downto 0) := x"D5";
+constant ADDR_SCORE_LO : std_logic_vector(7 downto 0) := x"81";
+constant ADDR_SCORE_HI : std_logic_vector(7 downto 0) := x"8A";
+-- Score-Stabilitaets-Fenster: so lange muessen die Player-Scores unveraendert sein, bevor gespeichert
+-- wird (Bonuszaehlung am Ballende abwarten). ~3 s @ 50 MHz. HW-tunbar.
+constant STABLE_CYCLES : integer := 150000000;
+constant ZERO96        : std_logic_vector(95 downto 0) := (others => '0');
+
+signal fram_wr_data  : fram_data_t(0 to FRAM_N-1) := (others => (others => '0'));
+signal fram_rd_data  : fram_data_t(0 to FRAM_N-1);
+signal fram_shadow   : fram_data_t(0 to FRAM_N-1) := (others => (others => '0'));  -- Boot-Read-Ergebnis
+signal persist_buf   : fram_data_t(0 to FRAM_N-1) := (others => (others => '0'));  -- gesnifftes Save-Abbild
+signal fram_go       : std_logic := '0';
+signal fram_cmd_read : std_logic := '0';
+signal fram_busy     : std_logic;
+signal fram_done     : std_logic;
+signal restore_valid : std_logic := '0';   -- '1' = gueltige Daten fuers aktuelle Spiel im FRAM
+
+-- Save-Trigger
+signal outhole_ofs   : integer range 0 to 79 := 67;   -- sw_state-offset des Outhole je Spiel
+signal outhole       : std_logic := '0';
+signal outhole_d     : std_logic := '0';
+signal game_played   : std_logic := '0';   -- latcht bei erstem Score /= 0 (kein Save von Nullen)
+signal save_arm      : std_logic := '0';   -- Outhole-Flanke gesehen, wartet auf Score-Stabilitaet
+signal save_request  : std_logic := '0';   -- 1-clk Save-Ausloeser
+signal save_seen     : std_logic := '0';   -- sticky Diagnose-LED (LED_D1): mind. 1x gespeichert
+signal disp_snap     : std_logic_vector(95 downto 0) := (others => '0');
+signal disp_now      : std_logic_vector(95 downto 0);
+signal stable_cnt    : integer range 0 to STABLE_CYCLES := 0;
+
+-- FRAM-Steuer-FSM (Boot-Op einmalig, danach Saves). FCB_ST_* = I2C-Loopback-Self-Test.
+type fram_ctrl_t is (FCB_WAIT, FCB_BOOT, FCB_RUN, FCB_SAVE, FCB_ST_W, FCB_ST_R);
+signal fram_ctrl_st  : fram_ctrl_t := FCB_WAIT;
+
+-- I2C-Diagnose (temporaer): FRAM_SELFTEST=true -> Boot schreibt ein Testpattern und liest es sofort
+-- zurueck (unabhaengig vom Spiel). Status-Display zeigt dann Valid-Flag + Byte $D5 (=Pattern 0xC3):
+-- "1 C3" = I2C-Write+Read OK; "0 00" = Write blockiert (FM24CL64B /WP-Pin high?) oder Read defekt.
+-- LED_D1 = selftest_pass. Fuer Normalbetrieb spaeter auf false setzen.
+constant FRAM_SELFTEST : boolean := false;
+signal selftest_pass : std_logic := '0';
+signal fram_ack_dbg  : std_logic;
+signal fram_ack_ok   : std_logic;
+signal fram_scl_dbg  : std_logic;
+signal fram_dbg_state : std_logic_vector(2 downto 0);
 
 -- ---------------------------------------------------------------------------
 
@@ -402,6 +463,23 @@ gen_dbg3: if DBG_MODE = 3 generate
 	debug_signal(6) <= dip_strobe(0);
 	debug_signal(7) <= i_disp_Load;
 end generate gen_dbg3;
+-- DBG_MODE=4 (FRAM-I2C-Trace): Logic Analyzer am FRAM-Bus + ACK-Beobachtung.
+--  [0] scl           I2C-Takt (toggelt waehrend Transfer)
+--  [1] sda           I2C-Daten (open-drain; high=idle/1, low=0/ACK)
+--  [2] ack_live      Slave-ACK je Byte gesampelt ('0'=FRAM zieht SDA im 9. Takt low = ACK)
+--  [3] ack_ok        sticky: FRAM hat im letzten Transfer geantwortet (=LED_D3)
+--  [4..6] dbg_state  FSM-Zustand: 0=IDLE 1=SEQ 2=START 3=TX 4=RX 5=STOP 6=FINISH
+--  [7] fram_go       Transfer-Start-Strobe (1-clk)
+gen_dbg4: if DBG_MODE = 4 generate
+	debug_signal(0) <= fram_scl_dbg;   -- scl (out-Port fram_i2c_scl ist nicht lesbar -> Modul-Spiegel)
+	debug_signal(1) <= fram_i2c_sda;
+	debug_signal(2) <= fram_ack_dbg;
+	debug_signal(3) <= fram_ack_ok;
+	debug_signal(4) <= fram_dbg_state(0);
+	debug_signal(5) <= fram_dbg_state(1);
+	debug_signal(6) <= fram_dbg_state(2);
+	debug_signal(7) <= fram_go;
+end generate gen_dbg4;
 
 -------------------------------
 reset_l_stable <= boot_phase(2); -- CPU-Release erst nach DIP-Read (Phase 1) + Info-Anzeige (Phase 2)
@@ -411,11 +489,14 @@ reset_h <= (not reset_l_stable) or por_active;
    -- Reaktivieren (or wd_reset) sobald Kick-Bedingung aus Schaltplan/ROM-Disassembly bekannt.
 
 -- LEDs (Schnell-Diagnose ohne LA) — Board-LEDs aktiv-LOW (gegen VCC, Pin nach GND => leuchten bei '0')
-LED_D1   <= not wd_seen;           -- Watchdog-Sticky: leuchtet, wenn der WD mind. einmal resettet hat
+-- FRAM Stufe 1 (2026-07-08): LED_D1 = sticky 'save_seen' (Save-Trigger gefeuert). Im I2C-Self-Test
+--   (FRAM_SELFTEST=true) stattdessen 'selftest_pass' (Loopback OK). Rueckbau spaeter: LED_D1 <= not wd_seen;
+LED_D1   <= (not selftest_pass) when FRAM_SELFTEST else (not save_seen);
 LED_D2   <= not cpu_fetch_cnt(20); -- CPU-Fetch-Blinker ~0.6 Hz: blinkt = cpu68 fetcht ROM-Befehle
                                     -- (steht dauerhaft: CPU halted oder hängt ohne ROM-Zugriff)
-LED_D3   <= not nmi_blink_cnt(8);  -- NMI-Generator-Blinker ~0.48 Hz: blinkt = HW-NMI-Takt läuft
-                                    -- (unabhängig von CPU; Freilauf aus dma_counter; 244 NMI/s -> Bit8 ~0.48 Hz)
+-- FRAM-Diagnose: LED_D3 = fram_ack_ok (leuchtet, wenn der FRAM im letzten Transfer geantwortet hat
+--   = mind. 1 Slave-ACK). Direkter "Chip antwortet ja/nein"-Indikator ohne LA. Sonst NMI-Heartbeat.
+LED_D3   <= (not fram_ack_ok) when FRAM_SELFTEST else (not nmi_blink_cnt(8));  -- ~0.48 Hz NMI-Blinker im Normalbetrieb
 
 -- use some IOs to read dips at start
 -- Route the matrix strobes to the lamp IOs only DURING the DIP read window.
@@ -503,9 +584,8 @@ SB_Sound        <= speech_pwm                           when speech_busy = '1'
               else '0';
 -- SB_Audio: separater MP3/Background-Pfad (ESP32/Mini-Player) -- nicht Teil der Emulation.
 SB_Audio <= '0';
--- FRAM I2C: Open-Drain im Leerlauf freigeben (externer Pull-up zieht high); SCL idle high.
-fram_i2c_sda <= 'Z';
-fram_i2c_scl <= '1';
+-- FRAM I2C: von der Instanz FRAM (fram_i2c.vhd) getrieben (SDA open-drain '0'/'Z', SCL push-pull).
+-- Die frueheren statischen Idle-Zuweisungen (sda<='Z', scl<='1') entfallen -> keine Doppeltreiber.
 -- ESP32-Link: UART-Leitung ruht HIGH; Signalpin Idle low.
 ESP32_ser_rx <= '1';
 ESP32_sig    <= '0';
@@ -540,7 +620,7 @@ end process;
 -- display_control.vhd, spiegelte aber die Spielanzeige doppelt -> jetzt nur hier.)
 -- x"F"=blank, Digit 6 = Player-up-LED (hier aus = x"0", nicht Teil der Ziffernfolge).
 ------------------------------------------------------------------------------
-boot_info : process(game_select, options, freeplay)
+boot_info : process(game_select, options, freeplay, fram_shadow, restore_valid)
 begin
 	-- Display 1: Version SW_MAIN SW_SUB1 SW_SUB2 (rechtsbuendig: SUB2 ganz rechts = Index 0)
 	bi_display1 <= (others => x"F");
@@ -568,17 +648,35 @@ begin
 	end loop;
 	bi_display3(6) <= x"0";
 
-	-- Display 4: Freeplay (active-low) -> '1' wenn aktiv, sonst '0' (ganz rechts = Index 0)
+	-- Display 4: Freeplay (active-low, Index 0) + FRAM-Verifikation (Stufe 1): bei gueltigem Restore
+	-- das erste gesicherte Score-Byte ($81) als 2 Hex-Ziffern (Index 3=hi, 2=lo) einblenden.
+	-- Bestaetigt am Board, dass die Score-Adresse ($81..) korrekt gesnifft/persistiert wurde.
 	bi_display4 <= (others => x"F");
 	if freeplay = '0' then
 		bi_display4(0) <= x"1";
 	else
 		bi_display4(0) <= x"0";
 	end if;
+	if restore_valid = '1' then
+		bi_display4(3) <= fram_shadow(REC_SCORE0)(7 downto 4);
+		bi_display4(2) <= fram_shadow(REC_SCORE0)(3 downto 0);
+	end if;
 	bi_display4(6) <= x"0";
 
-	-- Status-Display: blank
+	-- Status-Display: FRAM-Verifikation (Stufe 1). Index 0 = Valid-Flag (1=gueltiger Restore fuers
+	-- aktuelle Spiel im FRAM), Index 3/2 = restaurierte Credits ($D5) als 2 Hex-Ziffern. Blank sonst.
 	bi_status <= (others => x"F");
+	if restore_valid = '1' then
+		bi_status(0) <= x"1";
+	else
+		bi_status(0) <= x"0";
+	end if;
+	-- Status-/Credit-Ball-Display laeuft in der Digit-Reihenfolge entgegengesetzt zu Display 1..4
+	-- (Index 0 = physisch links). Daher hi-Nibble nach Index 2 (links), lo-Nibble nach Index 3
+	-- (rechts), damit der restaurierte Credit-Wert richtig herum ("42" statt "24") erscheint.
+	-- Betrifft NUR die Boot/Info-Anzeige; der Spiel-Pfad (status_d) ist unberuehrt.
+	bi_status(2) <= fram_shadow(REC_CREDIT)(7 downto 4);   -- hi-Nibble (links)
+	bi_status(3) <= fram_shadow(REC_CREDIT)(3 downto 0);   -- lo-Nibble (rechts)
 end process;
 
 -- Mux: in Phase 2 (boot_phase(2)='0') Boot-Info, danach Spiel/Normal-Daten.
@@ -957,6 +1055,208 @@ begin
 	end if;
 end process;
 
+
+------------------------------------------------------------------------------
+-- FRAM-Persistenz (Stufe 1, Airborne): Save-Trigger + I2C-Read/Write.
+-- Ablauf: (1) persist_sniffer schreibt bei jedem Spiel-RAM-Write auf $D5/$81..$8A in persist_buf;
+--         (2) save_trig feuert save_request, wenn nach der Outhole-Flanke die Player-Scores ~3 s
+--             stabil sind (Bonuszaehlung fertig), ein Spiel gespielt wurde und options(1)=ON;
+--         (3) fram_ctrl fuehrt beim Boot einmalig Read (ON) bzw. Erase (OFF) aus und danach die Saves.
+------------------------------------------------------------------------------
+-- Outhole je Spiel (sw_state-offset = CPU-Adr - 0x2000): Atarians 0x2013->19, Time 0x2035->53,
+-- Airborne 0x2043->67, MiddleEarth/Space 0x2038->56. Nur Airborne (game_idx=2) speichert in Stufe 1.
+outhole_ofs <= 19 when game_idx = 0 else
+               53 when game_idx = 1 else
+               67 when game_idx = 2 else
+               56 when game_idx = 3 else
+               56 when game_idx = 4 else
+               67;
+outhole <= sw_state(outhole_ofs);
+
+-- Player-Scores fuer die Stabilitaetspruefung: je Display die 6 Score-Ziffern (Index 0..5),
+-- OHNE die Player-up-LED (Index 6, blinkt im Attract). 4 x 6 x 4 Bit = 96 Bit.
+disp_now <= display1(5) & display1(4) & display1(3) & display1(2) & display1(1) & display1(0)
+          & display2(5) & display2(4) & display2(3) & display2(2) & display2(1) & display2(0)
+          & display3(5) & display3(4) & display3(3) & display3(2) & display3(1) & display3(0)
+          & display4(5) & display4(4) & display4(3) & display4(2) & display4(1) & display4(0);
+
+-- Persist-Sniffer: Airborne-Score/Credit-Bytes aus Page-0-Writes ins persist_buf (analog lamp_sniffer).
+persist_sniffer : process(clk_50)
+	variable sidx : integer range 0 to FRAM_N-1;
+begin
+	if rising_edge(clk_50) then
+		if ram_wren = '1' and cpu_addr(15 downto 8) = x"00" and game_idx = 2 then
+			if cpu_addr(7 downto 0) = ADDR_CREDIT then
+				persist_buf(REC_CREDIT) <= cpu_dout;
+			elsif cpu_addr(7 downto 0) >= ADDR_SCORE_LO and cpu_addr(7 downto 0) <= ADDR_SCORE_HI then
+				sidx := REC_SCORE0 + (conv_integer(cpu_addr(7 downto 0)) - conv_integer(ADDR_SCORE_LO));
+				persist_buf(sidx) <= cpu_dout;
+			end if;
+		end if;
+	end if;
+end process;
+
+-- Save-Trigger: Outhole-Flanke -> arm; Scores STABLE_CYCLES unveraendert + game_played + Airborne +
+-- options(1)=ON + FRAM frei -> save_request. save_seen = sticky Diagnose (LED_D1).
+save_trig : process(clk_50)
+begin
+	if rising_edge(clk_50) then
+		save_request <= '0';                       -- Default: 1-clk-Puls
+		if reset_l_stable = '0' then               -- Boot/Reset: Zustand neutral
+			outhole_d   <= '0';
+			game_played <= '0';
+			save_arm    <= '0';
+			save_seen   <= '0';
+			stable_cnt  <= 0;
+			disp_snap   <= (others => '0');
+		else
+			outhole_d <= outhole;
+			if disp_now /= ZERO96 then
+				game_played <= '1';                 -- ein Spiel lief (Score /= 0)
+			end if;
+			if disp_now /= disp_snap then
+				disp_snap  <= disp_now;             -- Score aendert sich -> Stabilitaetstimer zuruecksetzen
+				stable_cnt <= 0;
+			elsif stable_cnt < STABLE_CYCLES then
+				stable_cnt <= stable_cnt + 1;
+			end if;
+			if outhole = '1' and outhole_d = '0' then
+				save_arm <= '1';                    -- Ball gedrained
+			end if;
+			if save_arm = '1' and stable_cnt = STABLE_CYCLES and game_played = '1'
+			   and game_idx = 2 and options(1) = '0' and fram_busy = '0' then
+				save_request <= '1';
+				save_arm     <= '0';
+				save_seen    <= '1';
+			end if;
+		end if;
+	end if;
+end process;
+
+-- FRAM-Steuer-FSM: einmalige Boot-Op (Read bei ON / Erase bei OFF), danach Saves auf save_request.
+-- Reset an boot_phase(0) (synchronisiertes reset_sw) -- laeuft schon VOR reset_l_stable (Boot-Read
+-- muss vor CPU-Start fertig sein und im Info-Fenster anzeigbar).
+fram_ctrl : process(clk_50)
+begin
+	if rising_edge(clk_50) then
+		fram_go <= '0';                            -- Default: 1-clk-Strobe
+		if boot_phase(0) = '0' then                -- Board-Reset
+			fram_ctrl_st  <= FCB_WAIT;
+			fram_cmd_read <= '0';
+			restore_valid <= '0';
+		else
+			case fram_ctrl_st is
+			when FCB_WAIT =>
+				-- Warten bis DIP-Read fertig (options(1) gueltig) + PLL gelockt + FRAM frei
+				if boot_phase(1) = '1' and por_active = '0' and fram_busy = '0' then
+					if FRAM_SELFTEST then
+						-- I2C-Loopback-Test: Testpattern schreiben (danach zurueckgelesen in FCB_ST_R)
+						fram_cmd_read <= '0';
+						fram_wr_data(REC_MAGIC)  <= FRAM_MAGIC;                 -- 0xA5
+						fram_wr_data(REC_GAME)   <= "00000" & (not game_select);
+						fram_wr_data(REC_CREDIT) <= x"42";                     -- BCD-anzeigbar (CD4511): "42"
+						fram_wr_data(REC_SCORE0) <= x"81";
+						for i in REC_SCORE0+1 to FRAM_N-1 loop
+							fram_wr_data(i) <= (others => '0');
+						end loop;
+						fram_go      <= '1';
+						fram_ctrl_st <= FCB_ST_W;
+					else
+						if options(1) = '0' then        -- ON: Restore -> Block-Read
+							fram_cmd_read <= '1';
+						else                            -- OFF: FRAM loeschen -> Nullen schreiben (Magic ungueltig)
+							fram_cmd_read <= '0';
+							for i in 0 to FRAM_N-1 loop
+								fram_wr_data(i) <= (others => '0');
+							end loop;
+						end if;
+						fram_go      <= '1';
+						fram_ctrl_st <= FCB_BOOT;
+					end if;
+				end if;
+			when FCB_ST_W =>                          -- Self-Test: Pattern-Write fertig -> Read anstossen
+				if fram_done = '1' then
+					fram_cmd_read <= '1';
+					fram_go       <= '1';
+					fram_ctrl_st  <= FCB_ST_R;
+				end if;
+			when FCB_ST_R =>                          -- Self-Test: Readback auswerten
+				if fram_done = '1' then
+					for i in 0 to FRAM_N-1 loop
+						fram_shadow(i) <= fram_rd_data(i);
+					end loop;
+					if fram_rd_data(REC_MAGIC) = FRAM_MAGIC and fram_rd_data(REC_CREDIT) = x"42" then
+						selftest_pass <= '1';           -- Loopback OK (Write+Read funktionieren)
+					else
+						selftest_pass <= '0';
+					end if;
+					if fram_rd_data(REC_MAGIC) = FRAM_MAGIC
+					   and fram_rd_data(REC_GAME)(2 downto 0) = (not game_select) then
+						restore_valid <= '1';           -- Status-Display zeigt dann "1" + Credit=C3
+					else
+						restore_valid <= '0';
+					end if;
+					-- Diagnose: Self-Test dauerhaft wiederholen (staendige I2C-Aktivitaet fuer den LA).
+					fram_ctrl_st <= FCB_WAIT;
+				end if;
+			when FCB_BOOT =>
+				if fram_done = '1' then
+					if fram_cmd_read = '1' then      -- gelesene Daten in Shadow + validieren
+						for i in 0 to FRAM_N-1 loop
+							fram_shadow(i) <= fram_rd_data(i);
+						end loop;
+						if fram_rd_data(REC_MAGIC) = FRAM_MAGIC
+						   and fram_rd_data(REC_GAME)(2 downto 0) = (not game_select) then
+							restore_valid <= '1';
+						else
+							restore_valid <= '0';
+						end if;
+					end if;
+					fram_ctrl_st <= FCB_RUN;
+				end if;
+			when FCB_RUN =>
+				if save_request = '1' and fram_busy = '0' then
+					fram_cmd_read <= '0';
+					fram_wr_data(REC_MAGIC) <= FRAM_MAGIC;
+					fram_wr_data(REC_GAME)  <= "00000" & (not game_select);
+					for i in REC_CREDIT to FRAM_N-1 loop
+						fram_wr_data(i) <= persist_buf(i);
+					end loop;
+					fram_go      <= '1';
+					fram_ctrl_st <= FCB_SAVE;
+				end if;
+			when FCB_SAVE =>
+				if fram_done = '1' then
+					fram_ctrl_st <= FCB_RUN;
+				end if;
+			end case;
+		end if;
+	end if;
+end process;
+
+FRAM: entity work.fram_i2c
+generic map(
+	DEV_ADDR => "1010001",   -- 0x51 (A0=3V, A1=A2=GND)
+	CLK_DIV  => 125,         -- ~100 kHz SCL
+	N_BYTES  => FRAM_N
+)
+port map(
+	clk_50   => clk_50,
+	reset    => not boot_phase(0),
+	go       => fram_go,
+	cmd_read => fram_cmd_read,
+	mem_addr => x"0000",
+	wr_data  => fram_wr_data,
+	rd_data  => fram_rd_data,
+	busy     => fram_busy,
+	done     => fram_done,
+	ack_dbg  => fram_ack_dbg,
+	ack_ok   => fram_ack_ok,
+	scl_dbg  => fram_scl_dbg,
+	dbg_state=> fram_dbg_state,
+	sda      => fram_i2c_sda,
+	scl      => fram_i2c_scl
+);
 
 -- RAM -- 0x0000-0x01FF (512 Byte); 0x0200 ist 1-Byte-NVRAM-Register (s.o., nvram_dout)
 RAM: entity work.RAM --512byte

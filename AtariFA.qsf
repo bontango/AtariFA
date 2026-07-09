@@ -149,6 +149,7 @@ set_location_assignment PIN_91 -to dip_opt[2]
 set_location_assignment PIN_90 -to dip_opt[3]
 set_location_assignment PIN_88 -to dip_opt[4]
 set_global_assignment -name VHDL_FILE read_the_dips.vhd
+set_global_assignment -name VHDL_FILE fram_i2c.vhd
 set_global_assignment -name VHDL_FILE switch_matrix.vhd
 set_global_assignment -name VHDL_FILE solenoid_driver.vhd
 set_global_assignment -name VHDL_FILE lamp_matrix.vhd
