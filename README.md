@@ -8,9 +8,10 @@ replacement that plugs into the original Atari edge connectors and replaces the 
 ROMs and TTL glue logic, while a single FPGA bitstream supports the whole Gen1 generation.
 
 > Status: running on prototype hardware. The CPU core, clocking, memory map, game selection,
-> free-play option, sound, a boot speech announcement, the switch matrix, the solenoid drivers,
-> the lamp matrix and FRAM credit persistence are implemented and hardware-tested (see
-> [Roadmap](#roadmap)). All five games
+> free-play option, sound, a boot speech announcement, the switch matrix, the solenoid drivers
+> and the lamp matrix are implemented and hardware-tested (see [Roadmap](#roadmap)). FRAM credit
+> persistence was hardware-verified for Airborne but is **deferred / disabled as of 2026-07-10**
+> (see the [FRAM section](#fram-persistence-credits--high-score)). All five games
 > boot, accept credits, start a game (including from the free-play ROMs) and — except Atarians,
 > which has no documented self-test — enter the self-test and report switches correctly. Only the
 > sound bench test is still outstanding.
@@ -138,6 +139,14 @@ and reusable across boards: it needs only a clock, a reset and a start trigger.
 
 ## FRAM persistence (credits / high score)
 
+> **⚠ Deferred / I²C disabled (2026-07-10).** Extending credit persistence to all five games failed —
+> the empirical CRED_PROBE was unreliable (the known Airborne anchor came out as 240 instead of `$D5`=213;
+> root cause in [`doc/FRAM_Persistence.md`](doc/FRAM_Persistence.md)). The whole NVRAM/FRAM feature is
+> paused: the **I²C module is removed from the build** (`AtariFA.qsf` no longer compiles `fram_i2c.vhd`;
+> the top level drives the pins to a safe idle), while the **`fram_i2c.vhd` source is kept**. Current
+> build **SW 0.1.0**; the hardware-verified Airborne implementation stays in git history as SW 0.0.9
+> (`959ff6b`). The description below documents that (committed but now inactive) implementation.
+
 Atari Gen1 has **no native NVRAM** — RAM `0x0000–0x01FF` is cleared on boot, so credits and the last
 game's scores are lost on power-down. AtariFA persists them in an external I²C FRAM (**FM24CL64B**,
 slave `0x51`) driven by [`fram_i2c.vhd`](fram_i2c.vhd), a bit-banging I²C master. Currently implemented
@@ -233,9 +242,9 @@ written to `output_files/`.
   `0x1080/84/88` + `0x108C`, `solenoid_driver.vhd`), ✓ lamp matrix (`lamp_matrix.vhd`, 21×4
   multiplex) — all hardware-tested. **Phase B complete.**
 - **Phase C:** ✓ audio done (`sound.vhd`); remaining: generic per-game configuration.
-- **FRAM persistence:** ✓ credit save/restore hardware-verified (`fram_i2c.vhd` + injection FSM,
-  Airborne). Deferred: making restored **scores** visible in attract (needs the "game played" RAM flag)
-  and extending the addresses to the other four games.
+- **FRAM persistence:** credit save/restore was hardware-verified for Airborne (`fram_i2c.vhd` +
+  injection FSM, SW 0.0.9). **Deferred 2026-07-10 / I²C disabled** — extending to all five games failed
+  (empirical probe unreliable); the I²C module is out of the build, source kept. See the FRAM section above.
 - **Phase D:** cleanup, SDC completion, input synchronizers.
 - Watchdog reset is intentionally decoupled until the in-game `0x4000` kick is characterized.
 

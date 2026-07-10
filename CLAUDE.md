@@ -263,6 +263,15 @@ Umsetzungs-Ergebnis: **`doc/Speech_Boot_Feasibility.md`**.
   ist aber unterlegen (nur ~50ms passen in die 4096-Wort-Tiefe). **Tunbar:** knackiger ~1,2s = `60000000`.
 
 ## FRAM-Persistenz — Credits/Highscore (fram_i2c.vhd + Injection-FSM, 2026-07-09)
+> **⚠ DEAKTIVIERT (2026-07-10):** Die NVRAM/FRAM-Thematik ist **zurückgestellt** (Ausweitung auf alle 5
+> Spiele scheiterte — empirischer CRED_PROBE unzuverlässig, Airborne-Anker 240≠213; Root-Cause in
+> `doc/FRAM_Persistence.md`). Das **I²C-Modul ist aus dem Build genommen** (`AtariFA.qsf` ohne
+> `fram_i2c.vhd`; Top-Level treibt die Pins auf sicheren Leerlauf `fram_i2c_sda<='Z'`/`fram_i2c_scl<='1'`),
+> die **Source `fram_i2c.vhd` bleibt** erhalten. Aktueller Build **SW 0.1.0**; der HW-verifizierte
+> Airborne-Stand bleibt als **SW 0.0.9 (`959ff6b`)** in der git-History. Der folgende Abschnitt beschreibt
+> die (committete, aber aktuell inaktive) Implementierung — Reaktivierung: `fram_i2c.vhd` wieder in die
+> `.qsf` + Top-Level-Feature. **Zukunftsweg = RE statt Probe** (s. `doc/FRAM_Persistence.md`).
+
 Rettet **Credits + Scores des letzten Spiels** über Power-Cycle im externen I²C-FRAM (Atari Gen1 hat
 **kein natives NVRAM**). **Ausführliche Doku: `doc/FRAM_Persistence.md`** (RE-Adressen, Mechanik,
 Atari-Verhalten). Bisher nur **Airborne** (`game_idx=2`). SW-Version **0.0.9**.

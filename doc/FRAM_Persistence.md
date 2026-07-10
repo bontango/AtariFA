@@ -1,5 +1,12 @@
 # FRAM-Persistenz — Credits & Highscore über Power-Cycle (Airborne)
 
+> **⚠ STATUS 2026-07-10 — ZURÜCKGESTELLT / I²C deaktiviert.** Die Ausweitung auf alle 5 Spiele
+> scheiterte (empirischer CRED_PROBE unzuverlässig, s. Abschnitt am Ende); das gesamte NVRAM/FRAM-Feature
+> ist pausiert. Das **I²C-Modul ist aus dem Build genommen** (`AtariFA.qsf` ohne `fram_i2c.vhd`; Pins auf
+> sicherem Leerlauf), die **Source `fram_i2c.vhd` bleibt** erhalten. Der HW-verifizierte Airborne-Stand
+> (SW 0.0.9, `959ff6b`) bleibt in der git-History. Aktueller Build: **SW 0.1.0**. Details/Zukunftsweg:
+> Abschnitt *„Ausweitung auf alle 5 Spiele — ZURÜCKGESTELLT"* unten.
+
 Atari Gen1 hat **kein natives NVRAM**: RAM `0x0000–0x01FF` ist single-port und wird beim Boot
 gelöscht (Clear-Loop `0x00–0xD8`). Angezeigt wird immer nur der Score des **letzten Spiels**;
 einen „High Game To Date" gibt es nicht (Nutzer-bestätigt). Ziel dieses Features: **Credits und die
@@ -108,3 +115,59 @@ beim Coin/Start ohnehin aus `$D5` anzeigt.
 - **`HALT_SETTLE`** (~82 µs): Wartezeit nach `cpu_halt=1`, bis die CPU sicher im `halt_state` ist.
 - **`INJ_SCORES`** (false): Score-Injektion `$81–$8A` an/aus. **`INJ_DEBUG_LED`** (false): LED_D1 =
   `injected` (Injection-Bestätigung) statt `save_seen`.
+
+---
+
+## Ausweitung auf alle 5 Spiele — ZURÜCKGESTELLT (2026-07-10)
+
+Der Versuch, das Credit-Save/Restore von Airborne auf **alle 5 Spiele** auszuweiten, wurde am
+2026-07-10 **zurückgestellt** (Nutzer-Entscheid: Aufwand ↔ Nutzen stimmt nicht). Damit ist das
+**gesamte NVRAM/FRAM-Feature vorerst pausiert**: Das **I²C-Modul ist aus dem Build deaktiviert**
+(in `AtariFA.qsf` ist die Zeile `VHDL_FILE fram_i2c.vhd` entfernt; das Top-Level treibt die FRAM-Pins
+auf sicheren Leerlauf `fram_i2c_sda <= 'Z'` / `fram_i2c_scl <= '1'`). Die **Source `fram_i2c.vhd`
+bleibt im Repo** erhalten und ist jederzeit reaktivierbar. Build: **SW 0.1.0**. Der committete
+Airborne-Stand (SW 0.0.9, `959ff6b`) bleibt in der git-History als Referenz-Implementierung.
+
+### Warum der empirische CRED_PROBE-Ansatz scheiterte
+
+Um die Credit-RAM-Adresse je Spiel **ohne** ROM-Disassembly zu finden, wurde ein Diagnose-Build
+(`CRED_PROBE`) gebaut: Er puffert den letzten Page-0-Spielvariablen-Write und **votet** ihn (Boyer-Moore)
+bei jeder Änderung des Credit-Displays `$1D` (Annahme: der Credit-Zähler wird unmittelbar **vor** `$1D`
+mit demselben Wert geschrieben). Ergebnis am Board (Display 1 = gefundene Adresse dezimal):
+
+| Spiel | Probe (Display 1) | erwartet | Bewertung |
+|---|---|---|---|
+| Atarians | 206 (`$CE`) | ? | unbestätigt |
+| Time 2000 | 214 (`$D6`) | ? | unbestätigt |
+| **Airborne** | **240 (`$F0`)** | **213 (`$D5`)** | **FALSCH → Sanity-Anker verfehlt** |
+| Middle Earth | 107 (`$6B`) | ? | Konfidenz bleibt `01` = wertlos |
+| Space Race | 183 (`$B7`) | ? | Credit-Zählung hinkt/verzählt = wertlos |
+
+**Der bekannte Anker Airborne (`$D5` = 213, per HW-Restore bewiesen) wird verfehlt → die Methode ist
+unzuverlässig; 206/214/240/107/183 sind NICHT vertrauenswürdig.**
+
+**Root-Cause** (verifiziert in `tools/listing_aav.txt`): Die Heuristik „letzter Spielvariablen-Write vor
+einer `$1D`-Änderung = Credit-Zähler" ist **nicht eindeutig**, weil `$1D` aus **vielen** Codepfaden
+beschrieben wird:
+- Airborne schreibt `$1D` an ≥5 Stellen: `7CBF` (echte Credit-Routine, davor `STAB $D5` ✓), aber auch
+  `7D1C / 7D52 / 7D5E / 7DB0` (Attract-/Münz-/Start-Scan). Beim Test („nach Boot ein paar Coins") läuft
+  der **Attract-Münz-Scan** `7D4C–7DBB`, der `$1D` **direkt** hochzählt — **ohne** `$D5` davor. Der
+  „letzte Write" ist dann eine BCD-/Scratch-Variable (`$F0` = 240) statt des Credit-Masters `$D5`.
+- Middle Earth schreibt `$1D` aus ~10 Stellen → kein Kandidat gewinnt → Konfidenz konvergiert nie (`01`).
+- PinMAME (`doc/atari.c`) bestätigt: Gen1 hat **kein echtes NVRAM**; der Credit-Zähler ist reine
+  Spiel-RAM-Variable und wird von PinMAME nicht exponiert → nur per ROM-Disassembly sicher zu finden.
+
+### Verankerte Fakten für eine spätere Implementierung
+- **Airborne Credit-Master `$D5`** (HW-Restore bewiesen), Credit-**Limit** `$BC`, Credit-**Display** `$1D`.
+- **Outhole-Offsets** (Spielende-Marke, `sw_state`-Offset): Atarians 19, Time 53, ME 56, Space 56,
+  Airborne 67. Der Outhole-Trigger (`outhole_ofs`-Mux) war bereits generisch.
+- **FRAM-Slot-Idee je Spiel:** `mem_addr = game_idx * 16` (16-Byte-Record pro Spiel).
+
+### Empfohlener Zukunftsweg = RE statt Probe
+1. Je Spiel ein `dis6800.py`-Listing erzeugen (ME/AAV existieren schon in `tools/`).
+2. Die Master-Credit-Variable über das Airborne-Muster tracen:
+   `LDAB $cc; CMPB $limit; INCB/DECB; STAB $cc; JSR <BCD-Konvert>; STAA $1D` — die Adresse `$cc` ist der
+   gesuchte Credit-Master. Gegen Airborne = `$D5` verankern.
+3. Generischer Umbau (dann): `credit_addr(game_idx)`-Tabelle, die `game_idx=2`-Gates auf `0..4` öffnen,
+   per-Game-FRAM-Slot (`mem_addr = game_idx*16`), `CRED_PROBE`/Diagnose entfernen. Scores bleiben deferred.
+4. `fram_i2c.vhd` wieder in `AtariFA.qsf` aufnehmen und das Top-Level-Feature reaktivieren.
