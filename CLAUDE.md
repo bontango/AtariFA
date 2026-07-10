@@ -350,6 +350,9 @@ Atari-Verhalten). Bisher nur **Airborne** (`game_idx=2`). SW-Version **0.0.9**.
   (Referenzkopien der PinMAME-Quellen liegen zur Analyse in `doc/atari.c`/`doc/atari.h`/`doc/atarigames.c`)
 - **Display-Timing-Analyse: `doc/Display_Timing.md`** (gemessen aus Original-Board, Schaltbild Sheet 15B)
 - **Switch-Reading-Analyse: `doc/Switch_Reading_Analysis.md`** (0x200B-Testschalter-Polarität, ROM-Disassembly ME/Airborne)
+- **Lamp-Refresh-Analyse (EN): `doc/Lamp_Refresh_Analysis.md`** (Original-Refresh = DMA-Hardware, NICHT Software;
+  Vorglühen = HW-Artefakt der 20-V-Matrix, kein SW-„on-phase injection"; belegt via PinMAME `ram_w` +
+  Airborne-ROM-Disasm + NMI-ISR; LEDs auf AtariFA sicher, Refresh ändert nur Duty/Timing, nicht Spannung)
 - **Boot-Sprachausgabe: `doc/Speech_Boot_Feasibility.md`** (Codec-Analyse + Umsetzung PCM 8 kHz)
 - **FRAM-Persistenz: `doc/FRAM_Persistence.md`** (Credits/Highscore-Save/Restore, RE-Adressen Airborne,
   Bus-Injection-Mechanik, Atari-Attract-Anzeigeverhalten, zurückgestellte Score-Anzeige)
