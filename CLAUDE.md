@@ -160,20 +160,32 @@ Latches (Bits 0–3 = Sound; Bits 4–7 = Solenoide, s. „Solenoids"):**
 **ROM-Befund (`rom/82s130.hex`, 512×4, nur untere 4 Bit):** 16 zusammenhängende 32-Byte-Blöcke =
 **16 Wellenformen × 32 Samples**. ROM-Adresse = `"0" & snd_select(4) & sample_cnt(5)`.
 Tonfrequenz ≈ `AUDIO_CLK / ((16 − pitch)·32)`. **Vereinfachungen:** synchrone Zähler statt
-74163/7493-Ripple; AUDIO ENABLE/RESET als „Dauerton, Wellenform-Neustart bei Auswahl-Wechsel",
-„Aus" via Volume=0. `C_AUDIO_DIV` (Generic, Default 100) = einziger Tonhöhen-Tuning-Hebel.
+74163/7493-Ripple; Wellenform-Neustart bei Auswahl-Wechsel. `C_AUDIO_DIV` (Generic, Default 100)
+= einziger Tonhöhen-Tuning-Hebel.
+
+**AUDIO ENABLE/RESET (`snd_enable`, aus 0x3000/0x6000) gilt für BEIDE Pfade — Fix 2026-08-03, SW 0.1.1:**
+`snd_enable='0'` hält Pitch- **und** Sample-Zähler auf 0 (wie im Original `CET` an D13 + `R01/R02` an
+E12/E13, Sheet 15B) ⇒ ROM-Adresse konstant ⇒ AUDIO 0–3 statisch ⇒ DC ⇒ Aux-PCB koppelt über `C9` weg
+= still, **unabhängig vom Lautstärke-Latch**; zusätzlich `eff_volume`=0, jetzt als Port `volume_out`
+auch für den Aux-Attenuator. **Vorher wirkte `snd_enable` NUR über `eff_volume` und damit nur auf
+`sb_pwm`** → der Aux-Pfad lief frei weiter = lauter Dauerton am Aux-Board. Grund: das Spiel schaltet
+den Ton **nur** über AUDIO RESET ab und lässt `0x1084` stehen (Airborne `$79A2` = `STAA $6000 / RTS`,
+sonst nichts). Details: `doc/Sound_Emulation.md` §6.3.
 
 **Ausgabe-Mux per `options(3)`** (active-low, im Spiel dynamisch umschaltbar; in `AtariFA.vhd`):
-- `'1'` (DIP OFF) = **Original**: `aux_audio <= not snd_sample`, `aux_audio_latch <= "00" & not snd_volume`
-  ans echte Aux-Board (dortiger R-DAC + 4016 + Verstärker). **Invertiert wg. 74HCT540** (Konvention `disp_*`).
+- `'1'` (DIP OFF) = **Original**: `aux_audio <= not snd_sample`, `aux_audio_latch <= not snd_volume_eff`
+  (**4 Bit**, nicht 6) ans echte Aux-Board (dortiger R-DAC + 4016 + Verstärker). **Invertiert wg.
+  74HCT540** — schaltplan-bestätigt: `F_Audio0..3`/`F_L1084_B0..3` laufen über 540 (IC6/IC7 Main +
+  einer auf dem Solenoid-Blatt); nur `F_Sol_Enable` über den nicht invertierenden 74HCT541 (IC14).
 - `'0'` (DIP ON) = **Emulation**: `SB_Sound <= snd_pwm` (1-Bit Sigma-Delta von `(sample−8)·volume`,
   @clk_50) → Onboard-RC (3k3/4n7, fc≈10 kHz) + TDA7267. `SB_Audio` = separater MP3-Pfad, unangetastet.
+  Aux-Ausgänge im Idle auf **`(others => '1')`** → Aux-Board sieht AUDIO=0/LATCH1084=0; früher `'0'`
+  ⇒ über den invertierenden 540 Voll-DAC bei max. Attenuator (falscher „Aus"-Zustand, Offset am 741).
 
-**Compile (2026-06-21):** 0 Fehler, Timing ok (Setup ≥3,0 ns / Hold ≥0,16 ns); BRAM 22/30 M9K (+1 für
-D12). Warnung 14320 (ROM `q[7:4]` wegoptimiert) harmlos. **HW-Vorbehalte (im Code kommentiert):**
-(1) Original-Pfad erreicht das Aux-Board erst mit aktivem 74HCT540 (`solenoids_enable`, Phase B/C);
-(2) `aux_audio_latch` Bit 5/4 auf Idle '0' (HW-Zuordnung der oberen 2 Bit prüfen);
-(3) Adress-/Volume-Bit-Reihenfolge bei „falschem" Klang 1-zeilig tauschbar.
+**Compile (2026-08-03, SW 0.1.1):** 0 Fehler / 0 Critical, Timing ok (Setup +2,40 ns / Hold +0,44 ns),
+LE 41 %, BRAM 73 % (unverändert); `aux_audio`/`aux_audio_latch` nicht „stuck". Warnung 14320 (ROM
+`q[7:4]` wegoptimiert) harmlos. **HW-Vorbehalt:** Adress-/Volume-Bit-Reihenfolge bei „falschem"
+Klang 1-zeilig tauschbar.
 
 ## Lamps (lamp_matrix.vhd, 2026-07-04, HW-getestet OK)
 84 Lampen als **21×4-Multiplex-Matrix** (ersetzt den gelöschten `lamp_driver.vhd`/TPIC6B595-Entwurf).

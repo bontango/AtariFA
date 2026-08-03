@@ -148,7 +148,7 @@ architecture rtl of AtariFA is
 -- could later be exposed via a DIP/debug read address or the ESP32 link for a software query.
 constant SW_MAIN : std_logic_vector(3 downto 0) := x"0";
 constant SW_SUB1 : std_logic_vector(3 downto 0) := x"1";
-constant SW_SUB2 : std_logic_vector(3 downto 0) := x"0";
+constant SW_SUB2 : std_logic_vector(3 downto 0) := x"1";
 
 --internal signals via logic
 signal reset_h		: 	std_logic;
@@ -176,6 +176,7 @@ signal snd_select	: std_logic_vector(3 downto 0) := (others => '0');  -- Latch 1
 signal snd_pitch	: std_logic_vector(3 downto 0) := (others => '0');  -- Latch 1088: Tonhoehe
 signal snd_volume	: std_logic_vector(3 downto 0) := (others => '0');  -- Latch 1084: Lautstaerke
 signal snd_sample	: std_logic_vector(3 downto 0);  -- roher 4-Bit ROM-Nibble (Aux-Pfad)
+signal snd_volume_eff	: std_logic_vector(3 downto 0);  -- eff. Lautstaerke (0 wenn audio_enable='0'), Aux-Pfad
 signal snd_pwm		: std_logic;                     -- 1-Bit Sigma-Delta (Onboard-Pfad)
 signal sound_cs		: std_logic;
 -- AUDIO ENABLE/RESET (PinMAME atari.c: 0x3000 soundg1_w, 0x6000-0x6FFF audiog1_w) -> Gate fuer sound.vhd.
@@ -491,11 +492,22 @@ aux_lamp_strobe <= not lamp_strobe_sel;
 -- Sound-Ausgabe-Mux (options(3), active-low; dynamisch im Spiel umschaltbar):
 --   '1' (DIP OFF) = Original : AUDIO 0..3 + Volume-Latch ans Aux-Board (dortiger DAC/4016/Amp)
 --   '0' (DIP ON)  = Emulation: 1-Bit Sigma-Delta ueber SB_Sound (Onboard RC + TDA7267)
--- Aux-Datenleitungen invertiert wegen 74HCT540 (Konvention wie disp_*); HW-Vorbehalt: der
--- Original-Pfad erreicht das Aux-Board erst, wenn der 74HCT540 enabled ist (solenoids_enable,
--- Phase B/C). aux_audio_latch ist 4 Bit: Volume auf Bit 3..0
-aux_audio       <= not snd_sample                      when options(3) = '1' else (others => '0');
-aux_audio_latch <= (not snd_volume)             when options(3) = '1' else (others => '0');
+-- Aux-Datenleitungen invertiert wegen 74HCT540 (schaltplan-bestaetigt: F_Audio0..3 und
+-- F_L1084_B0..3 laufen ueber IC6/IC7 bzw. den 540 auf dem Solenoid-Blatt; nur F_Sol_Enable
+-- geht ueber den nicht invertierenden 74HCT541). Der Original-Pfad erreicht das Aux-Board
+-- erst, wenn der 540 enabled ist (solenoids_enable). aux_audio_latch ist 4 Bit: Volume Bit 3..0.
+--
+-- WICHTIG (Fix 2026-08-03, Dauerton am Aux-Board): hier muss snd_volume_EFF stehen, nicht der
+-- rohe Latch. Das Spiel schaltet den Ton nur ueber AUDIO RESET (0x6000) ab und laesst 0x1084
+-- unveraendert stehen (Airborne $79A2 = "STAA $6000 / RTS"). Ohne Gate lief der Tongenerator
+-- am Aux-Board mit der zuletzt gesetzten Lautstaerke ewig weiter = lauter Dauerton. Der
+-- Haupt-Gate sitzt in sound.vhd (Zaehler-Freeze wie im Original), das hier ist die zweite Stufe.
+--
+-- Idle-Zweig (Emulations-Modus) = (others => '1'): ueber den INVERTIERENDEN 540 sieht das
+-- Aux-Board damit AUDIO 0-3 = 0 und LATCH 1084 = 0 (aus). Frueher '0' -> Aux-Board sah 1111/1111
+-- = Voll-DAC bei maximaler Attenuator-Stellung (falscher "Aus"-Zustand, voller Offset am 741).
+aux_audio       <= not snd_sample     when options(3) = '1' else (others => '1');
+aux_audio_latch <= not snd_volume_eff when options(3) = '1' else (others => '1');
 -- Boot-Sprache hat Vorrang: waehrend speech_busy spricht das Sprachmodul ueber SB_Sound,
 -- danach (im Spiel) normaler Emulations-Sound bei options(3)=ON. Faellt ins Info-Fenster.
 SB_Sound        <= speech_pwm                           when speech_busy = '1'
@@ -630,7 +642,8 @@ end generate gen_disptest;
 ------------------------------------------------------------------------------
 -- sound.vhd bildet D12-ROM + D13-Pitch-Teiler + E12/E13-Sample-Zaehler nach.
 -- Eingaenge: die drei Sound-Latches (1080/1088/1084), unten am Bus dekodiert.
--- Ausgaenge: snd_sample (4-Bit, Aux-Pfad) und snd_pwm (Sigma-Delta, Onboard-Pfad).
+-- Ausgaenge: snd_sample + snd_volume_eff (Aux-Pfad) und snd_pwm (Sigma-Delta, Onboard-Pfad).
+-- snd_volume_eff = Lautstaerke-Latch, aber 0 wenn audio_enable='0' (s. Mux-Kommentar oben).
 -- Die Auswahl Original/Emulation per options(3) erfolgt im Ausgabe-Mux (oben).
 SND: entity work.sound
 port map(
@@ -641,6 +654,7 @@ port map(
 	snd_volume	=> snd_volume,
 	snd_enable	=> audio_enable,
 	sample		=> snd_sample,
+	volume_out	=> snd_volume_eff,
 	sb_pwm		=> snd_pwm
 	);
 

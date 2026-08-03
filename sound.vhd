@@ -13,12 +13,22 @@
 -- Tonfrequenz ~ AUDIO_CLK / ((16 - snd_pitch) * 32)
 --
 -- Vereinfachung (siehe Plan): synchrone Zaehler statt 74163/7493-Ripple; Wellenform-Neustart bei
---   Auswahl-Wechsel. AUDIO ENABLE/RESET real: snd_enable-Eingang (im Top aus 0x3000/0x6000
---   dekodiert, PinMAME atari.c) -> stumm wenn '0' (sonst Dauerton: Ton stoppt erst mit Enable-Aus).
+--   Auswahl-Wechsel.
 --
--- Zwei Ausgaben (Auswahl per options(3) im Top, nicht hier):
---   sample : roher 4-Bit ROM-Nibble                 -> Aux-Board DAC          (Original-Pfad)
---   sb_pwm : 1-Bit Sigma-Delta von (sample*volume)  -> Onboard RC + TDA7267   (Emulations-Pfad)
+-- AUDIO ENABLE/RESET (snd_enable, im Top aus 0x3000/0x6000 dekodiert, PinMAME atari.c) wirkt
+--   wie im Original auf die ZAEHLER: dort haengen AUDIO ENABLE/RESET an CET von D13 und an
+--   R01/R02 von E12/E13 (Sheet 15B). Bei '0' stehen Pitch- und Sample-Zaehler auf 0 -> ROM-Adresse
+--   konstant -> AUDIO 0-3 statisch -> reines DC -> auf der Aux-PCB ueber C9 weggekoppelt = still,
+--   UNABHAENGIG vom Lautstaerke-Latch. Das ist essenziell: das Spiel schaltet den Ton nur ueber
+--   AUDIO RESET ab und laesst 0x1084 stehen (Airborne $79A2: "STAA $6000 / RTS", sonst nichts).
+--   Zusaetzlich wird die effektive Lautstaerke auf 0 gezwungen (eff_volume) - das gilt fuer beide
+--   Ausgabepfade. Frueher wirkte snd_enable NUR ueber eff_volume und damit nur auf sb_pwm; der
+--   Aux-Pfad lief frei weiter -> lauter Dauerton am Aux-Board (HW-Symptom 2026-08-03).
+--
+-- Drei Ausgaben (Auswahl per options(3) im Top, nicht hier):
+--   sample     : roher 4-Bit ROM-Nibble                 -> Aux-Board DAC        (Original-Pfad)
+--   volume_out : effektive Lautstaerke (0 wenn stumm)   -> Aux-Board 4016       (Original-Pfad)
+--   sb_pwm     : 1-Bit Sigma-Delta von (sample*volume)  -> Onboard RC + TDA7267 (Emulations-Pfad)
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -38,6 +48,7 @@ entity sound is
         snd_volume : in  std_logic_vector(3 downto 0);  -- Latch 1084: Lautstaerke
         snd_enable : in  std_logic;                      -- AUDIO ENABLE (0x3000/0x6000): '0' = stumm
         sample     : out std_logic_vector(3 downto 0);  -- roher ROM-Nibble (Aux-Pfad)
+        volume_out : out std_logic_vector(3 downto 0);  -- eff. Lautstaerke (0 wenn snd_enable='0'), Aux-Pfad
         sb_pwm     : out std_logic                      -- Sigma-Delta (Onboard-Pfad)
     );
 end sound;
@@ -63,6 +74,7 @@ architecture rtl of sound is
 begin
 
     eff_volume <= snd_volume when snd_enable = '1' else "0000";
+    volume_out <= eff_volume;   -- Aux-Board 4016-Attenuator (Top invertiert wg. 74HCT540)
 
     --------------------------------------------------------------------------
     -- D12 Sound-ROM
@@ -96,13 +108,14 @@ begin
     --------------------------------------------------------------------------
     -- Pitch-Teiler (D13): "step" alle (16 - snd_pitch) AUDIO-CLK-Pulse
     --   cmp = 15 - snd_pitch (0..15) -> Periode cmp+1 = 16 - snd_pitch
+    --   snd_enable='0' haelt den Zaehler an (Original: CET an D13) -> keine "step"-Pulse
     --------------------------------------------------------------------------
     process(clk_50)
         variable cmp : unsigned(3 downto 0);
     begin
         if rising_edge(clk_50) then
             step <= '0';
-            if reset_l = '0' then
+            if reset_l = '0' or snd_enable = '0' then
                 pitch_cnt <= (others => '0');
             elsif audio_en = '1' then
                 cmp := to_unsigned(15, 4) - unsigned(snd_pitch);
@@ -118,13 +131,14 @@ begin
 
     --------------------------------------------------------------------------
     -- Sample-Zaehler (E12/E13): +1 je "step", mod 32;
-    --   Neustart bei Wellenform-Wechsel (entspricht AUDIO RESET)
+    --   Neustart bei Wellenform-Wechsel; snd_enable='0' haelt den Zaehler auf 0
+    --   (Original: AUDIO RESET an R01/R02 von E12/E13) -> ROM-Ausgang statisch = DC = still
     --------------------------------------------------------------------------
     process(clk_50)
     begin
         if rising_edge(clk_50) then
             sel_d <= snd_select;
-            if reset_l = '0' or snd_select /= sel_d then
+            if reset_l = '0' or snd_enable = '0' or snd_select /= sel_d then
                 sample_cnt <= (others => '0');
             elsif step = '1' then
                 sample_cnt <= sample_cnt + 1;  -- 5 Bit -> wrap mod 32

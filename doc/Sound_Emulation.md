@@ -125,7 +125,7 @@ Vereinfachungen (bewusst, klangneutral):
 | Original | FPGA (`sound.vhd`) |
 |---|---|
 | `D13`/`E12`/`E13` Ripple-Zähler | **synchrone Zähler** (Strategie wie 9-Bit-DMA-Zähler statt 7493-Kette) |
-| `AUDIO ENABLE`/`AUDIO RESET` Logik | „**Dauerton**, Wellenform-Neustart bei Auswahl-Wechsel"; „Aus" via `Volume = 0` |
+| `AUDIO ENABLE`/`AUDIO RESET` Logik | `snd_enable` **hält Pitch- und Sample-Zähler auf 0** (wie `CET` an `D13` + `R01/R02` an `E12`/`E13`) **und** zwingt die effektive Lautstärke auf 0 — beides für **beide** Ausgabepfade (s. §6.3) |
 | analoger R-DAC auf Aux-PCB | im **Original-Pfad** beibehalten; im **Emulations-Pfad** 1-Bit-Sigma-Delta |
 | `AUDIO CLK = Ø1/2` aus 7493-Kette | `clk_50 / C_AUDIO_DIV` (Default 100 → 500 kHz) |
 
@@ -180,11 +180,43 @@ hier vermieden (eigenständiges Modul).
 
 | `options(3)` | DIP | Modus | Treibt |
 |---|---|---|---|
-| `'1'` | OFF | **Original** | `aux_audio <= not snd_sample`, `aux_audio_latch <= "00" & not snd_volume` (Aux-PCB) |
-| `'0'` | ON | **Emulation** | `SB_Sound <= snd_pwm` (Onboard RC + TDA7267) |
+| `'1'` | OFF | **Original** | `aux_audio <= not snd_sample`, `aux_audio_latch <= not snd_volume_eff` (Aux-PCB) |
+| `'0'` | ON | **Emulation** | `SB_Sound <= snd_pwm` (Onboard RC + TDA7267); Aux-Ausgänge auf `(others => '1')` = Aux-Board sieht 0/0 |
 
 `aux_audio`/`aux_audio_latch` sind **invertiert** wegen des 74HCT540 auf der AtariFA-Platine
-(Konvention wie `disp_*`). `SB_Audio` = separater MP3/Background-Pfad, unangetastet.
+(Konvention wie `disp_*`). Schaltplan-bestätigt (2026-08-03) aus `AtariFA_07_Final_Main_SCH.PDF`
+und `..._Solenoids_SCH.PDF`: `F_Audio0..3` und `F_L1084_B0..3` laufen über **74HCT540**
+(IC6/IC7 auf dem Main-Blatt, ein weiterer 540 auf dem Solenoid-Blatt für `F_Audio0`, `F_Audio2`,
+`F_L1084_B0`, `F_L1080_B5`); nur `F_Sol_Enable` geht über den nicht invertierenden 74HCT541 (IC14).
+`SB_Audio` = separater MP3/Background-Pfad, unangetastet.
+
+> **`aux_audio_latch` ist 4 Bit**, nicht 6 — der frühere Hinweis auf `"00" & not snd_volume` und
+> „Bit 5/4 prüfen" war veraltet (Port `AtariFA.vhd`, QSF-Pins nur `[3:0]`).
+
+### 6.3 AUDIO ENABLE/RESET gilt für **beide** Pfade (Fix 2026-08-03, SW 0.1.1)
+
+Bis SW 0.1.0 wirkte `snd_enable` nur über `eff_volume` und damit **ausschließlich auf `sb_pwm`**.
+Der Aux-Pfad (`sample`, `snd_volume`) lief ungegated weiter ⇒ **lauter Dauerton am Aux-Board**,
+sobald das Spiel einmal eine Lautstärke gesetzt hatte.
+
+Ursache ist das Spielverhalten: **die „Sound aus"-Routine schreibt nur AUDIO RESET und lässt
+`0x1084` stehen.** Airborne (`tools/airborne_listing.txt`):
+
+```
+7979:  STAA $6000     ; AUDIO ENABLE/RESET
+797F:  ... STAA $1080 ; Wellenform
+798D:  ... STAA $1088 ; Tonhoehe
+7999:  ... STAA $1084 ; Lautstaerke
+79A1:  RTS
+79A2:  STAA $6000     ; "Sound aus" -- NUR AUDIO RESET, $1084 bleibt stehen!
+79A5:  RTS
+```
+
+Im Original ist das unkritisch, weil `AUDIO ENABLE`/`AUDIO RESET` an `CET` von `D13` und an
+`R01/R02` von `E12`/`E13` hängen (Sheet 15B): Zähler stehen ⇒ ROM-Adresse konstant ⇒ `AUDIO 0–3`
+statisch ⇒ reines DC ⇒ auf der Aux-PCB über `C9` weggekoppelt = still, **unabhängig vom
+Lautstärke-Latch**. `sound.vhd` bildet das jetzt nach (Zähler-Freeze) und führt zusätzlich
+`eff_volume` als `volume_out` heraus, das im Top den Aux-Attenuator speist.
 
 ---
 
@@ -203,12 +235,11 @@ hier vermieden (eigenständiges Modul).
 ## 8. Offene HW-Feintuning-Punkte
 
 - **Original-Pfad braucht aktiven 74HCT540** (`solenoids_enable`): solange disabled (Idle `'1'`),
-  erreicht der Sound das Aux-Board nicht. Aktivierung gemeinsam mit den Solenoiden in **Phase B/C**;
-  die Datenleitungen werden bereits korrekt getrieben.
-- **`aux_audio_latch` ist 6 Bit**, Volume nur 4 (Bit 3..0). Bit 5/4 auf Idle `'0'` — HW-Zuordnung
-  der oberen 2 Bit prüfen.
-- **`AUDIO ENABLE/RESET`** vereinfacht (Dauerton / Neustart bei Auswahl-Wechsel / Aus via Volume=0).
-  Falls ein Spiel Sounds „hängen" lässt oder zu kurz spielt, hier nachjustieren.
+  erreicht der Sound das Aux-Board nicht. Seit Phase B durch `solenoids_enable <= not reset_l_stable`
+  freigegeben, sobald die CPU läuft.
+- **`AUDIO ENABLE/RESET`**: ✓ erledigt, s. §6.3 — gilt seit SW 0.1.1 für beide Pfade. Falls ein Spiel
+  Sounds jetzt *zu früh* abschneidet oder gar nicht mehr spielt, die per-Spiel-Semantik in
+  `AtariFA.vhd` gegen `doc/atari.c` (`soundg1_w`/`audiog1_w`) und das ROM-Listing gegenprüfen.
 - **Tonhöhe**: bei zu hohem/tiefem Klang `C_AUDIO_DIV` anpassen (Original ≈ cpu_clk/2).
 - **Adress-/Volume-Bit-Reihenfolge**: bei „falschem" Klang 1-zeilig im ROM-Adress- bzw.
   Volume-Mapping tauschbar (PinMAME-Segment-/Bit-Indizes sind teils absteigend).
