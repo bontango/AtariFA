@@ -17,13 +17,15 @@
 -- ============================ MAPPING (HW-abgeleitet) ============================
 -- Aus dem 9334-Decode (Sheet 18A): die 8 Byte-Latches (1000/04/08/0C = Lampen, 1080/84/88/8C
 -- = Sound/Sol) werden per Adressbits A2,A3,A7 gewaehlt; Latch-Bit b <- Datenbit Db.
--- Aus AtariFA_Lamps.xlsx (byte-genau geparst):
---   595-Ausgang (Gruppe) N (1..21) = 4*b + L + 1   (L=Latch-Index 0=1000..3=100C, b=Latch-Bit)
---     -> Bits 0..4 alle 4 Latches (N=1..20), Bit 5 nur Latch 1000 (N=21).
+-- Aus AtariFA_Lamps.xlsx, Mappe 'aktuell' (byte-genau geparst, Stand 2026-08-05):
+--   595-Ausgang (Gruppe) N (1..21) je (Latch L, Bit b) -> Tabelle GRP_OF (unten).
+--   Die frueher gueltige Formel N = 4*b + L + 1 (= Mappe 'alt') trifft NICHT mehr zu; die
+--   neue Zuordnung ist eine Permutation ohne geschlossene Form. Belegt sind Bits 0..4 aller
+--   4 Latches + Bit 5 nur bei Latch 1000 = 21 Gruppen (unveraendert gegenueber 'alt').
 -- RAM-Offset-Zerlegung (9334-Adressierung beim DMA-Read von 0x30-0x3F; A7=0=Lampen,
 --   A4/A5 fest -> Latch=offset[3:2], Strobe=offset[1:0]):
 --   RAM-Offset einer (Latch L, Strobe s)-Zelle = L*4 + s
---   => ser_bit(Gruppe N, Strobe s) = lamp_state[(L*4 + s)*8 + b]   mit N = 4*b + L + 1
+--   => ser_bit(Gruppe N, Strobe s) = lamp_state[(L*4 + s)*8 + b]   mit N = GRP_OF(L*6 + b)
 --
 -- Scan-FSM (clk_50): je Strobe-Phase s: (a) oe_n=1 blanken -> (b) 24 Bit schieben (21 genutzt,
 --   3 = '0') -> (c) rck-Latch -> (d) strobe_sel<=enc(s) -> (e) oe_n=0 (Phase sichtbar) -> (f) Dwell.
@@ -33,6 +35,7 @@
 --   (In AtariFA.vhd: enable=reset_l_stable -> Lampen erst mit laufender CPU; Boot/Reset sicher AUS.)
 --
 -- HW-TUNBAR (bei falscher Lampe/Strobe am Prototyp NUR die markierten Stellen aendern):
+--   * GRP_OF     : (Latch L, Bit b) -> 595-Ausgang N; direkte Abschrift der Excel-Mappe 'aktuell'.
 --   * STROBE_ENC : Strobe-Index s (0..3) -> 2-Bit-Code (Aux-Decoder-Permutation; die
 --                  74HCT540-Invertierung von aux_lamp_strobe passiert im Top).
 --   * Latch=offset[3:2]/Strobe=offset[1:0] : Annahme aus 9334-Adressierung (unten im idx).
@@ -70,6 +73,17 @@ architecture rtl of lamp_matrix is
 	signal div_cnt   : integer range 0 to SHIFT_DIV := 0;
 	signal tick      : std_logic := '0';
 
+	-- HW-TUNBAR: 595-Ausgang (Gruppe) N je (Latch L, Bit b) -- aus doc/AtariFA_Lamps.xlsx,
+	-- Mappe 'aktuell'. Index = L*6 + b (L: 0=0x1000, 1=0x1004, 2=0x1008, 3=0x100C);
+	-- Wert 0 = Kombination unbenutzt. Alle Werte 1..21 kommen genau einmal vor.
+	type grp_t is array(0 to 23) of integer range 0 to 21;
+	constant GRP_OF : grp_t := (
+		--  b=0  b=1  b=2  b=3  b=4  b=5
+		      6,   3,  14,  17,  20,   9,   -- L=0 : 0x1000
+		      7,   4,  15,  18,   1,   0,   -- L=1 : 0x1004
+		      8,   5,  16,  10,  12,   0,   -- L=2 : 0x1008
+		      2,  13,  19,  21,  11,   0);  -- L=3 : 0x100C
+
 	-- HW-TUNBAR: Strobe-Index s (0..3) -> 2-Bit-Code an strobe_sel (Aux-Board dekodiert 1-of-4).
 	type enc_t is array(0 to 3) of std_logic_vector(1 downto 0);
 	constant STROBE_ENC : enc_t := ("00", "01", "10", "11");
@@ -92,7 +106,7 @@ begin
 	-- Scan-FSM
 	process(clk_50)
 		variable vec : std_logic_vector(23 downto 0);
-		variable L, b, idx : integer;
+		variable N, idx : integer;
 	begin
 		if rising_edge(clk_50) then
 			if reset = '1' or enable = '0' then
@@ -111,11 +125,14 @@ begin
 					when St_Load =>
 						-- 24-Bit-Vektor fuer aktuelle Phase bauen (vec(N-1) = 595-Ausgang N, 1..24)
 						vec := (others => '0');
-						for N in 1 to 21 loop
-							L   := (N - 1) mod 4;            -- Latch-Index 0=1000..3=100C
-							b   := (N - 1) / 4;              -- Latch-Bit
-							idx := (L * 4 + phase) * 8 + b;  -- RAM-Bit: offset = L*4 + s (HW-TUNBAR)
-							vec(N - 1) := lamp_state(idx);
+						for L in 0 to 3 loop                     -- Latch-Index 0=1000..3=100C
+							for b in 0 to 5 loop                 -- Latch-Bit
+								N := GRP_OF(L * 6 + b);          -- 595-Ausgang (0 = unbenutzt)
+								if N /= 0 then
+									idx := (L * 4 + phase) * 8 + b;  -- RAM-Bit: offset = L*4 + s (HW-TUNBAR)
+									vec(N - 1) := lamp_state(idx);
+								end if;
+							end loop;
 						end loop;
 						shiftreg <= vec;
 						bit_cnt  <= 0;

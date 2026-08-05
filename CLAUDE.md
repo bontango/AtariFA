@@ -197,9 +197,13 @@ getrieben von einer **Kaskade aus drei 74HC595** (24 Bit, 21 genutzt) = 21 „La
 - **Datenquelle:** RAM **0x30–0x3F**-Write-Sniffer → `lamp_state(127:0)` (in `AtariFA.vhd`, Prozess
   `lamp_sniffer`, analog Display-Shadow-Buffer; nur Page-0, nicht der Mirror). Die CPU schreibt Lampen
   nach 0x30–0x3F — **nicht** 0x1000–0x100C (das ist RAM-Mirror → Score-Bytes, würde sonst korrumpieren).
-- **Mapping (HW-abgeleitet):** 595-Gruppe `N = 4*b + L + 1` (Excel; `L`=Latch 0=1000..3=100C, `b`=Bit),
-  RAM-Offset `= L*4 + s` (aus 9334-Adressbits A2/A3/A7 beim DMA-Read von 0x30–0x3F: A7=0=Lampen,
-  `offset[3:2]`=Latch, `offset[1:0]`=Strobe s) ⇒ `ser_bit(N,s) = lamp_state[(L*4+s)*8 + b]`.
+- **Mapping (HW-abgeleitet):** 595-Gruppe `N` je (Latch `L` 0=1000..3=100C, Bit `b`) als **Tabelle
+  `GRP_OF`** in `lamp_matrix.vhd` — direkte Abschrift von `doc/AtariFA_Lamps.xlsx`, Mappe **`aktuell`**
+  (korrigiert 2026-08-05, SW 0.1.2). Die frühere Formel `N = 4*b + L + 1` entspricht der Mappe **`alt`**
+  und gilt **nicht mehr** (neue Zuordnung ist eine Permutation ohne geschlossene Form; belegt weiter
+  Bits 0..4 aller 4 Latches + Bit 5 nur bei 1000 = 21 Gruppen). RAM-Offset `= L*4 + s` (aus
+  9334-Adressbits A2/A3/A7 beim DMA-Read von 0x30–0x3F: A7=0=Lampen, `offset[3:2]`=Latch,
+  `offset[1:0]`=Strobe s) — **unverändert** ⇒ `ser_bit(N,s) = lamp_state[(L*4+s)*8 + b]`.
   84 unabhängige Lampen (21 Gruppen × 4 Strobes).
 - **Scan-FSM (`lamp_matrix.vhd`, @clk_50):** je Strobe-Phase: blanken (`oe_595`='1') → 24 Bit MSB-first
   in die Kaskade schieben → `rclk`-Latch → `aux_lamp_strobe`=enc(s) → `oe_595`='0' → Dwell
@@ -350,10 +354,12 @@ Atari-Verhalten). Bisher nur **Airborne** (`game_idx=2`). SW-Version **0.0.9**.
   High-Nibble (7..4) → ungerader/linker Index** (LSD rechts) für alle 4 Player-Scores. **NICHT** getauscht:
   Player-up-LED (Index 6), **Status/Credit-Ball** (0x1C/1D — dort ist die HW-Darstellung bereits korrekt,
   Status-Konvention weicht also vom Score ab) und **Boot-Info/Version** (unberührt, bleibt korrekt).
-- **Lamp-Matrix-Zuordnung** (`lamp_matrix.vhd`, s. Abschnitt „Lamps"): 595-Gruppe↔(Latch,Bit) aus
-  `AtariFA_Lamps.xlsx` fix; **HW-tunbar am Prototyp NUR dort:** `STROBE_ENC` (2-Bit-Code ↔ SA/SB/SC/SD +
-  540-Invertierung), `offset[3:2]=Latch`/`offset[1:0]=Strobe`, 595-Shift-Reihenfolge. Im Lampen-Selbsttest
-  prüfen, welche physische Lampe/Strobe aufleuchtet.
+- **Lamp-Matrix-Zuordnung** (`lamp_matrix.vhd`, s. Abschnitt „Lamps"): 595-Gruppe↔(Latch,Bit) steht als
+  Tabelle **`GRP_OF`** im Code = Abschrift von `AtariFA_Lamps.xlsx`, Mappe **`aktuell`** (Mappe `alt`
+  = Vorgängerstand mit der alten Formel). **HW-tunbar am Prototyp NUR dort:** `GRP_OF` (Gruppen-
+  zuordnung), `STROBE_ENC` (2-Bit-Code ↔ SA/SB/SC/SD + 540-Invertierung), `offset[3:2]=Latch`/
+  `offset[1:0]=Strobe`, 595-Shift-Reihenfolge. Im Lampen-Selbsttest prüfen, welche physische
+  Lampe/Strobe aufleuchtet — liegen nur **Spalten** daneben, ist es `STROBE_ENC`, nicht `GRP_OF`.
 - Treiber sind **ULN2003A** (Original-Design, kein TPIC): nur die 12 bestückten ICs A20…B15 genutzt;
   #44/#47-Glühlampen unkritisch (Original-Auslegung).
 

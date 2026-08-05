@@ -148,7 +148,7 @@ architecture rtl of AtariFA is
 -- could later be exposed via a DIP/debug read address or the ESP32 link for a software query.
 constant SW_MAIN : std_logic_vector(3 downto 0) := x"0";
 constant SW_SUB1 : std_logic_vector(3 downto 0) := x"1";
-constant SW_SUB2 : std_logic_vector(3 downto 0) := x"1";
+constant SW_SUB2 : std_logic_vector(3 downto 0) := x"2";
 
 --internal signals via logic
 signal reset_h		: 	std_logic;
