@@ -55,6 +55,8 @@ archive/        historic modules, in no build
 
 **User manual: [`docs/AtariFA_HWv1_x_user_manual.md`](docs/AtariFA_HWv1_x_user_manual.md)** — for
 whoever puts the board into a machine: DIP switches, boot sequence, sound paths, LEDs, free play.
+In German: [`docs/AtariFA_HWv1_x_Bedienungsanleitung.md`](docs/AtariFA_HWv1_x_Bedienungsanleitung.md).
+Same chapter numbering, so a hint like "see chapter 4.3" fits both.
 
 Everything else in `docs/` is development material: measurements, schematic extracts and the
 analyses behind individual design decisions. `WORKFLOW.md` and `VARIANTEN.md` are for working

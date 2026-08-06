@@ -12,6 +12,10 @@ ralf@lisy.dev
 
 v1.0 06.08.2026
 
+> Eine deutsche Fassung gibt es unter `AtariFA_HWv1_x_Bedienungsanleitung.md`.
+> A German version is available as `AtariFA_HWv1_x_Bedienungsanleitung.md`. The chapter
+> numbering is the same in both.
+
 ## Table of contents
 
 - [Important remark](#important-remark)

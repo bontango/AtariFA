@@ -421,10 +421,13 @@ Atari-Verhalten). Bisher nur **Airborne** (`game_idx=2`). SW-Version **0.0.9**.
   #44/#47-Glühlampen unkritisch (Original-Auslegung).
 
 ## Referenz
-- **User Manual (EN): `docs/AtariFA_HWv1_x_user_manual.md`** — die nutzerseitige Sicht (DIP-Bedeutung,
+- **User Manual: `docs/AtariFA_HWv1_x_user_manual.md` (EN) und
+  `docs/AtariFA_HWv1_x_Bedienungsanleitung.md` (DE)** — die nutzerseitige Sicht (DIP-Bedeutung,
   Boot-Ablauf/Info-Anzeige, Sound-Pfade, LEDs, Freispiel, Board-Varianten, „noch nicht implementiert").
-  **Bei Änderungen an DIP-Belegung, Boot-Info-Anzeige, Options oder LED-Bedeutung mitziehen** — das ist
-  die einzige Datei, die diese Dinge aus Anwendersicht beschreibt. Aufbau/Tiefe analog
+  **Bei Änderungen an DIP-Belegung, Boot-Info-Anzeige, Options oder LED-Bedeutung BEIDE mitziehen** —
+  das sind die einzigen Dateien, die diese Dinge aus Anwendersicht beschreiben. Die **Kapitelnummerierung
+  ist in beiden identisch** (ein Verweis „siehe Kapitel 4.3" passt auf beide) — beim Ergänzen eines
+  Kapitels also nicht in nur einer Fassung umnummerieren. Aufbau/Tiefe analog
   `N:\Projekte\WillFA7\FPGA_source\docs\WillFA7S_HWv1_x_user_manual.md`.
 - PinMAME `src/wpc/atari.c`: maßgeblich für Speicher-Map, Display-Mapping, Switch/DIP-Handler
   (Referenzkopien der PinMAME-Quellen liegen zur Analyse in `docs/atari.c`/`docs/atari.h`/`docs/atarigames.c`)
