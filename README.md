@@ -51,6 +51,15 @@ docs/           analyses, schematics, PinMAME reference sources
 archive/        historic modules, in no build
 ```
 
+## Documentation
+
+**User manual: [`docs/AtariFA_HWv1_x_user_manual.md`](docs/AtariFA_HWv1_x_user_manual.md)** — for
+whoever puts the board into a machine: DIP switches, boot sequence, sound paths, LEDs, free play.
+
+Everything else in `docs/` is development material: measurements, schematic extracts and the
+analyses behind individual design decisions. `WORKFLOW.md` and `VARIANTEN.md` are for working
+on the source, not for using the board.
+
 ## Build
 
 ```powershell
