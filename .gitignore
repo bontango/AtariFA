@@ -1,4 +1,5 @@
-# Quartus build artifacts
+# Quartus build artifacts. They now sit inside variants/<name>/, one set per
+# variant, because that is the Quartus project directory.
 db/
 incremental_db/
 output_files/
@@ -24,8 +25,6 @@ simulation/
 c5_pin_model_dump.txt
 PLLJ_PLLSPE_INFO.txt
 greybox_tmp/
-*.cmp
-*.ppf
 
 # Build/verification logs
 *.log
@@ -37,8 +36,17 @@ desktop.ini
 # Office lock/temp files (e.g. ~$AtariFA_Lamps.xlsx while open in Excel)
 ~$*
 
-# Local tools / binaries
-tools/
-
 # Local audio sources (speech ROM is regenerated from these; see CLAUDE.md)
 *.wav
+
+# NOTE: rtl/cyclone_10/*.cmp and cpu_clock.ppf are tracked. They belong to the
+#       megafunctions (the .qip lists them as MISC_FILE), so a fresh clone needs
+#       them - they used to be ignored as build artefacts, which they are not.
+# NOTE: rom/*.hex and rom/lisy.mif are source files, not build output.
+# NOTE: the two scripts in tools/ are tracked (dis6800.py = 6800 disassembler,
+#       make_speech_mif.py = speech ROM encoder). Binaries and the disassembly
+#       listings they produce are not - those regenerate from the ROMs.
+#       tools/listing.txt predates this rule and stays tracked.
+tools/*.exe
+tools/airborne_listing.txt
+tools/listing_*.txt

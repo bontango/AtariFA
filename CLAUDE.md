@@ -4,16 +4,72 @@
 FPGA-Nachbau der Atari Gen1 Pinball-MPU (MC6800 / John Kent cpu68).
 Quartus Prime **22.1std.2 Lite Edition**. GitHub: https://github.com/bontango/AtariFA
 
+## Ordnerstruktur — gemeinsamer Sourcebaum (Umbau 2026-08-06)
+Seit 2026-08-06 liegt das Repo in **`N:\Projekte\FPGA Atari\FPGA_source`** (vorher der flache
+Projektordner `AtariFA\`). Grund: eine **zweite Board-Variante** kam dazu, und mit zwei
+handgepflegten `.qsf` müsste jede Änderung doppelt portiert werden. **Doku: `README.md`
+(öffentlich), `WORKFLOW.md` (wie man hier arbeitet), `VARIANTEN.md` (Boards + HW-Teststand),
+`PLAN_Zielstruktur.md` (warum die Struktur so aussieht).**
+
+```
+top/AtariFA.vhd     DAS eine Top-Level für alle Boards
+rtl/common/         alle Module + version_pkg (SW_SUB1/2) + display_pkg (Typen)
+rtl/cyclone_10/     Megafunctions der Chipfamilie (RAM, cpu_clock, sound_rom)
+rom/  docs/  archive/  bin/
+variants/<name>/    variant_pkg.vhd (BOARD_ID) · device.tcl · pins.tcl · AtariFA.sdc
+                    AtariFA.qpf · AtariFA.cof · AtariFA.qsf (GENERIERT)
+scripts/            gen_qsf.ps1 · check.ps1 · build.ps1 · release.ps1 · baseline.csv
+                    common_header.tcl · files_common.tcl · files_cyclone_10.tcl
+```
+
+**Zwei Varianten, beide 10CL006YE144C8G:** `cyclone_10_pcb` (BOARD_ID 0, Leitvariante,
+HW-getestet bis SW 0.1.2) und `cyclone_10_dev_open` (BOARD_ID 1, **nie HW-getestet**;
+anderes Piggy-back-Board: 4 statt 3 LEDs, eigener Reset-Taster, nur 3 statt 8 Debug-Pins).
+Unterschied im Code = **null**: nur `pins.tcl` + `BOARD_ID`; `LED_D4` und `debug_signal[3..7]`
+stehen in beiden Portlisten und bekommen dort, wo sie fehlen, `VIRTUAL_PIN` aus `variant.psd1`.
+
+**Harte Regeln:**
+- **`variants/<n>/AtariFA.qsf` ist erzeugt — nie von Hand editieren.** Ändern:
+  `device.tcl` / `pins.tcl` / `variant.psd1` / `scripts/files_*.tcl`, dann `gen_qsf.ps1`.
+  Quartus schreibt aus der IDE in die Datei zurück; `check.ps1`/`build.ps1` regenerieren
+  deshalb vorher (`gen_qsf.ps1 -Check` zeigt, was Quartus hineingeschrieben hat).
+- **Alle Pfade sind projektverzeichnisrelativ, Projektverzeichnis = `variants/<n>/`.**
+  Quellen `../../rtl/...`, `init_file` in den ROM-Wrappern und die 10 `generic map` im
+  Top-Level `../../rom/...`, `.cof`-Pfade `output_files/...` (**nicht absolut!**).
+  Ausnahme: `.qip` nutzen `$::quartus(qip_path)` und sind ortsunabhängig.
+- **Version an genau einer Stelle:** `rtl/common/version_pkg.vhd` (`SW_SUB1`/`SW_SUB2`);
+  die führende Ziffer ist `BOARD_ID` aus `variants/<n>/variant_pkg.vhd`. Anzeige =
+  `BOARD_ID.SW_SUB1.SW_SUB2` (pcb `0.1.2`, dev_open `1.1.2`).
+- **Alte Ordner `AtariFA\` und `AtariFA_dev_open\` bleiben als Backup liegen** bis zum
+  HW-Test — **von dort nicht mehr committen/pushen**. `AtariFA_dev_open` hatte nie ein Git;
+  Sicherung: `AtariFA_dev_open_BACKUP_2026-08-06.zip` im Elternordner.
+
 ## Build / Compile (Claude kann das selbst ausführen)
-- **Full Compile (CLI):** `& "C:\intelFPGA_lite\22.1std\quartus\bin64\quartus_sh.exe" --flow compile AtariFA`
-  (aus dem Projekt-Root; läuft ~Minuten — am besten `run_in_background`). `quartus_sh` liegt **nicht im PATH**;
-  immer den vollen Pfad nutzen. Andere gefundene Installs (`C:\intelFPGA\23.1std\...`, `C:\altera\...`) sind
+- **Bevorzugt die Skripte** (aus dem Repo-Root, PowerShell):
+  `scripts\check.ps1` (Synthese beider Varianten, schnell) · `scripts\check.ps1 -Fit`
+  (+ Fitter/Timing + Baseline-Vergleich) · `scripts\build.ps1 cyclone_10_pcb` (Full Compile
+  + `.jic`) · `scripts\release.ps1 -Note "…"`. Laufen Minuten → `run_in_background`.
+- **Direkt (falls nötig):** `& "C:\intelFPGA_lite\22.1std\quartus\bin64\quartus_sh.exe" --flow compile AtariFA`
+  **mit CWD `variants/<n>/`**. `quartus_sh` liegt **nicht im PATH**; immer den vollen Pfad
+  nutzen. Andere gefundene Installs (`C:\intelFPGA\23.1std\...`, `C:\altera\...`) sind
   nur **qprogrammer** (kein Compile-Flow) bzw. falsche Version → **nicht** verwenden.
-- **Verifikation der Reports** (alle in `output_files/`): `AtariFA.map.rpt` (Analysis & Synthesis),
-  `AtariFA.fit.rpt` (Fitter/Pins), `AtariFA.sta.rpt` (TimeQuest/Slack), `AtariFA.flow.rpt` (Flow-Status).
-  Auf Warnings (z. B. 332174/332049/18236) und negative Slacks prüfen.
+- **Verifikation der Reports** (in `variants/<n>/output_files/`): `AtariFA.map.rpt`
+  (Analysis & Synthesis), `AtariFA.fit.rpt` (Fitter/Pins), `AtariFA.sta.rpt`
+  (TimeQuest/Slack), `AtariFA.flow.rpt` (Flow-Status). Auf Warnings und negative Slacks prüfen.
+- **Abnahmekriterium = die SYNTHESE-Zahlen** (`map.rpt`: Total combinational functions /
+  Total registers / Total memory bits), exakt gegen `scripts/baseline.csv`. Die
+  **LE-Zahl des Fitters taugt dafür nicht**: beim Umbau 2026-08-06 blieb die Synthese Byte
+  für Byte gleich (2433/935/202752) und der Fitter ging trotzdem 2554 → 2545, nur weil ein
+  einziger zusätzlicher `VIRTUAL_PIN` die LE-Packung ändert. Slack schwankt ebenfalls
+  (Toleranz 1,5 ns in `check.ps1`); der enge Pfad ist **`cpu_clk`**, nicht `clk_50`.
+- **Erwartete, harmlose Warnungen** (nicht „beheben"): 113009 (Intel-HEX-Records),
+  14320 (`sound_rom q[7:4]` wegoptimiert), `solenoids[14]/[18] stuck at VCC` (unbestückt),
+  3× 10036 (`dma_clk`/`audio_clk`/`nvram_wren` zugewiesen, nie gelesen).
 - **Zielplatine (AtariFA-PCB):** Cyclone 10 LP **10CL006YE144C8G** (E144) — „piggy-back"-Replacement-CPU mit RAM/ROM + TTL-Ersatz, parallel zu den Atari-Edge-Connectors plus „Box-Connectors". Migriert 2026-06; nur Display-Routinen übernommen, Rest (Switch/Lamps/Solenoide/Audio/FRAM/ESP32) step-by-step (Phase B/C).
 - **Testplatine (vorher):** GottFA3 / Cyclone IV E EP4CE6F17C8 — Bring-up abgeschlossen 2026-06-06.
+- **Dritte Ausprägung, bewusst außen vor:** `N:\Projekte\FPGA Atari\AtariFA - on SYS3 Test PCB`
+  (Cyclone IV EP4CE6F17C8, Stand 2026-06-06, eigenes Git ohne Remote). Nicht Teil des Baums;
+  Nachrücken hieße `variants/cyclone_iv_sys3/` + `rtl/cyclone_iv/` + `files_cyclone_iv.tcl`.
 
 ## Zielspiele
 Generische Gen1-Basis: Atarians, Time 2000, Airborne Avenger, Middle Earth, Space Riders.
@@ -55,7 +111,7 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
   `reset_l_stable <= boot_phase(2)`. **HW-Vorbehalt:** Ziffern-/Options-Reihenfolge (Index 5=rechts angenommen)
   bei Bedarf 1-zeilig im `boot_info`-Prozess tauschbar.
 - **Pin-Umbenennung:** Top-Ports `game_select`/`options`/`reset_l` → `dip_ret`/`dip_opt`/`reset_sw`
-  (siehe `AtariFA.qsf`). **✓ Erledigt:** `AtariFA.sdc(39)` auf `reset_sw` korrigiert (Warning 332174/332049
+  (siehe `variants/<n>/pins.tcl`). **✓ Erledigt:** `variants/<n>/AtariFA.sdc(39)` auf `reset_sw` korrigiert (Warning 332174/332049
   behoben, `set_false_path` greift wieder). Zusätzlich `NUM_PARALLEL_PROCESSORS 14` in der QSF gesetzt
   (Warning 18236 weg). **Achtung:** Quartus erkennt auf dieser Maschine nur **14** Prozessoren (Windows
   meldet 20 logisch) → Wert >14 löst Warning **20031** (Über-Subskription) aus; daher 14, nicht 16.
@@ -74,7 +130,7 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
 - **Shadow-Buffer statt Dual-Port-RAM**: Schreibzugriffe auf RAM 0x00–0x1F werden per Write-Sniffer in `display1..4`/`status_d` kopiert (Single-Port-RAM bleibt für CPU)
 - **DMA-Toggle**: `dma_toggle` flippt alle 2 NMI-Pulse (Edge-Detect auf `nmi_level`, Modulo-2 in clk_50-Prozess); Bit 6 von 0x2000 — Game-Code braucht diesen Wechsel zum Fortlaufen
 - **Synchroner 12-Bit-Zähler** statt 3× SN7493-Ripple-Kaskade; NMI-Periode = 4096 cpu_clk = 4096 µs
-  = **244 Hz** (PinMAME `ATARI_NMIFREQ=244`, entspricht der gemessenen Frame-Periode, s. `doc/Display_Timing.md`).
+  = **244 Hz** (PinMAME `ATARI_NMIFREQ=244`, entspricht der gemessenen Frame-Periode, s. `docs/Display_Timing.md`).
   **War früher 9-Bit ÷512 = 1953 Hz (8× zu schnell)** → Switch-Scan im NMI-Handler registrierte jeden Tastendruck
   mehrfach; 2026-07-06 auf ÷4096 korrigiert (`dma_counter(11 downto 0)`, `nmi_level = Bit10 and Bit11`).
 
@@ -85,7 +141,7 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
 - **B5**: ✓ adressiert — unimplementierte Ausgänge auf sicheren Inaktiv-Pegel getrieben (s.o. „Sichere Inaktiv-Pegel"). Solenoide/Münztür/`solenoids_enable` haben jetzt **echte Logik** (`solenoid_driver.vhd`, 2026-07-04); Lampen jetzt ebenfalls echte Logik (`lamp_matrix.vhd`, 2026-07-04).
 - **B10–B12**: ✓ Teil-Cleanup — `DIAG_SEL`+`hex7seg` (GottFA3-SEG7-Reste) entfernt, `cpu_clk_gen.vhd` aus `.qsf` (toter Code; PLL `cpu_clock` wird genutzt). Display-Signal-Ownership noch offen.
 - **B13 — Switch-Test ROM-abhängig (✓ behoben 2026-07-06, HW-getestet alle 5 Spiele):** Ursache waren
-  **zwei Fehler** (Root-Cause via ROM-Disassembly, `tools/dis6800.py` + `doc/Switch_Reading_Analysis.md`):
+  **zwei Fehler** (Root-Cause via ROM-Disassembly, `tools/dis6800.py` + `docs/Switch_Reading_Analysis.md`):
   **(1) NMI 8× zu schnell** (÷512=1953 Hz statt ÷4096=244 Hz) → Switch-Scan registrierte jeden Druck
   mehrfach; auf 244 Hz korrigiert (s.o. „Architektur-Entscheidungen"). **(2) 0x200B-Testschalter war
   invertiert:** ME @7F9C und Airborne @7AB4 werten **Bit7=1 = Test gedrückt**; unser `not sw_state(11)`
@@ -123,7 +179,7 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
     `../doc/AtariFA_07_Final_Switches_SCH.PDF` (Eltern-Ordner `N:\Projekte\FPGA Atari\doc\`, Geschwister: Main/Lamps/Solenoids) (s. „Bekannte HW-Feintuning-Stellen"). CPU-Read: `sw_value`
     @0x2010–0x204F (PinMAME swg1_r, geschlossen=0xFF), `dip_value` @0x2000–0x200F volles 1:1 aus Matrix
     (SW1/SW2-Programmier-DIPs + Replay-Hex) — **Ausnahmen** 0x2000 (DMA-Sync/BPL, synthetisiert) und
-    0x200B (Testschalter, **NICHT** invertiert; ME `game_idx=3` = Basis XOR 0x0F, s. B13/`doc/Switch_Reading_Analysis.md`).
+    0x200B (Testschalter, **NICHT** invertiert; ME `game_idx=3` = Basis XOR 0x0F, s. B13/`docs/Switch_Reading_Analysis.md`).
     **Start-Bug behoben** (war 0x2013, korrekt **0x2012**). Compile 0 Fehler/
     0 Critical, Timing ok (Setup ≈+2,8 ns / Hold ≈+0,45 ns), LE 36 %, BRAM unverändert. **HW-getestet OK
     alle 5 Spiele (2026-07-06, SW 0.0.6)** — Selbsttest/Switch-Werte korrekt, keine Phantomschalter (außer
@@ -143,7 +199,7 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
 
 ## Display-Timing (display_control.vhd v2.0, 2026-06-20)
 Multiplex-Timing aus realer LogicPort-Aufzeichnung des Original-Boards vermessen und FSM darauf
-abgeglichen. **Ausführliche Doku: `doc/Display_Timing.md`** (inkl. Schaltbild `doc/Display_Logic.png`,
+abgeglichen. **Ausführliche Doku: `docs/Display_Timing.md`** (inkl. Schaltbild `docs/Display_Logic.png`,
 Sheet 15B, und Messmethodik). Kernwerte: Blank ~129 µs / Show ~383 µs → 512 µs/Digit, 8 Digits,
 4,10 ms/Frame, ~244 Hz, Duty ~75 %. Timing in Konstanten `C_BLANK_PAD/C_SHOW/C_LAST_DIGIT`.
 Wichtigster Fidelity-Hebel = Blank:Show-Verhältnis (vorher ~95 % an = ~25 % zu hell). Zwei
@@ -151,7 +207,7 @@ index-sichere Funktionen `display_nibble/status_nibble` (entschärfen latenten `
 
 ## Sound (sound.vhd, 2026-06-21)
 Digitale Nachbildung der Original-Tonerzeugung (Prozessor-PCB Sheet 15B + Aux-PCB), aus den
-Schaltplänen `doc/Display_Logic.png` + `doc/Auxiliary_PCB.png` verifiziert. **Drei geteilte
+Schaltplänen `docs/Display_Logic.png` + `docs/Auxiliary_PCB.png` verifiziert. **Drei geteilte
 Latches (Bits 0–3 = Sound; Bits 4–7 = Solenoide, s. „Solenoids"):**
 - **0x1080 = Wellenform-Auswahl** → D12-ROM Adr A5–A8 (16 Wellenformen).
 - **0x1088 = Tonhöhe** → D13 (74LS9316) Teiler `(16 − wert)` von AUDIO CLK (≈ cpu_clk/2 = 500 kHz).
@@ -170,7 +226,7 @@ E12/E13, Sheet 15B) ⇒ ROM-Adresse konstant ⇒ AUDIO 0–3 statisch ⇒ DC ⇒
 auch für den Aux-Attenuator. **Vorher wirkte `snd_enable` NUR über `eff_volume` und damit nur auf
 `sb_pwm`** → der Aux-Pfad lief frei weiter = lauter Dauerton am Aux-Board. Grund: das Spiel schaltet
 den Ton **nur** über AUDIO RESET ab und lässt `0x1084` stehen (Airborne `$79A2` = `STAA $6000 / RTS`,
-sonst nichts). Details: `doc/Sound_Emulation.md` §6.3.
+sonst nichts). Details: `docs/Sound_Emulation.md` §6.3.
 
 **Ausgabe-Mux per `options(3)`** (active-low, im Spiel dynamisch umschaltbar; in `AtariFA.vhd`):
 - `'1'` (DIP OFF) = **Original**: `aux_audio <= not snd_sample`, `aux_audio_latch <= not snd_volume_eff`
@@ -192,13 +248,13 @@ Klang 1-zeilig tauschbar.
 Reale Prototyp-HW: 12× **ULN2003A** (A20…B15; A14/B14/A13/B13/A12/B12 unbestückt) als Zeilen/Sink,
 getrieben von einer **Kaskade aus drei 74HC595** (24 Bit, 21 genutzt) = 21 „Lampengruppen"; die
 4 Strobes SA/SB/SC/SD (Spalten, +20 V) erzeugt das **Aux-Board** aus 2 Bit (`aux_lamp_strobe`, extern
-7402-NOR+MC14xx 1-of-4-dekodiert). Schaltplan: `doc/Lamp_Logic.png` (18D) + `doc/Lamp_Logic2.png`
-(18A, 9334-Decode) + `doc/Auxiliary_PCB.png` (10A) + `doc/AtariFA_Lamps.xlsx`.
+7402-NOR+MC14xx 1-of-4-dekodiert). Schaltplan: `docs/Lamp_Logic.png` (18D) + `docs/Lamp_Logic2.png`
+(18A, 9334-Decode) + `docs/Auxiliary_PCB.png` (10A) + `docs/AtariFA_Lamps.xlsx`.
 - **Datenquelle:** RAM **0x30–0x3F**-Write-Sniffer → `lamp_state(127:0)` (in `AtariFA.vhd`, Prozess
   `lamp_sniffer`, analog Display-Shadow-Buffer; nur Page-0, nicht der Mirror). Die CPU schreibt Lampen
   nach 0x30–0x3F — **nicht** 0x1000–0x100C (das ist RAM-Mirror → Score-Bytes, würde sonst korrumpieren).
 - **Mapping (HW-abgeleitet):** 595-Gruppe `N` je (Latch `L` 0=1000..3=100C, Bit `b`) als **Tabelle
-  `GRP_OF`** in `lamp_matrix.vhd` — direkte Abschrift von `doc/AtariFA_Lamps.xlsx`, Mappe **`aktuell`**
+  `GRP_OF`** in `lamp_matrix.vhd` — direkte Abschrift von `docs/AtariFA_Lamps.xlsx`, Mappe **`aktuell`**
   (korrigiert 2026-08-05, SW 0.1.2). Die frühere Formel `N = 4*b + L + 1` entspricht der Mappe **`alt`**
   und gilt **nicht mehr** (neue Zuordnung ist eine Permutation ohne geschlossene Form; belegt weiter
   Bits 0..4 aller 4 Latches + Bit 5 nur bei 1000 = 21 Gruppen). RAM-Offset `= L*4 + s` (aus
@@ -220,7 +276,7 @@ getrieben von einer **Kaskade aus drei 74HC595** (24 Bit, 21 genutzt) = 21 „La
 
 ## Solenoids (solenoid_driver.vhd, 2026-07-04, HW-getestet OK)
 20 Solenoide + 2 Münztür-Spulen. Statische Latches (wie Original 74LS175), @clk_50. Latch-Adressen
-schaltplan-verifiziert (`doc/Switch_Sol_Logic.png` Sheet 15C + `doc/Auxiliary_PCB.png` Sheet 10A):
+schaltplan-verifiziert (`docs/Switch_Sol_Logic.png` Sheet 15C + `docs/Auxiliary_PCB.png` Sheet 10A):
 - **Solenoid-Bits:** `0x1080[7:4]` + `0x1084[7:4]` + `0x1088[7:4]` + `0x108C[7:0]` = **20 Bits**
   (untere Nibbles 1080/84/88 = Sound). **Münztür (Aux-PCB):** `COIN_CNTREN=0x1080 bit4`,
   `LOCKOUT_EN=0x1080 bit5` (→ `aux_sol_latch(0/1)`).
@@ -244,7 +300,7 @@ schaltplan-verifiziert (`doc/Switch_Sol_Logic.png` Sheet 15C + `doc/Auxiliary_PC
 ## Boot-Sprachausgabe „Lisü" (speech.vhd, 2026-06-22)
 Beim Boot wird einmalig das Wort „Lisü" (deutsche Roboterstimme) über die vorhandene Onboard-
 Audiokette ausgegeben (Sigma-Delta-PWM `SB_Sound` → RC 3k3/4n7 → TDA7267). Machbarkeitsanalyse +
-Umsetzungs-Ergebnis: **`doc/Speech_Boot_Feasibility.md`**.
+Umsetzungs-Ergebnis: **`docs/Speech_Boot_Feasibility.md`**.
 - **Codec = 8-Bit-PCM @ 8 kHz** (nicht Delta!). Ursprünglich war 1-Bit-Delta-Modulation geplant
   (Logik-/ROM-Minimum, 1 M9K), klang aber **stark verrauscht** — Ursache: zu geringe Überabtastung
   (Delta braucht hohe OSR; niedrigere Rate verschlimmert es). Daher PCM: **sauberster Klang,
@@ -263,7 +319,8 @@ Umsetzungs-Ergebnis: **`doc/Speech_Boot_Feasibility.md`**.
   damit „Lisü" NICHT ins TDA7267-Einschalt/Mute-Fenster fällt (s. HW-Test unten). Ausgabe-Mux mit **Vorrang**:
   `SB_Sound <= speech_pwm when speech_busy='1' else snd_pwm when options(3)='0' else '0'`.
   Fällt komplett ins vorhandene ~5s-Info-Fenster (`boot_phase(2)`), kein zusätzliches Boot-Delay.
-- **Encoder `tools/make_speech_mif.py`** (pure stdlib, **gitignored** wie ganzes `tools/`): erzeugt das
+- **Encoder `tools/make_speech_mif.py`** (pure stdlib; die beiden `.py` in `tools/` sind getrackt,
+  Binaries und generierte Listings dort nicht — s. `.gitignore`): erzeugt das
   `.mif` aus einer WAV. Optionen u.a. `--pcm` (8-Bit-PCM statt Delta), `--fade-out-ms`, `--smooth`
   (Moving-Avg-LPF), `--trim-thresh`, `--pad-ms`, `--pcm-preview`. Quelle via espeak (klassisch,
   `C:\Program Files (x86)\eSpeak\command_line\espeak.exe`): `espeak -v de -s 135 "[[l'i:zy]]"`.
@@ -281,15 +338,15 @@ Umsetzungs-Ergebnis: **`doc/Speech_Boot_Feasibility.md`**.
 ## FRAM-Persistenz — Credits/Highscore (fram_i2c.vhd + Injection-FSM, 2026-07-09)
 > **⚠ DEAKTIVIERT (2026-07-10):** Die NVRAM/FRAM-Thematik ist **zurückgestellt** (Ausweitung auf alle 5
 > Spiele scheiterte — empirischer CRED_PROBE unzuverlässig, Airborne-Anker 240≠213; Root-Cause in
-> `doc/FRAM_Persistence.md`). Das **I²C-Modul ist aus dem Build genommen** (`AtariFA.qsf` ohne
+> `docs/FRAM_Persistence.md`). Das **I²C-Modul ist aus dem Build genommen** (Dateiliste `scripts/files_common.tcl` ohne
 > `fram_i2c.vhd`; Top-Level treibt die Pins auf sicheren Leerlauf `fram_i2c_sda<='Z'`/`fram_i2c_scl<='1'`),
 > die **Source `fram_i2c.vhd` bleibt** erhalten. Aktueller Build **SW 0.1.0**; der HW-verifizierte
 > Airborne-Stand bleibt als **SW 0.0.9 (`959ff6b`)** in der git-History. Der folgende Abschnitt beschreibt
 > die (committete, aber aktuell inaktive) Implementierung — Reaktivierung: `fram_i2c.vhd` wieder in die
-> `.qsf` + Top-Level-Feature. **Zukunftsweg = RE statt Probe** (s. `doc/FRAM_Persistence.md`).
+> `.qsf` + Top-Level-Feature. **Zukunftsweg = RE statt Probe** (s. `docs/FRAM_Persistence.md`).
 
 Rettet **Credits + Scores des letzten Spiels** über Power-Cycle im externen I²C-FRAM (Atari Gen1 hat
-**kein natives NVRAM**). **Ausführliche Doku: `doc/FRAM_Persistence.md`** (RE-Adressen, Mechanik,
+**kein natives NVRAM**). **Ausführliche Doku: `docs/FRAM_Persistence.md`** (RE-Adressen, Mechanik,
 Atari-Verhalten). Bisher nur **Airborne** (`game_idx=2`). SW-Version **0.0.9**.
 - **`fram_i2c.vhd`:** Bit-Banging-I²C-Master @clk_50 für **FM24CL64B** (Slave **0x51**, A0=3V/A1=A2=GND;
   `CLK_DIV=125`≈100 kHz; Block-Read/Write; SDA open-drain `inout` / SCL out). **Read-Bug-Fix (wichtig):**
@@ -365,14 +422,14 @@ Atari-Verhalten). Bisher nur **Airborne** (`game_idx=2`). SW-Version **0.0.9**.
 
 ## Referenz
 - PinMAME `src/wpc/atari.c`: maßgeblich für Speicher-Map, Display-Mapping, Switch/DIP-Handler
-  (Referenzkopien der PinMAME-Quellen liegen zur Analyse in `doc/atari.c`/`doc/atari.h`/`doc/atarigames.c`)
-- **Display-Timing-Analyse: `doc/Display_Timing.md`** (gemessen aus Original-Board, Schaltbild Sheet 15B)
-- **Switch-Reading-Analyse: `doc/Switch_Reading_Analysis.md`** (0x200B-Testschalter-Polarität, ROM-Disassembly ME/Airborne)
-- **Lamp-Refresh-Analyse (EN): `doc/Lamp_Refresh_Analysis.md`** (Original-Refresh = DMA-Hardware, NICHT Software;
+  (Referenzkopien der PinMAME-Quellen liegen zur Analyse in `docs/atari.c`/`docs/atari.h`/`docs/atarigames.c`)
+- **Display-Timing-Analyse: `docs/Display_Timing.md`** (gemessen aus Original-Board, Schaltbild Sheet 15B)
+- **Switch-Reading-Analyse: `docs/Switch_Reading_Analysis.md`** (0x200B-Testschalter-Polarität, ROM-Disassembly ME/Airborne)
+- **Lamp-Refresh-Analyse (EN): `docs/Lamp_Refresh_Analysis.md`** (Original-Refresh = DMA-Hardware, NICHT Software;
   Vorglühen = HW-Artefakt der 20-V-Matrix, kein SW-„on-phase injection"; belegt via PinMAME `ram_w` +
   Airborne-ROM-Disasm + NMI-ISR; LEDs auf AtariFA sicher, Refresh ändert nur Duty/Timing, nicht Spannung)
-- **Boot-Sprachausgabe: `doc/Speech_Boot_Feasibility.md`** (Codec-Analyse + Umsetzung PCM 8 kHz)
-- **FRAM-Persistenz: `doc/FRAM_Persistence.md`** (Credits/Highscore-Save/Restore, RE-Adressen Airborne,
+- **Boot-Sprachausgabe: `docs/Speech_Boot_Feasibility.md`** (Codec-Analyse + Umsetzung PCM 8 kHz)
+- **FRAM-Persistenz: `docs/FRAM_Persistence.md`** (Credits/Highscore-Save/Restore, RE-Adressen Airborne,
   Bus-Injection-Mechanik, Atari-Attract-Anzeigeverhalten, zurückgestellte Score-Anzeige)
 - ROM-Disassembler `tools/dis6800.py` (game-parametrierbar: `<rom@0x7000> <rom@0x7800> --name --out`)
 - Vollständiger Code-Review: `N:\Projekte\FPGA Atari\AtariFA_Code_Review.md`

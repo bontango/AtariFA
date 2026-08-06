@@ -1,0 +1,19 @@
+# Line endings are frozen as committed. The tree carries a mix - Quartus generated
+# files (.qsf, .sdc, the megafunction wrappers, rom/*.hex) are CRLF, hand written
+# modules and the markdown are LF - and converting either way now would rewrite half
+# the repository for no gain. What matters is that git does not silently change them
+# per machine, which is what -text guarantees.
+* -text
+
+# Binaries: never diff, never convert.
+*.sof binary
+*.jic binary
+*.pof binary
+*.rbf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.xlsx binary
+*.wav binary
+*.exe binary
