@@ -1,11 +1,30 @@
-# Line endings are frozen as committed. The tree carries a mix - Quartus generated
-# files (.qsf, .sdc, the megafunction wrappers, rom/*.hex) are CRLF, hand written
-# modules and the markdown are LF - and converting either way now would rewrite half
-# the repository for no gain. What matters is that git does not silently change them
-# per machine, which is what -text guarantees.
-* -text
+# Zeilenenden: im Repository ausnahmslos LF.
+#
+# Hier stand bis 08.2026 `* -text` ("Zeilenenden so einfrieren, wie sie committet
+# sind") mit der Begruendung, eine Umstellung wuerde das halbe Repository ohne
+# Gewinn umschreiben. Die Begruendung hat sich ueberholt: `-text` haelt nur GIT
+# davon ab, Zeilenenden zu aendern - es haelt kein Werkzeug davon ab, eine Datei
+# beim Speichern von LF auf CRLF zu kippen. Genau das ist beim FA-Control-Umbau
+# reihenweise passiert (Editoren und Skripte schreiben auf Windows CRLF), und
+# jede dieser Dateien landete danach als Ganzdatei-Diff im Commit, in dem drei
+# Zeilen geaendert waren.
+#
+# Mit `text=auto eol=lf` normalisiert git beim Einchecken. Ein Werkzeug darf die
+# Arbeitskopie also weiter auf CRLF schreiben - im Repository kommt LF an, und
+# `git status` bleibt sauber. Das ist die einzige Variante, die den Fehler
+# strukturell abstellt statt ihn jedes Mal von Hand zu korrigieren.
+#
+# Die Umstellung selbst war ein eigener Commit (22 Dateien, reine
+# Zeilenenden-Aenderung, kein Inhalt): top/AtariFA.vhd, CLAUDE.md, die
+# Quartus-Erzeugnisse unter rtl/cyclone_10/ und variants/, die aus WillFA7
+# uebernommenen uart_*.vhd sowie game_rom/speech/speech_rom.vhd. Nicht betroffen
+# waren rom/* und die .sdc - die lagen ohnehin schon als LF vor.
+#
+# Quartus und PowerShell kommen mit LF zurecht; die Dateien unter rom/ liegen
+# seit jeher als LF vor und werden unveraendert eingelesen.
+* text=auto eol=lf
 
-# Binaries: never diff, never convert.
+# Binaerdateien: nie diffen, nie konvertieren.
 *.sof binary
 *.jic binary
 *.pof binary
@@ -17,3 +36,4 @@
 *.xlsx binary
 *.wav binary
 *.exe binary
+*.zip binary
