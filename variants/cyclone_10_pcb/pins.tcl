@@ -8,7 +8,8 @@ set_location_assignment PIN_101 -to solenoids[4]
 set_location_assignment PIN_103 -to solenoids[5]
 set_location_assignment PIN_105 -to solenoids[7]
 set_location_assignment PIN_106 -to solenoids[8]
-set_location_assignment PIN_11 -to ESP32_sig
+set_location_assignment PIN_11 -to ESP32_ctrl_req
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to ESP32_ctrl_req
 set_location_assignment PIN_111 -to solenoids[10]
 set_location_assignment PIN_112 -to solenoids[11]
 set_location_assignment PIN_113 -to solenoids[12]

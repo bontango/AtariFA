@@ -4,7 +4,7 @@
 
 **Hardware-Version v1.x**
 
-**Software-Version 0.1.2**
+**Software-Version 0.1.3**
 
 **Bedienungsanleitung**
 
@@ -28,7 +28,8 @@ v1.0 06.08.2026
   - [4.1. Die 4er-Bank: Spielauswahl und Freispiel](#41-die-4er-bank-spielauswahl-und-freispiel)
   - [4.2. Die 6er-Bank: Optionen](#42-die-6er-bank-optionen)
     - [4.2.1. Option 3 -> wo der Ton herauskommt](#421-option-3---wo-der-ton-herauskommt)
-    - [4.2.2. Optionen 1, 2, 4, 5, 6 -> reserviert](#422-optionen-1-2-4-5-6---reserviert)
+    - [4.2.2. Option 4 -> FA-Control darf übernehmen](#422-option-4---fa-control-darf-übernehmen)
+    - [4.2.3. Optionen 1, 2, 5, 6 -> reserviert](#423-optionen-1-2-5-6---reserviert)
   - [4.3. Sechs der zehn DIPs werden nur beim Einschalten gelesen](#43-sechs-der-zehn-dips-werden-nur-beim-einschalten-gelesen)
 - [5. Der Startvorgang](#5-der-startvorgang)
   - [5.1. Phase 1: die DIP-Schalter werden gelesen](#51-phase-1-die-dip-schalter-werden-gelesen)
@@ -43,10 +44,16 @@ v1.0 06.08.2026
   - [8.1. Was nachgebildet wird](#81-was-nachgebildet-wird)
   - [8.2. Die zwei Tonwege](#82-die-zwei-tonwege)
   - [8.3. Die Ansage beim Einschalten](#83-die-ansage-beim-einschalten)
-- [9. Die Status-LEDs](#9-die-status-leds)
-- [10. Das FPGA programmieren](#10-das-fpga-programmieren)
-- [11. Platinen-Varianten](#11-platinen-varianten)
-- [12. Noch nicht implementiert](#12-noch-nicht-implementiert)
+- [9. Die FA-Control-Schnittstelle (ESP32)](#9-die-fa-control-schnittstelle-esp32)
+  - [9.1. Die Freigabe: Option 4](#91-die-freigabe-option-4)
+  - [9.2. Was während der Übernahme passiert](#92-was-während-der-übernahme-passiert)
+  - [9.3. Wie die Kontrolle wieder zurückgeht](#93-wie-die-kontrolle-wieder-zurückgeht)
+  - [9.4. Was die Weboberfläche von der Platine erfährt](#94-was-die-weboberfläche-von-der-platine-erfährt)
+  - [9.5. Anschluss](#95-anschluss)
+- [10. Die Status-LEDs](#10-die-status-leds)
+- [11. Das FPGA programmieren](#11-das-fpga-programmieren)
+- [12. Platinen-Varianten](#12-platinen-varianten)
+- [13. Noch nicht implementiert](#13-noch-nicht-implementiert)
 - [Anhang A 'game select'](#anhang-a-game-select)
 - [Anhang B Kurzübersicht](#anhang-b-kurzübersicht)
 
@@ -80,7 +87,7 @@ Mehr nicht. Keine SD-Karte, kein Kartenleser, keine Batterie.
 
 1.  Das aktuelle FPGA-Programm für **AtariFA** von lisy.dev herunterladen
 
-2.  Das FPGA programmieren (Kapitel 10)
+2.  Das FPGA programmieren (Kapitel 11)
 
 3.  Die Spielauswahl passend zu Ihrem Flipper einstellen (Anhang A)
 
@@ -123,7 +130,7 @@ Die Box-Connectors führen auch die vier Lampen-Strobes, die auf der Platine von
 
 Die Platine hat eigene Sicherungshalter für die Spulenversorgung. Verwenden Sie **2 A träge**.
 
-Zwei der zwanzig Spulentreiber, Q14 und Q18, sind nicht bestückt — je nach Spiel gibt es diese Ausgänge auch im Original nicht. Das FPGA hält sie dauerhaft ausgeschaltet.
+Zwei der zwanzig Spulentreiber, Q14 und Q18, sind nicht bestückt — je nach Spiel gibt es diese Ausgänge auch im Original nicht. Es fehlt dort schlicht der MOSFET; das Spiel kann sie ohnehin nicht ansteuern.
 
 ## 4. DIP-Schalter-Einstellungen
 
@@ -153,25 +160,31 @@ Grundeinstellung ist **alle „OFF"** — das ist bei einem Standardautomaten ri
 | Dip1 | reserviert                                                  | beim Einschalten  |
 | Dip2 | reserviert                                                  | beim Einschalten  |
 | Dip3 | **Ton: OFF = Auxiliary Board, ON = Verstärker auf der Platine** | fortlaufend    |
-| Dip4 | reserviert                                                  | fortlaufend       |
+| Dip4 | **FA-Control darf übernehmen** — ON = erlaubt                | fortlaufend       |
 | Dip5 | reserviert                                                  | fortlaufend       |
 | Dip6 | reserviert                                                  | fortlaufend       |
 
 #### 4.2.1. Option 3 -> wo der Ton herauskommt
 
-Das ist der einzige Optionsschalter, der derzeit etwas bewirkt.
-
 - **„OFF"** — **der Originalweg.** AtariFA speist das Atari Auxiliary Board genau so, wie es die originale MPU tut: über die vier Audioleitungen und die vier Leitungen des Lautstärke-Latches. Der Ton entsteht dann auf dem Auxiliary Board und geht an den Verstärker Ihres Automaten. **Das ist die Einstellung für einen unveränderten Flipper.**
 
 - **„ON"** — **der Weg über die Platine.** Der Ton wird im FPGA erzeugt, gefiltert und an den kleinen Verstärker (TDA7267) auf der AtariFA-Platine geschickt. Sinnvoll auf dem Werktisch oder in einem Automaten, dessen Auxiliary Board im Tonteil defekt ist. Die Ausgänge zum Auxiliary Board bleiben währenddessen im Ruhezustand.
 
-Anders als die übrigen fünf **darf dieser Schalter im laufenden Spiel umgestellt werden** — er wird fortlaufend gelesen. Der Ton wandert sofort mit.
+Dieser Schalter **darf im laufenden Spiel umgestellt werden** — er wird fortlaufend gelesen. Der Ton wandert sofort mit.
 
-#### 4.2.2. Optionen 1, 2, 4, 5, 6 -> reserviert
+#### 4.2.2. Option 4 -> FA-Control darf übernehmen
+
+- **„OFF"** — **niemand redet dazwischen.** Ein angestecktes FA-Control-Modul kann die Anzeigen und Schalter mitlesen, aber nichts schalten. Das ist die Einstellung für den normalen Spielbetrieb, und es ist die Grundeinstellung.
+
+- **„ON"** — **FA-Control darf die Anlage steuern.** Erst dann gibt AtariFA auf Anfrage die Kontrolle ab; das Spiel wird dabei angehalten. Alles Weitere in Kapitel 9.
+
+Auch dieser Schalter wird fortlaufend gelesen: wer ihn im laufenden Betrieb auf „OFF" stellt, nimmt FA-Control die Kontrolle **sofort** wieder weg, und das Spiel startet neu. Das ist der Not-Aus für den Fall, dass ein Testgerät sich aufhängt.
+
+#### 4.2.3. Optionen 1, 2, 5, 6 -> reserviert
 
 Nicht belegt, bitte auf „OFF" lassen. Sie sind verdrahtet, sie werden auf der Info-Anzeige dargestellt, und sie sind für spätere Software-Versionen vorgesehen.
 
-Option 1 gehörte zu einer versuchsweisen Speicherung von Credits und Highscores, die derzeit zurückgestellt ist, siehe Kapitel 12. In dieser Software-Version hat sie keine Wirkung.
+Option 1 gehörte zu einer versuchsweisen Speicherung von Credits und Highscores, die derzeit zurückgestellt ist, siehe Kapitel 13. In dieser Software-Version hat sie keine Wirkung.
 
 ### 4.3. Sechs der zehn DIPs werden nur beim Einschalten gelesen
 
@@ -205,7 +218,7 @@ Alles steht rechtsbündig, die nicht benutzten Stellen bleiben dunkel.
 
 Beispiel: Spieler 1 zeigt `012`, Spieler 2 zeigt `02`, Spieler 3 zeigt `000000`, Spieler 4 zeigt `0` — das ist Software 0.1.2 auf der Standardplatine, Airborne Avenger, keine Optionen gesetzt, kein Freispiel.
 
-**Die erste Ziffer der Version sagt Ihnen, welche Platinen-Variante Sie haben**, siehe Kapitel 11. `0` ist die Standard-AtariFA-Platine.
+**Die erste Ziffer der Version sagt Ihnen, welche Platinen-Variante Sie haben**, siehe Kapitel 12. `0` ist die Standard-AtariFA-Platine.
 
 Etwa zwei Sekunden nach Beginn dieses Fensters meldet sich die Platine über den bordeigenen Verstärker mit ihrem Namen — siehe Kapitel 8.3.
 
@@ -239,7 +252,7 @@ Betätigen Sie den Testschalter — entweder den in der Münztür oder den auf d
 
 Beim Ausschalten des Automaten sind Credits und Spielstände weg. **Die originale Atari-Generation-1-MPU verhält sich genauso** — anders als spätere Geräte hat sie überhaupt keinen batteriegepufferten Speicher.
 
-Auf der Platine sitzt zwar ein FRAM-Baustein, um das zu ändern, aber diese Funktion ist noch nicht fertig und in dieser Software-Version abgeschaltet. Siehe Kapitel 12.
+Auf der Platine sitzt zwar ein FRAM-Baustein, um das zu ändern, aber diese Funktion ist noch nicht fertig und in dieser Software-Version abgeschaltet. Siehe Kapitel 13.
 
 Wenn der Automat ohne Münzeinwurf starten soll, verwenden Sie Freispiel — Kapitel 7.
 
@@ -279,7 +292,58 @@ Sie kommt **immer aus dem Verstärker auf der Platine**, unabhängig von Option 
 
 Hören Sie hier nichts, prüfen Sie zuerst den Verstärker auf der Platine und dessen Lautsprecheranschluss, bevor Sie woanders suchen.
 
-## 9. Die Status-LEDs
+## 9. Die FA-Control-Schnittstelle (ESP32)
+
+Auf der Platine ist ein Steckplatz für ein **ESP32-C3 Super Mini** vorbereitet. Darauf läuft **FA-Control** — eine kleine Firmware, die ein WLAN aufmacht und im Browser eine Testoberfläche anbietet: jede Lampe einzeln schalten, jede Spule pulsen, alle Schalter live mitlesen, Ziffern auf die Displays schreiben, Töne abspielen.
+
+Das ist ein **Werkzeug für die Werkbank und die Fehlersuche**, kein Zubehör für den Spielbetrieb. Wer nichts einsteckt, merkt von dieser Schnittstelle nichts — die Platine verhält sich exakt so wie ohne.
+
+> Diese Funktion ist neu in Software-Version 0.1.3 und **noch nicht an einem echten Automaten erprobt.**
+
+### 9.1. Die Freigabe: Option 4
+
+Ein Testgerät soll nicht ungefragt in ein laufendes Spiel eingreifen können. Deshalb müssen **zwei Dinge** zusammenkommen:
+
+1. Das ESP32-Modul fragt aktiv an („ich möchte übernehmen").
+2. **Option-DIP 4 steht auf ON.**
+
+Steht Option 4 auf OFF, meldet die Weboberfläche im Klartext *„Kontrolle verweigert — Option-DIP 4 auf ON stellen"*, und das Spiel läuft ungestört weiter. Lesen darf das Modul trotzdem: Schalterzustände lassen sich also auch bei laufendem Spiel mitverfolgen, ohne etwas freizugeben.
+
+### 9.2. Was während der Übernahme passiert
+
+**Das Spiel wird angehalten.** Der Prozessor geht in den Reset, und alles — Lampen, Spulen, Displays, Ton — kommt ab sofort aus der Weboberfläche. Das muss so sein: liefe das Spiel weiter, würde es jede von Hand gesetzte Testlampe nach wenigen Millisekunden wieder überschreiben.
+
+**Das Spiel beginnt danach von vorn.** Es lässt sich nicht anhalten und fortsetzen. Ein laufendes Spiel geht also verloren — übernehmen Sie die Kontrolle nur im Attract Mode oder auf der Werkbank.
+
+### 9.3. Wie die Kontrolle wieder zurückgeht
+
+Auf drei Wegen, und alle drei führen sofort dazu, dass alle Ausgänge abfallen und das Spiel neu startet:
+
+- **In der Weboberfläche** auf „Kontrolle zurückgeben".
+- **Option-DIP 4 auf OFF stellen.** Der Schalter wird fortlaufend gelesen — das ist der Not-Aus.
+- **Nichts tun.** Meldet sich das Modul zwei Sekunden lang nicht mehr, gibt AtariFA von selbst zurück. Wer das USB-Kabel des ESP32 zieht, hat also nach zwei Sekunden wieder einen normalen Flipper.
+
+### 9.4. Was die Weboberfläche von der Platine erfährt
+
+Beim Verbinden fragt FA-Control die Ausstattung ab und stellt sich selbst darauf ein — es muss nichts von Hand eingetragen werden. Bei AtariFA kommt zurück:
+
+| | |
+|---|---|
+| Kennung | `AtariFA` |
+| Software-Version | dieselbe wie auf der Info-Anzeige, z. B. `0.1.3` |
+| Lampen | 84 |
+| Spulen | 22 (20 Spielfeld + Münzzähler + Sperrspule) |
+| Schalter | 80 |
+| Töne | 16 |
+| Displays | 5 (Status mit 4 Stellen, vier Spieler mit je 6) |
+
+Die Nummerierung folgt dabei der Platine: Schalter tragen dieselbe Nummer wie im Selbsttest des Spiels, Spule 0 bis 19 sind die zwanzig Spielfeld-Ausgänge in der Reihenfolge des Schaltplans.
+
+### 9.5. Anschluss
+
+Das ESP32-Modul wird nur aufgesteckt; es sind keine Kabel zu löten. Versorgt wird es von der Platine. Für die Ersteinrichtung des WLAN macht FA-Control beim ersten Start einen eigenen Zugangspunkt auf — Näheres in der Anleitung von FA-Control selbst.
+
+## 10. Die Status-LEDs
 
 Die Platine hat drei Status-LEDs, parallel zu den LEDs der Huckepack-Platine geschaltet. Sie sind die schnellste Diagnose ohne Logikanalysator.
 
@@ -293,9 +357,9 @@ Lesen Sie die drei zusammen:
 
 - **D2 und D3 blinken** — Platine und Spiel leben. So soll es aussehen.
 - **D3 blinkt, D2 steht** — die Hardware läuft, aber der Prozessor arbeitet nicht. Spielauswahl und Reset-Taster prüfen.
-- **Nichts blinkt** — das FPGA ist nicht programmiert oder hat keinen Takt. Neu programmieren (Kapitel 10).
+- **Nichts blinkt** — das FPGA ist nicht programmiert oder hat keinen Takt. Neu programmieren (Kapitel 11).
 
-## 10. Das FPGA programmieren
+## 11. Das FPGA programmieren
 
 Alles, was Sie brauchen, um die Software auf die Platine zu bekommen, ist auf meiner Website beschrieben und wird dort aktuell gehalten:
 
@@ -303,11 +367,11 @@ Alles, was Sie brauchen, um die Software auf die Platine zu bekommen, ist auf me
 
 Dort finden Sie das aktuelle FPGA-Programm zum Herunterladen, welche Programmiersoftware Sie benötigen, wie der Treiber für den USB-Blaster installiert wird und wie das FPGA programmiert wird.
 
-**Achten Sie darauf, die AtariFA-Fassung zu nehmen** — und, falls es mehrere gibt, die für Ihre Platinen-Variante, siehe Kapitel 11. Welche Variante gemeint ist, steht als erste Ziffer der Version auf der Info-Anzeige.
+**Achten Sie darauf, die AtariFA-Fassung zu nehmen** — und, falls es mehrere gibt, die für Ihre Platinen-Variante, siehe Kapitel 12. Welche Variante gemeint ist, steht als erste Ziffer der Version auf der Info-Anzeige.
 
 Für AtariFA gibt es kein SD-Karten-Abbild. Die Spiel-ROMs sind Teil des FPGA-Programms.
 
-## 11. Platinen-Varianten
+## 12. Platinen-Varianten
 
 Dasselbe Design läuft auf zwei Huckepack-Platinen. Das FPGA-Programm ist zwischen ihnen **nicht** austauschbar — die Pinbelegung unterscheidet sich.
 
@@ -322,12 +386,11 @@ Abgesehen von der Pinbelegung sind beide gleich, mit zwei kleinen Unterschieden 
 
 **Die Variante `cyclone_10_dev_open` ist noch nicht am Automaten erprobt.**
 
-## 12. Noch nicht implementiert
+## 13. Noch nicht implementiert
 
 Das Folgende ist auf der Platine vorhanden und verdrahtet, wird von dieser Software-Version aber nicht genutzt. Es tut nichts, und es schadet nichts — das FPGA hält alles davon in einem sicheren Ruhezustand.
 
 - **FRAM (Credits und Highscores über das Ausschalten hinweg).** Der Baustein ist bestückt und die Ansteuerung funktioniert, aber es zuverlässig für alle fünf Spiele hinzubekommen erfordert mehr Analyse der Spiel-ROMs als erwartet. Die Funktion ist abgeschaltet; Optionsschalter 1, der sie früher gesteuert hat, hat keine Wirkung. Kapitel 6.3.
-- **Die ESP32-C3-Schnittstelle.** Der Steckverbinder und die seriellen Leitungen sind vorhanden und sollen später eine Weboberfläche zum Testen tragen.
 - **Der MP3-Hintergrundspieler.** Ein zweiter, unabhängiger Tonweg auf der Platine. Von dieser Software-Version nicht angesteuert; er hat nichts mit dem Spielton aus Kapitel 8 zu tun.
 
 ## Anhang A 'game select'
@@ -356,12 +419,14 @@ Alle fünf laufen auch mit Freispiel (Kapitel 7).
  1  Spielauswahl Bit 0  (+1)         1  reserviert          beim Einschalten
  2  Spielauswahl Bit 1  (+2)         2  reserviert          beim Einschalten
  3  Spielauswahl Bit 2  (+4)         3  Tonweg              fortlaufend
- 4  Freispiel, ON = aktiv            4  reserviert          fortlaufend
+ 4  Freispiel, ON = aktiv            4  FA-Control erlaubt  fortlaufend
                                      5  reserviert          fortlaufend
  alle vier nur beim Einschalten      6  reserviert          fortlaufend
 ```
 
 **Tonweg, Option 3:** OFF = Auxiliary Board (Standard) · ON = Verstärker auf der Platine
+
+**FA-Control, Option 4:** OFF = niemand redet dazwischen (Standard) · ON = das ESP32-Testwerkzeug darf die Anlage steuern (Kapitel 9)
 
 **Nach dem Ändern eines Schalters, der beim Einschalten gelesen wird: aus- und wieder einschalten.**
 

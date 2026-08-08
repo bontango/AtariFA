@@ -128,7 +128,8 @@ set_location_assignment PIN_76 -to fram_i2c_sda
 set_location_assignment PIN_77 -to clk_595
 set_location_assignment PIN_80 -to fram_i2c_scl
 set_location_assignment PIN_83 -to rclk_595
-set_location_assignment PIN_84 -to ESP32_sig
+set_location_assignment PIN_84 -to ESP32_ctrl_req
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to ESP32_ctrl_req
 set_location_assignment PIN_85 -to oe_595
 set_location_assignment PIN_86 -to ESP32_ser_tx
 set_location_assignment PIN_87 -to serin_595
@@ -141,6 +142,11 @@ set_location_assignment PIN_99 -to LED_D2
 set_global_assignment -name VHDL_FILE variant_pkg.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/version_pkg.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/display_pkg.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/common/lamp_map_pkg.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/fa_control/fa_control_pkg.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/fa_control/uart_rx.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/fa_control/uart_tx.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/fa_control/fa_control.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/read_the_dips.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/switch_matrix.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/solenoid_driver.vhd

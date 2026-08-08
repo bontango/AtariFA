@@ -78,7 +78,8 @@ set_location_assignment PIN_76 -to fram_i2c_sda
 set_location_assignment PIN_77 -to clk_595
 set_location_assignment PIN_80 -to fram_i2c_scl
 set_location_assignment PIN_83 -to rclk_595
-set_location_assignment PIN_84 -to ESP32_sig
+set_location_assignment PIN_84 -to ESP32_ctrl_req
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to ESP32_ctrl_req
 set_location_assignment PIN_85 -to oe_595
 set_location_assignment PIN_86 -to ESP32_ser_tx
 set_location_assignment PIN_87 -to serin_595

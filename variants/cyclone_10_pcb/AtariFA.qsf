@@ -58,7 +58,8 @@ set_location_assignment PIN_101 -to solenoids[4]
 set_location_assignment PIN_103 -to solenoids[5]
 set_location_assignment PIN_105 -to solenoids[7]
 set_location_assignment PIN_106 -to solenoids[8]
-set_location_assignment PIN_11 -to ESP32_sig
+set_location_assignment PIN_11 -to ESP32_ctrl_req
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to ESP32_ctrl_req
 set_location_assignment PIN_111 -to solenoids[10]
 set_location_assignment PIN_112 -to solenoids[11]
 set_location_assignment PIN_113 -to solenoids[12]
@@ -141,6 +142,11 @@ set_location_assignment PIN_99 -to solenoids[2]
 set_global_assignment -name VHDL_FILE variant_pkg.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/version_pkg.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/display_pkg.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/common/lamp_map_pkg.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/fa_control/fa_control_pkg.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/fa_control/uart_rx.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/fa_control/uart_tx.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/fa_control/fa_control.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/read_the_dips.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/switch_matrix.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/solenoid_driver.vhd

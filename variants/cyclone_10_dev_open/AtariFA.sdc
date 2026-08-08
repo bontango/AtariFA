@@ -40,7 +40,12 @@
 	# sw_com_in is an asynchronous switch-matrix return; it only enters the 2-FF synchronizer
 	# in switch_matrix.vhd -> exclude from timing analysis (metastability handled there)
 	set_false_path -from [get_ports sw_com_in]
-	
+	# ESP32 link (rtl/fa_control): both inputs are asynchronous to clk_50 and both are
+	# synchronized inside the module - ESP32_ser_tx by the 2-FF sampler in uart_rx.vhd,
+	# ESP32_ctrl_req by the req_meta/req_sync pair in fa_control.vhd.
+	set_false_path -from [get_ports ESP32_ser_tx]
+	set_false_path -from [get_ports ESP32_ctrl_req]
+
 	#
 	# example second clock
 	#create_clock -name {clk} -period 400.000 -waveform { 0.000 200.000 } [get_registers {clk}]

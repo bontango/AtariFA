@@ -78,6 +78,8 @@ use ieee.std_logic_unsigned.all;
 use work.instruction_buffer_type.all;   -- rtl/common/display_pkg.vhd
 use work.version_pkg.all;               -- rtl/common/version_pkg.vhd  - SW_SUB1, SW_SUB2
 use work.variant_pkg.all;               -- variants/<name>/variant_pkg.vhd - BOARD_ID
+use work.lamp_map_pkg.all;              -- rtl/common/lamp_map_pkg.vhd - FA_LAMP_BIT, LAMP_COUNT
+use work.fa_control_pkg.all;            -- rtl/fa_control/fa_control_pkg.vhd - Nibble-Feld, Display-Breiten
 
 entity AtariFA is
 	port(		
@@ -133,10 +135,20 @@ entity AtariFA is
 		SB_Audio	: out std_logic;
 		SB_Sound	: out std_logic;
 
-		-- 9) ESP32-C3 interface 
-		ESP32_ser_tx	: in std_logic;				
-		ESP32_ser_rx	: out std_logic;				
-		ESP32_sig   	: out std_logic;				
+		-- 9) ESP32-C3 interface
+		-- Names are from the ESP32's point of view: ESP32_ser_tx is the ESP's TX and
+		-- therefore an INPUT here, ESP32_ser_rx is the ESP's RX and an output.
+		-- Schematic (doc/AtariFA_07_Final_Main_SCH.PDF, X7 <-> X1P):
+		--   GPIO7 = net ESP32_TX    -> PIN_33  (this FPGA receives)
+		--   GPIO6 = net ESP32_RX    -> PIN_44  (this FPGA sends)
+		--   GPIO10 = net ESP32_IO10 -> PIN_11  (ESP output, this FPGA reads)
+		ESP32_ser_tx	: in std_logic;
+		ESP32_ser_rx	: out std_logic;
+		-- ESP32_ctrl_req: the ESP asks to take over ("FA-Control"). ACTIVE LOW, driven
+		-- push-pull by the ESP; weak pull-up in the FPGA (variants/<n>/pins.tcl) so an
+		-- empty ESP socket reads as "no request". Used to be ESP32_sig, an OUTPUT parked
+		-- at '0' - which fought the ESP pin whenever a module was plugged in.
+		ESP32_ctrl_req	: in std_logic;
 
 		-- 10) debug ports
 		debug_signal	: out std_logic_vector(7 downto 0)
@@ -180,6 +192,12 @@ signal rom2_cs			: std_logic;
 signal snd_select	: std_logic_vector(3 downto 0) := (others => '0');  -- Latch 1080: Wellenform
 signal snd_pitch	: std_logic_vector(3 downto 0) := (others => '0');  -- Latch 1088: Tonhoehe
 signal snd_volume	: std_logic_vector(3 downto 0) := (others => '0');  -- Latch 1084: Lautstaerke
+-- gemuxte sound.vhd-Eingaenge: Spiel-Latches vs. FA-Control (VHDL-93 kennt kein
+-- when/else im Port-Map, deshalb ueber eigene Signale)
+signal snd_select_mux	: std_logic_vector(3 downto 0);
+signal snd_pitch_mux	: std_logic_vector(3 downto 0);
+signal snd_volume_mux	: std_logic_vector(3 downto 0);
+signal snd_enable_mux	: std_logic;
 signal snd_sample	: std_logic_vector(3 downto 0);  -- roher 4-Bit ROM-Nibble (Aux-Pfad)
 signal snd_volume_eff	: std_logic_vector(3 downto 0);  -- eff. Lautstaerke (0 wenn audio_enable='0'), Aux-Pfad
 signal snd_pwm		: std_logic;                     -- 1-Bit Sigma-Delta (Onboard-Pfad)
@@ -349,6 +367,35 @@ signal por_count      : integer range 0 to 50001 := 0;
 signal por_active     : std_logic := '1';
    -- Power-on-Reset: hält CPU für 50 000 clk_50-Takte (1 ms) nach Konfiguration im Reset
 
+-- ---------------------------------------------------------------------------
+-- FA-Control (rtl/fa_control): LISY-Slave am ESP32-C3. Der ESP darf die Anlage
+-- uebernehmen, wenn er es ueber ESP32_ctrl_req anfordert UND Options-DIP 4 auf ON
+-- steht. Waehrend der Uebernahme haelt das Top-Level die CPU im Reset und speist
+-- Lampen/Spulen/Displays/Ton aus den fa_*-Sollwerten statt aus dem Spiel.
+-- ---------------------------------------------------------------------------
+signal fa_ctrl_active : std_logic;
+-- Vektorbreiten exakt auf die Anlage zugeschnitten (84 Lampen, 22 Spulen, 80 Schalter,
+-- 5 Displays a 6 Ziffern) -- jeder ueberzaehlige Eintrag kostet im Modul Register und
+-- Muxlogik, s. Kommentar bei den MAX_*-Generics in fa_control.vhd.
+signal fa_lamp_ovr    : std_logic_vector(LAMP_COUNT - 1 downto 0);
+signal fa_sol_ovr     : std_logic_vector(21 downto 0);
+signal fa_disp_ovr    : fa_nibble_array_t(0 to 5 * 6 - 1);
+signal fa_snd_ovr     : std_logic_vector(3 downto 0);
+signal fa_snd_en      : std_logic;
+signal fa_sw_state    : std_logic_vector(79 downto 0);    -- sw_state auf die Modulbreite gebracht
+signal fa_lamp_state  : std_logic_vector(127 downto 0);   -- fa_lamp_ovr in die RAM-Bit-Lage gedreht
+signal lamp_state_mux : std_logic_vector(127 downto 0);   -- was die Matrix wirklich anzeigt
+signal fa_display1    : DISPLAY_T;
+signal fa_display2    : DISPLAY_T;
+signal fa_display3    : DISPLAY_T;
+signal fa_display4    : DISPLAY_T;
+signal fa_status      : DISPLAY_TS;
+-- io_live: Peripherie ist scharf, wenn das SPIEL laeuft ODER FA-Control uebernommen hat.
+-- reset_l_stable allein taugt dafuer nicht mehr -- das ist seit der Uebernahme nur noch
+-- die CPU-Freigabe, und mit angehaltener CPU muessen Schalter, Lampen, Spulen und Ton
+-- trotzdem arbeiten, sonst liesse sich nichts testen.
+signal io_live        : std_logic;
+
 -- Switch-Matrix (Phase B): reale 10x8-Matrix per switch_matrix.vhd gescannt.
 -- sw_state(offset) = entprellter Zustand je CPU-offset (addr-0x2000); '1' = geschlossen.
 -- Der 2-FF-Synchronizer (B4) liegt jetzt im Modul; die alten sw_meta/sw_sync (GottFA3-Erbe,
@@ -410,7 +457,12 @@ gen_dbg3: if DBG_MODE = 3 generate
 end generate gen_dbg3;
 
 -------------------------------
-reset_l_stable <= boot_phase(2); -- CPU-Release erst nach DIP-Read (Phase 1) + Info-Anzeige (Phase 2)
+-- CPU-Release erst nach DIP-Read (Phase 1) + Info-Anzeige (Phase 2) -- und nur solange
+-- FA-Control NICHT uebernommen hat: waehrend der Uebernahme bleibt der 6800 im Reset,
+-- damit Spielcode und Testbefehle nicht gegeneinander arbeiten.
+reset_l_stable <= boot_phase(2) and not fa_ctrl_active;
+-- Peripherie scharf, sobald das Spiel laeuft ODER FA-Control uebernommen hat.
+io_live   <= reset_l_stable or fa_ctrl_active;
 disp_show <= boot_phase(1);       -- Display aktiv ab DIP-Read fertig (durch Info-Phase bis ins Spiel)
 reset_h <= (not reset_l_stable) or por_active;
    -- WD deliberately disconnected: Game kickt 0x4000 nicht im Attract Mode → permanenter Reset-Loop.
@@ -422,9 +474,10 @@ LED_D2   <= not cpu_fetch_cnt(20); -- CPU-Fetch-Blinker ~0.6 Hz: blinkt = cpu68 
                                     -- (steht dauerhaft: CPU halted oder hängt ohne ROM-Zugriff)
 LED_D3   <= not nmi_blink_cnt(8);  -- NMI-Generator-Blinker ~0.48 Hz: blinkt = HW-NMI-Takt läuft
                                     -- (unabhängig von CPU; Freilauf aus dma_counter; 244 NMI/s -> Bit8 ~0.48 Hz)
-LED_D4   <= '1';                   -- Reserve, bewusst AUS getrieben (aktiv-LOW). Nicht undriven lassen:
-                                    -- ein deklarierter Ausgang ohne Treiber ist für Quartus trotzdem ein
-                                    -- benutzter Pin. Nur auf cyclone_10_dev_open real vorhanden.
+LED_D4   <= not fa_ctrl_active;    -- leuchtet, solange FA-Control die Kontrolle hat (aktiv-LOW).
+                                    -- Nicht undriven lassen: ein deklarierter Ausgang ohne Treiber ist
+                                    -- für Quartus trotzdem ein benutzter Pin. Nur auf
+                                    -- cyclone_10_dev_open real vorhanden, sonst VIRTUAL_PIN.
 
 -- use some IOs to read dips at start
 -- Route the matrix strobes to the lamp IOs only DURING the DIP read window.
@@ -476,15 +529,20 @@ disp_Anode_blank <= not i_disp_Anode_blank;
 -- Solenoide (Phase B): getrieben vom solenoid_driver (Instanz SOL, s.u.). sol_ah ist aktiv-high
 -- ('1'=bestromt); invertierender 74HCT540 -> FPGA '1' => 540-Ausgang '0' => Gate low => MOSFET AUS.
 -- Das Modul haelt bei Reset/enable=0 alles auf 0 (AUS) -> hier '1' am Port (sicher).
-solenoids        <= not sol_ah;
+-- Waehrend der FA-Control-Uebernahme kommen die Spulen aus fa_sol_ovr: Bit 0..19 = solenoids(1..20),
+-- Bit 20 = Muenzzaehler, Bit 21 = Lockout (Nummerierung siehe docs/FA_Control_Interface.md).
+gen_fa_sol: for i in 1 to 20 generate
+	solenoids(i) <= not fa_sol_ovr(i - 1) when fa_ctrl_active = '1' else not sol_ah(i);
+end generate;
 -- Muenztuer-Spulen ueber Aux-Board (invertierender 74HCT540): aktiv-high coin_cntr/lockout -> invertiert.
-aux_sol_latch(0) <= not coin_cntr_ah;   -- COIN_CNTREN (0x1080 bit4)
-aux_sol_latch(1) <= not lockout_ah;     -- LOCKOUT_EN  (0x1080 bit5)
+aux_sol_latch(0) <= not fa_sol_ovr(20) when fa_ctrl_active = '1' else not coin_cntr_ah;   -- COIN_CNTREN (0x1080 bit4)
+aux_sol_latch(1) <= not fa_sol_ovr(21) when fa_ctrl_active = '1' else not lockout_ah;     -- LOCKOUT_EN  (0x1080 bit5)
 -- solenoids_enable: laeuft ueber den NICHT invertierenden 74HCT541 an die active-low /OE der
 -- 74HCT540 (Solenoid-MOSFETs UND Aux-Board). '0' => 540 freigegeben, '1' => disabled (sicher).
--- Freigabe erst mit CPU (reset_l_stable = boot_phase(2)); Boot/Reset = '1' = disabled.
+-- Freigabe mit io_live, NICHT mit reset_l_stable: bei einer FA-Control-Uebernahme steht die CPU,
+-- der 540 muss aber offen bleiben -- sonst liesse sich keine einzige Spule testen.
 -- Achtung: gibt auch den Original-Audio-Aux-Pfad frei (aux-Signale am selben 540, beabsichtigt).
-solenoids_enable <= not reset_l_stable;
+solenoids_enable <= not io_live;
 -- Lamp-Matrix (Phase B, lamp_matrix.vhd, Instanz LAMP): treibt die 74HC595-Kaskade ueber den
 -- NICHT-invertierenden 74HCT541. oe_595 aktiv-low ('0'=Ausgaenge frei). Bei Boot/Reset haelt
 -- das Modul (enable='0') oe_595='1' => Lampen sicher AUS.
@@ -529,9 +587,112 @@ SB_Audio <= '0';
 -- SCL idle high. Hintergrund + Zukunftsweg (RE statt Probe): doc/FRAM_Persistence.md.
 fram_i2c_sda <= 'Z';
 fram_i2c_scl <= '1';
--- ESP32-Link: UART-Leitung ruht HIGH; Signalpin Idle low.
-ESP32_ser_rx <= '1';
-ESP32_sig    <= '0';
+------------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------
+-- FA-Control: LISY-Slave am ESP32-C3 (rtl/fa_control/fa_control.vhd).
+-- Protokoll und Nummerierung: docs/FA_Control_Interface.md.
+--
+-- reset: bewusst NICHT reset_l_stable -- das haengt inzwischen selbst an
+-- fa_ctrl_active und ergaebe eine Schleife. Wie bei der Boot-Sprachausgabe wird
+-- der synchronisierte reset_sw plus Power-on-Reset genommen; das Modul laeuft
+-- damit ab dem PLL-Lock durch und kann schon waehrend der Boot-Info antworten.
+--
+-- ctrl_allow = not options(4): Options-DIP 4, active-low gelesen (ON = '0'), und
+-- fortlaufend -- der Betreiber kann die Freigabe also jederzeit wegnehmen.
+------------------------------------------------------------------------------
+FAC: entity work.fa_control
+generic map(
+	CLKS_PER_BIT => 434,          -- 50 MHz / 115200 Baud
+	HW_NAME      => "AtariFA",
+	API_VER      => "0.12",
+	N_LAMPS      => LAMP_COUNT,   -- 84 = 21 Gruppen x 4 Strobes
+	N_SOL        => 22,           -- 20 Spielfeld + Muenzzaehler + Lockout
+	N_SOUNDS     => 16,           -- die 16 Wellenformen des 82s130-ROMs
+	N_SW         => 80,           -- 10x8-Matrix, Nummer = CPU-Offset (addr-0x2000)
+	N_DISP       => 5,            -- 0 = Status/Credit, 1..4 = Spieler 1..4
+	DISP_TYPE    => 1,            -- BCD7
+	DISP_DIGITS  => (4, 6, 6, 6, 6, 0, 0),
+	-- Vektorbreiten exakt = Bestueckung, nicht grosszuegig (kostet sonst Logik)
+	MAX_LAMPS    => LAMP_COUNT,
+	MAX_SOL      => 22,
+	MAX_SW       => 80,
+	MAX_DIGITS   => 6
+	)
+port map(
+	clk         => clk_50,
+	reset       => (not boot_phase(0)) or por_active,
+	rxd         => ESP32_ser_tx,  -- ESP sendet -> FPGA empfaengt
+	txd         => ESP32_ser_rx,  -- FPGA sendet -> ESP empfaengt
+	ctrl_req    => ESP32_ctrl_req,
+	ctrl_allow  => not options(4),
+	ctrl_active => fa_ctrl_active,
+	ver_main    => SW_MAIN,
+	ver_sub1    => SW_SUB1,
+	ver_sub2    => SW_SUB2,
+	-- Spielnummer 0..7 als Nibble. Gleiche Schreibweise wie in boot_info -- ein
+	-- conv_std_logic_vector waere ieee.std_logic_arith, und das ist hier bewusst
+	-- nicht eingebunden (Konvention: nur std_logic_unsigned).
+	game_info   => '0' & (not game_select),
+	sw_state    => fa_sw_state,
+	lamp_ovr    => fa_lamp_ovr,
+	sol_ovr     => fa_sol_ovr,
+	disp_ovr    => fa_disp_ovr,
+	snd_ovr     => fa_snd_ovr,
+	snd_en      => fa_snd_en
+	);
+
+-- sw_state ist (0 to 79) aufsteigend, das Modul will (79 downto 0) -- Bit i bleibt
+-- Schalter i, nur die Laufrichtung des Index dreht sich.
+gen_fa_sw: for i in 0 to 79 generate
+	fa_sw_state(i) <= sw_state(i);
+end generate;
+
+-- Lampennummer -> lamp_state-Bit. FA_LAMP_BIT kommt aus lamp_map_pkg und wird dort
+-- zur Elaborationszeit aus GRP_OF berechnet; die Zuordnung hat damit weiterhin genau
+-- eine Quelle (s. Kommentar in lamp_map_pkg.vhd).
+fa_lamp_map : process(fa_lamp_ovr)
+	variable v : std_logic_vector(127 downto 0);
+begin
+	v := (others => '0');
+	for n in 0 to LAMP_COUNT - 1 loop
+		v(FA_LAMP_BIT(n)) := fa_lamp_ovr(n);
+	end loop;
+	fa_lamp_state <= v;
+end process;
+
+lamp_state_mux <= fa_lamp_state when fa_ctrl_active = '1' else lamp_state;
+
+-- Display-Ziffern von FA-Control in die Shadow-Buffer-Form bringen.
+-- LISY sendet rechtsbuendig und hoechstwertig zuerst (Index 0 = physisch LINKS), die
+-- Digit-Adresse der Platine laeuft aber gegenlaeufig (Index 0 = physisch RECHTS, s.
+-- Kommentar bei boot_info). Deshalb hier GESPIEGELT ablegen -- genau wie bei der
+-- Boot-Info und anders als beim Spiel-Sniffer, der schon in HW-Reihenfolge vorliegt.
+-- HW-TUNBAR: erscheint die Anzeige am Prototyp seitenverkehrt, ist es dieser Block.
+fa_disp_map : process(fa_disp_ovr)
+begin
+	fa_display1 <= (others => x"F");
+	fa_display2 <= (others => x"F");
+	fa_display3 <= (others => x"F");
+	fa_display4 <= (others => x"F");
+	fa_status   <= (others => x"F");
+	-- Index im Modul = Display-Nr * 6 + Ziffer (MAX_DIGITS = 6, s. Instanz oben).
+	for i in 0 to 5 loop
+		fa_display1(5 - i) <= fa_disp_ovr(1 * 6 + i);   -- LISY-Display 1 = Spieler 1
+		fa_display2(5 - i) <= fa_disp_ovr(2 * 6 + i);
+		fa_display3(5 - i) <= fa_disp_ovr(3 * 6 + i);
+		fa_display4(5 - i) <= fa_disp_ovr(4 * 6 + i);
+	end loop;
+	for i in 0 to 3 loop
+		fa_status(3 - i) <= fa_disp_ovr(0 * 6 + i);     -- LISY-Display 0 = Status/Credit, 4 Stellen
+	end loop;
+	-- Digit 6 ist die Player-up-LED, nicht Teil der Ziffernfolge -> aus.
+	fa_display1(6) <= x"0";
+	fa_display2(6) <= x"0";
+	fa_display3(6) <= x"0";
+	fa_display4(6) <= x"0";
+end process;
 ------------------------------------------------------------------------------
 
 
@@ -604,12 +765,14 @@ begin
 	bi_status <= (others => x"F");
 end process;
 
--- Mux: in Phase 2 (boot_phase(2)='0') Boot-Info, danach Spiel/Normal-Daten.
-dc_display1 <= bi_display1 when boot_phase(2) = '0' else display1;
-dc_display2 <= bi_display2 when boot_phase(2) = '0' else display2;
-dc_display3 <= bi_display3 when boot_phase(2) = '0' else display3;
-dc_display4 <= bi_display4 when boot_phase(2) = '0' else display4;
-dc_status   <= bi_status   when boot_phase(2) = '0' else status_d;
+-- Mux: FA-Control hat Vorrang (dann steht die CPU und display1..4 waeren ohnehin
+-- ein eingefrorenes Standbild), sonst in Phase 2 (boot_phase(2)='0') die Boot-Info,
+-- sonst die Spiel/Normal-Daten.
+dc_display1 <= fa_display1 when fa_ctrl_active = '1' else bi_display1 when boot_phase(2) = '0' else display1;
+dc_display2 <= fa_display2 when fa_ctrl_active = '1' else bi_display2 when boot_phase(2) = '0' else display2;
+dc_display3 <= fa_display3 when fa_ctrl_active = '1' else bi_display3 when boot_phase(2) = '0' else display3;
+dc_display4 <= fa_display4 when fa_ctrl_active = '1' else bi_display4 when boot_phase(2) = '0' else display4;
+dc_status   <= fa_status   when fa_ctrl_active = '1' else bi_status   when boot_phase(2) = '0' else status_d;
 
 
 DC: entity work.display_control
@@ -653,14 +816,22 @@ end generate gen_disptest;
 -- Ausgaenge: snd_sample + snd_volume_eff (Aux-Pfad) und snd_pwm (Sigma-Delta, Onboard-Pfad).
 -- snd_volume_eff = Lautstaerke-Latch, aber 0 wenn audio_enable='0' (s. Mux-Kommentar oben).
 -- Die Auswahl Original/Emulation per options(3) erfolgt im Ausgabe-Mux (oben).
+-- Waehrend einer FA-Control-Uebernahme kommen Wellenform und Freigabe vom Host:
+-- LISY "Sound n" = Wellenform n, feste Tonhoehe und volle Lautstaerke (der Atari kennt
+-- keine Sound-Nummern, sondern nur die 16 Wellenformen des 82s130 -- s. docs/Sound_Emulation.md).
+snd_select_mux <= fa_snd_ovr when fa_ctrl_active = '1' else snd_select;
+snd_pitch_mux  <= x"8"       when fa_ctrl_active = '1' else snd_pitch;
+snd_volume_mux <= x"F"       when fa_ctrl_active = '1' else snd_volume;
+snd_enable_mux <= fa_snd_en  when fa_ctrl_active = '1' else audio_enable;
+
 SND: entity work.sound
 port map(
 	clk_50		=> clk_50,
-	reset_l		=> reset_l_stable,
-	snd_select	=> snd_select,
-	snd_pitch	=> snd_pitch,
-	snd_volume	=> snd_volume,
-	snd_enable	=> audio_enable,
+	reset_l		=> io_live,
+	snd_select	=> snd_select_mux,
+	snd_pitch	=> snd_pitch_mux,
+	snd_volume	=> snd_volume_mux,
+	snd_enable	=> snd_enable_mux,
 	sample		=> snd_sample,
 	volume_out	=> snd_volume_eff,
 	sb_pwm		=> snd_pwm
@@ -743,10 +914,12 @@ port map(
 -- sampelt den einen Rueckkanal sw_com_in (durch inv. 74HC4049) und liefert sw_state(0..79)
 -- (offset = addr-0x2000; '1' = geschlossen). Reset an reset_l_stable gekoppelt.
 ------------------------------------------------------------------------------
+-- reset an io_live (nicht reset_l_stable): bei einer FA-Control-Uebernahme steht die CPU,
+-- die Matrix muss aber weiterscannen -- Schalter ablesen ist die halbe Miete beim Testen.
 SWM: entity work.switch_matrix
 port map(
 	clk_50    => clk_50,
-	reset     => not reset_l_stable,
+	reset     => not io_live,
 	sw_strobe => sw_strobe,
 	sw_com    => sw_com,
 	sw_com_in => sw_com_in,
@@ -759,6 +932,8 @@ port map(
 -- sol_ah(1..20) + Muenztuer (coin_cntr_ah/lockout_ah), oben invertiert auf die Ports.
 -- reset/enable an reset_l_stable gekoppelt (AUS im Boot/Reset, live sobald CPU laeuft).
 ------------------------------------------------------------------------------
+-- Bei FA-Control-Uebernahme bleibt diese Instanz im Reset (alle Ausgaenge AUS); die
+-- Spulen kommen dann direkt aus fa_sol_ovr, s. Mux oben bei 'solenoids'.
 SOL: entity work.solenoid_driver
 port map(
 	clk_50    => clk_50,
@@ -778,12 +953,14 @@ port map(
 -- (ser/srck/rck/oe_n) + 2-Bit-Strobe-Select. reset/enable an reset_l_stable gekoppelt
 -- (AUS im Boot/Reset, live sobald CPU laeuft -- analog Solenoide).
 ------------------------------------------------------------------------------
+-- reset/enable an io_live: der Scan laeuft auch waehrend einer FA-Control-Uebernahme,
+-- gespeist dann aus fa_lamp_state (Lampennummer -> RAM-Bit-Lage, s. fa_lamp_map).
 LAMP: entity work.lamp_matrix
 port map(
 	clk_50     => clk_50,
-	reset      => not reset_l_stable,
-	enable     => reset_l_stable,
-	lamp_state => lamp_state,
+	reset      => not io_live,
+	enable     => io_live,
+	lamp_state => lamp_state_mux,
 	ser        => lamp_ser,
 	srck       => lamp_srck,
 	rck        => lamp_rck,

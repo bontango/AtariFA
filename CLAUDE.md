@@ -13,7 +13,8 @@ handgepflegten `.qsf` müsste jede Änderung doppelt portiert werden. **Doku: `R
 
 ```
 top/AtariFA.vhd     DAS eine Top-Level für alle Boards
-rtl/common/         alle Module + version_pkg (SW_SUB1/2) + display_pkg (Typen)
+rtl/common/         alle Module + version_pkg (SW_SUB1/2) + display_pkg + lamp_map_pkg
+rtl/fa_control/     ESP32-/LISY-Schnittstelle, self-contained zum Kopieren in andere Projekte
 rtl/cyclone_10/     Megafunctions der Chipfamilie (RAM, cpu_clock, sound_rom)
 rom/  docs/  archive/  bin/
 variants/<name>/    variant_pkg.vhd (BOARD_ID) · device.tcl · pins.tcl · AtariFA.sdc
@@ -21,6 +22,13 @@ variants/<name>/    variant_pkg.vhd (BOARD_ID) · device.tcl · pins.tcl · Atar
 scripts/            gen_qsf.ps1 · check.ps1 · build.ps1 · release.ps1 · baseline.csv
                     common_header.tcl · files_common.tcl · files_cyclone_10.tcl
 ```
+
+**Keine Feature-Flags je Variante.** Neue Module kommen in `scripts/files_common.tcl` und werden
+unbedingt instanziiert — beide Boards bekommen alles. Ein `HAS_*`-Schalter in `variant_pkg.vhd`
+plus `Options`-Eintrag, eigener `files_*.tcl` und zwei komplementären `if generate` kostet mehr
+als das Feature überall zu bauen und führt die Doppelpflege wieder ein, gegen die dieser Baum
+angetreten ist. (WillFA7 hat mit `HAS_MONITOR` so einen Schalter — dort gibt es aber eine
+Cyclone-II-Variante, die die LEs wirklich nicht frei hat. Hier gibt es keinen solchen Fall.)
 
 **Zwei Varianten, beide 10CL006YE144C8G:** `cyclone_10_pcb` (BOARD_ID 0, Leitvariante,
 HW-getestet bis SW 0.1.2) und `cyclone_10_dev_open` (BOARD_ID 1, **nie HW-getestet**;
@@ -63,8 +71,10 @@ stehen in beiden Portlisten und bekommen dort, wo sie fehlen, `VIRTUAL_PIN` aus 
   einziger zusätzlicher `VIRTUAL_PIN` die LE-Packung ändert. Slack schwankt ebenfalls
   (Toleranz 1,5 ns in `check.ps1`); der enge Pfad ist **`cpu_clk`**, nicht `clk_50`.
 - **Erwartete, harmlose Warnungen** (nicht „beheben"): 113009 (Intel-HEX-Records),
-  14320 (`sound_rom q[7:4]` wegoptimiert), `solenoids[14]/[18] stuck at VCC` (unbestückt),
-  3× 10036 (`dma_clk`/`audio_clk`/`nvram_wren` zugewiesen, nie gelesen).
+  14320 (`sound_rom q[7:4]` wegoptimiert), 3× 10036 (`dma_clk`/`audio_clk`/`nvram_wren`
+  zugewiesen, nie gelesen). **`solenoids[14]/[18] stuck at VCC` gibt es seit SW 0.1.3 NICHT
+  mehr** — die beiden unbestückten Ausgänge sind nicht mehr konstant, seit FA-Control alle 20
+  Spulenpositionen adressieren kann.
 - **Zielplatine (AtariFA-PCB):** Cyclone 10 LP **10CL006YE144C8G** (E144) — „piggy-back"-Replacement-CPU mit RAM/ROM + TTL-Ersatz, parallel zu den Atari-Edge-Connectors plus „Box-Connectors". Migriert 2026-06; nur Display-Routinen übernommen, Rest (Switch/Lamps/Solenoide/Audio/FRAM/ESP32) step-by-step (Phase B/C).
 - **Testplatine (vorher):** GottFA3 / Cyclone IV E EP4CE6F17C8 — Bring-up abgeschlossen 2026-06-06.
 - **Dritte Ausprägung, bewusst außen vor:** `N:\Projekte\FPGA Atari\AtariFA - on SYS3 Test PCB`
@@ -122,6 +132,9 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
 - RAM-Write-Strobe immer in `clk_50`-Domain (fallende cpu_clk-Flanke per Edge-Detect auf `cpu_clk_d1/d2`)
 - Open-Bus-Default: `cpu_din <= x"FF"` wenn keine CS aktiv
 - Display-Outputs sind **invertiert** wegen 74HCT540-Treiber: `disp_* <= not i_disp_*`
+- **`io_live` statt `reset_l_stable` für Peripherie** (seit SW 0.1.3): `reset_l_stable` ist nur noch
+  die CPU-Freigabe. Wer ein Modul anschließt, das auch bei FA-Control-Übernahme laufen muss
+  (Schalter, Lampen, Spulen, Ton), nimmt **`io_live`** — s. Abschnitt „FA-Control-Schnittstelle".
 - **Sichere Inaktiv-Pegel:** noch nicht implementierte Ausgänge werden in `AtariFA.vhd` **explizit** getrieben (nicht undriven lassen!) — Quartus-Default `'0'` würde über den invertierenden 74HCT540 die Solenoide EINschalten. Solenoide/`solenoids_enable`/`aux_sol_latch` sind seit 2026-07-04 vom `solenoid_driver` getrieben; **Lampen** (`oe_595`/`serin_595`/`clk_595`/`rclk_595`/`aux_lamp_strobe`) seit 2026-07-04 vom `lamp_matrix` (bei Reset/Boot sicher AUS: `enable=0` → `oe_595='1'`). Block direkt nach den `disp_*`-Zuweisungen.
 - **FRAM:** `fram_i2c_sda` ist `inout` (open-drain, idle `'Z'`, externer Pull-up) — I2C braucht bidirektionale SDA für ACK/Read; `fram_i2c_scl` bleibt `out`.
 - SDC-Datei: `AtariFA.sdc`; `cpu_clk` (PLL clk[0]) wird als Datensignal in `clk_50` gesampled → `set_false_path` auf `cpu_clk_d1` (verhindert falsche Hold-Violations durch „clock-used-as-data")
@@ -194,6 +207,9 @@ Von 6 auf **10 DIPs** erweitert: **4er-Block** = 3× `game_select` + 1× `freepl
 - **Phase C**: ✓ **Audio implementiert** (`sound.vhd`, s. eigener Abschnitt); offen: generische
   Spiel-Konfiguration per Generic. *(Roadmap nannte früher 0x3000/0x6000 — falsch; schaltplan-
   verifiziert sind die Sound-Latches **0x1080/1084/1088**.)*
+  ✓ **ESP32-Anbindung implementiert** (`rtl/fa_control`, 2026-08-08, s. eigener Abschnitt) —
+  damit ist der letzte offene Punkt der Phase-B/C-Liste („Switch/Lamps/Solenoide/Audio/FRAM/ESP32")
+  abgearbeitet, bis auf das zurückgestellte FRAM. **HW-Test steht noch aus.**
 - **Phase D**: Cleanup, SDC weiter vervollständigen (B4 switch[5..16]/options[], IO-Delays), Test-Module hinter Generic
   - ✓ Hold-Violations behoben (`set_false_path` cpu_clk_d1), SDC → `AtariFA.sdc` umbenannt
 
@@ -376,6 +392,46 @@ Atari-Verhalten). Bisher nur **Airborne** (`game_idx=2`). SW-Version **0.0.9**.
 - **HW-Tuning-Hebel (`AtariFA.vhd`):** `DELAY_CLEAR`, `HALT_SETTLE`, `INJ_SCORES`, `INJ_DEBUG_LED`
   (LED_D1 = `injected` statt `save_seen`).
 
+## FA-Control-Schnittstelle (rtl/fa_control, 2026-08-08, SW 0.1.3, **noch nicht HW-getestet**)
+LISY-Slave am ESP32-C3, Gegenstelle zu `N:\Projekte\FA_Control` (Weboberfläche zum Testen).
+**Ausführliche Doku: `docs/FA_Control_Interface.md`** — dort stehen Protokoll, Nummerierung,
+HW-Tuning-Stellen und die Inbetriebnahme-Reihenfolge.
+- **Protokoll = LISY API 0.12 unverändert** (`N:\Projekte\lisy_5_28\src\lisy\lisy_api.h`), keine
+  Eigenerfindung. FA_Control sprach das schon, nur die **Info-Gruppe 0..9** fehlte auf beiden
+  Seiten — genau die ist jetzt der **Connect-Handshake**: der Host fragt Bestückung (84 Lampen,
+  22 Spulen, 80 Schalter, 16 Sounds, 5 Displays), Kennung und Version ab, statt sie geraten zu
+  bekommen. `G_LISY_VER` (Op 1) liefert `BOARD_ID.SW_SUB1.SW_SUB2` aus `version_pkg`.
+- **Pin-Richtungswechsel (kein HW-Umbau):** `ESP32_sig : out` → **`ESP32_ctrl_req : in`**
+  (PIN_11 pcb / PIN_84 dev_open, `WEAK_PULL_UP_RESISTOR ON`, active low). GPIO10 ist auf der
+  ESP-Seite ein Push-Pull-**Ausgang** — der alte, fest auf `'0'` getriebene FPGA-Ausgang hat mit
+  gestecktem Modul dagegengetrieben. Kein ESP gesteckt = high = keine Anforderung ⇒ Verhalten
+  ohne ESP exakt wie vorher. **Portnamen sind aus ESP-Sicht:** `ESP32_ser_tx` ist ein FPGA-*Eingang*.
+- **Freigabe = `ESP32_ctrl_req` low UND Options-DIP 4 = ON**, umgeschaltet erst durch Opcode 100
+  (`LISY_INIT`); dessen Antwort nennt den Grund (0 gewährt / 1 DIP aus / 2 Anforderung fehlt).
+  Fällt eine Bedingung weg (DIP wirkt fortlaufend!) oder kommt **2 s kein Byte** (Totmann,
+  Reset bei JEDEM Byte, nicht nur beim Watchdog-Opcode) → Kontrolle sofort weg, alle Sollwerte
+  gelöscht.
+- **Übernahmemodell: CPU wird angehalten.** `reset_l_stable <= boot_phase(2) and not fa_ctrl_active`.
+  **Neu und wichtig: `io_live <= reset_l_stable or fa_ctrl_active`** — Schaltermatrix,
+  Lampenmatrix, `sound.vhd` und `solenoids_enable` hängen jetzt an `io_live`, NICHT mehr an
+  `reset_l_stable`. Sonst stünde bei angehaltener CPU die ganze Peripherie und nichts wäre
+  testbar (der 74HCT540 bliebe gesperrt = keine Spule). Beim Loslassen startet das Spiel neu.
+  `LED_D4` zeigt `fa_ctrl_active`.
+- **`GRP_OF` ist nach `rtl/common/lamp_map_pkg.vhd` gewandert**, weil das Top-Level die Lampen-
+  zuordnung jetzt auch braucht — dort **umgekehrt**. Die Umkehrtabelle `FA_LAMP_BIT` wird zur
+  Elaborationszeit aus `GRP_OF` **berechnet**; es gibt bewusst keine zweite Tabelle, die driften
+  könnte. GRP_OF bleibt die eine HW-Tuning-Stelle.
+- **Ressourcen:** Comb 2433 → **4326**, Reg 935 → **1434**, LEfit 2545 → **4402 (70 %)**,
+  Slack sogar besser (2,304 → 3,142 ns). **BRAM unverändert 202752** — das war das
+  Abnahmekriterium, denn mit 73 % ist der Speicher die knappe Ressource. **Kein neuer Pin**
+  (85/89). Das Modul selbst: 1700 ALUTs / 499 Reg.
+- **`MAX_*`-Generics knapp setzen!** Sie bestimmen die Vektorbreiten; „großzügig statt genau"
+  (128/32/128/8 statt 84/22/80/6) hat hier **~900 LEs** gekostet.
+- **Wiederverwendbar:** `rtl/fa_control/` ist self-contained (Paket + nandland-UART + Slave),
+  VHDL-93, alle Anlagengrößen als Generics. Port nach WillFA/GottFA = Ordner kopieren + vier
+  Zeilen Dateiliste + Instanz. **Achtung WillFA7:** dort liegen `uart_rx`/`uart_tx` schon unter
+  `rtl/serial_api/` — nicht doppelt eintragen.
+
 ## Bekannte HW-Feintuning-Stellen
 - **Switch-Matrix-Codierung — schaltplan-verifiziert (2026-07-02, `switch_matrix.vhd`):** aus
   `../doc/AtariFA_07_Final_Switches_SCH.PDF` (Eltern-Ordner `N:\Projekte\FPGA Atari\doc\`, Geschwister: Main/Lamps/Solenoids). 74HCT540 invertiert alle Ausgänge; E11a 74LS42-Spalten-Map
@@ -411,7 +467,8 @@ Atari-Verhalten). Bisher nur **Airborne** (`game_idx=2`). SW-Version **0.0.9**.
   High-Nibble (7..4) → ungerader/linker Index** (LSD rechts) für alle 4 Player-Scores. **NICHT** getauscht:
   Player-up-LED (Index 6), **Status/Credit-Ball** (0x1C/1D — dort ist die HW-Darstellung bereits korrekt,
   Status-Konvention weicht also vom Score ab) und **Boot-Info/Version** (unberührt, bleibt korrekt).
-- **Lamp-Matrix-Zuordnung** (`lamp_matrix.vhd`, s. Abschnitt „Lamps"): 595-Gruppe↔(Latch,Bit) steht als
+- **Lamp-Matrix-Zuordnung** (seit SW 0.1.3 in `rtl/common/lamp_map_pkg.vhd`, s. Abschnitt „Lamps"):
+  595-Gruppe↔(Latch,Bit) steht als
   Tabelle **`GRP_OF`** im Code = Abschrift von `AtariFA_Lamps.xlsx`, Mappe **`aktuell`** (Mappe `alt`
   = Vorgängerstand mit der alten Formel). **HW-tunbar am Prototyp NUR dort:** `GRP_OF` (Gruppen-
   zuordnung), `STROBE_ENC` (2-Bit-Code ↔ SA/SB/SC/SD + 540-Invertierung), `offset[3:2]=Latch`/
@@ -436,6 +493,8 @@ Atari-Verhalten). Bisher nur **Airborne** (`game_idx=2`). SW-Version **0.0.9**.
 - **Lamp-Refresh-Analyse (EN): `docs/Lamp_Refresh_Analysis.md`** (Original-Refresh = DMA-Hardware, NICHT Software;
   Vorglühen = HW-Artefakt der 20-V-Matrix, kein SW-„on-phase injection"; belegt via PinMAME `ram_w` +
   Airborne-ROM-Disasm + NMI-ISR; LEDs auf AtariFA sicher, Refresh ändert nur Duty/Timing, nicht Spannung)
+- **FA-Control-Schnittstelle: `docs/FA_Control_Interface.md`** (LISY-Protokoll, Nummerierung von
+  Lampen/Spulen/Schaltern/Displays, Übernahmemodell, Übernahme in andere FPGA-Projekte, Inbetriebnahme)
 - **Boot-Sprachausgabe: `docs/Speech_Boot_Feasibility.md`** (Codec-Analyse + Umsetzung PCM 8 kHz)
 - **FRAM-Persistenz: `docs/FRAM_Persistence.md`** (Credits/Highscore-Save/Restore, RE-Adressen Airborne,
   Bus-Injection-Mechanik, Atari-Attract-Anzeigeverhalten, zurückgestellte Score-Anzeige)

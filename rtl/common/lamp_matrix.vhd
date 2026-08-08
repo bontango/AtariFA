@@ -36,6 +36,10 @@
 --
 -- HW-TUNBAR (bei falscher Lampe/Strobe am Prototyp NUR die markierten Stellen aendern):
 --   * GRP_OF     : (Latch L, Bit b) -> 595-Ausgang N; direkte Abschrift der Excel-Mappe 'aktuell'.
+--                  Steht seit 08.2026 in rtl/common/lamp_map_pkg.vhd, weil auch das Top-Level
+--                  die Zuordnung braucht (FA-Control schaltet Lampen einzeln, s. rtl/fa_control).
+--                  Die dortige Umkehrtabelle FA_LAMP_BIT wird daraus berechnet und faellt
+--                  automatisch mit -- GRP_OF bleibt die EINE Stelle zum Tunen.
 --   * STROBE_ENC : Strobe-Index s (0..3) -> 2-Bit-Code (Aux-Decoder-Permutation; die
 --                  74HCT540-Invertierung von aux_lamp_strobe passiert im Top).
 --   * Latch=offset[3:2]/Strobe=offset[1:0] : Annahme aus 9334-Adressierung (unten im idx).
@@ -44,6 +48,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
+use work.lamp_map_pkg.all;        -- GRP_OF (HW-TUNBAR)
 
 entity lamp_matrix is
 	generic (
@@ -73,16 +78,8 @@ architecture rtl of lamp_matrix is
 	signal div_cnt   : integer range 0 to SHIFT_DIV := 0;
 	signal tick      : std_logic := '0';
 
-	-- HW-TUNBAR: 595-Ausgang (Gruppe) N je (Latch L, Bit b) -- aus doc/AtariFA_Lamps.xlsx,
-	-- Mappe 'aktuell'. Index = L*6 + b (L: 0=0x1000, 1=0x1004, 2=0x1008, 3=0x100C);
-	-- Wert 0 = Kombination unbenutzt. Alle Werte 1..21 kommen genau einmal vor.
-	type grp_t is array(0 to 23) of integer range 0 to 21;
-	constant GRP_OF : grp_t := (
-		--  b=0  b=1  b=2  b=3  b=4  b=5
-		      6,   3,  14,  17,  20,   9,   -- L=0 : 0x1000
-		      7,   4,  15,  18,   1,   0,   -- L=1 : 0x1004
-		      8,   5,  16,  10,  12,   0,   -- L=2 : 0x1008
-		      2,  13,  19,  21,  11,   0);  -- L=3 : 0x100C
+	-- GRP_OF (595-Ausgang je Latch/Bit) kommt aus work.lamp_map_pkg -- dort steht auch
+	-- die daraus berechnete Umkehrung, die das Top-Level fuer FA-Control braucht.
 
 	-- HW-TUNBAR: Strobe-Index s (0..3) -> 2-Bit-Code an strobe_sel (Aux-Board dekodiert 1-of-4).
 	type enc_t is array(0 to 3) of std_logic_vector(1 downto 0);

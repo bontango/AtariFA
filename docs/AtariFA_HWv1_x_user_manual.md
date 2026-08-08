@@ -4,7 +4,7 @@
 
 **Hardware version v1.x**
 
-**Software Version 0.1.2**
+**Software Version 0.1.3**
 
 **user manual**
 
@@ -29,7 +29,8 @@ v1.0 06.08.2026
   - [4.1. The 4 switch bank: game select and free play](#41-the-4-switch-bank-game-select-and-free-play)
   - [4.2. The 6 switch bank: options](#42-the-6-switch-bank-options)
     - [4.2.1. Option 3 -> where the sound comes out](#421-option-3---where-the-sound-comes-out)
-    - [4.2.2. Options 1, 2, 4, 5, 6 -> reserved](#422-options-1-2-4-5-6---reserved)
+    - [4.2.2. Option 4 -> let FA-Control take over](#422-option-4---let-fa-control-take-over)
+    - [4.2.3. Options 1, 2, 5, 6 -> reserved](#423-options-1-2-5-6---reserved)
   - [4.3. Six of the ten DIPs are read once, at boot](#43-six-of-the-ten-dips-are-read-once-at-boot)
 - [5. Boot sequence](#5-boot-sequence)
   - [5.1. Phase 1: reading the DIP switches](#51-phase-1-reading-the-dip-switches)
@@ -44,10 +45,16 @@ v1.0 06.08.2026
   - [8.1. What is rebuilt](#81-what-is-rebuilt)
   - [8.2. The two audio paths](#82-the-two-audio-paths)
   - [8.3. The boot announcement](#83-the-boot-announcement)
-- [9. The status LEDs](#9-the-status-leds)
-- [10. Programming the FPGA](#10-programming-the-fpga)
-- [11. Board variants](#11-board-variants)
-- [12. Not implemented yet](#12-not-implemented-yet)
+- [9. The FA-Control interface (ESP32)](#9-the-fa-control-interface-esp32)
+  - [9.1. The permission: option 4](#91-the-permission-option-4)
+  - [9.2. What happens while it has control](#92-what-happens-while-it-has-control)
+  - [9.3. How control is handed back](#93-how-control-is-handed-back)
+  - [9.4. What the web interface learns from the board](#94-what-the-web-interface-learns-from-the-board)
+  - [9.5. Connecting it](#95-connecting-it)
+- [10. The status LEDs](#10-the-status-leds)
+- [11. Programming the FPGA](#11-programming-the-fpga)
+- [12. Board variants](#12-board-variants)
+- [13. Not implemented yet](#13-not-implemented-yet)
 - [Appendix A 'game select'](#appendix-a-game-select)
 - [Appendix B Quick reference](#appendix-b-quick-reference)
 
@@ -81,7 +88,7 @@ That is all. No SD card, no card reader, no battery.
 
 1.  Download the latest FPGA program for **AtariFA** from lisy.dev
 
-2.  Program the FPGA (chapter 10)
+2.  Program the FPGA (chapter 11)
 
 3.  Set 'game select' according to your pinball (Appendix A)
 
@@ -124,7 +131,7 @@ The box connectors also carry the four lamp strobes, made on the board by four P
 
 The board has its own fuse holders for the solenoid supply. Use **2 A slow blow**.
 
-Two of the twenty solenoid drivers, Q14 and Q18, are not fitted - depending on the game those outputs do not exist on the original either. The FPGA holds them permanently off.
+Two of the twenty solenoid drivers, Q14 and Q18, are not fitted - depending on the game those outputs do not exist on the original either. There is simply no MOSFET there, and the game cannot drive them anyway.
 
 ## 4. Dip Switch Settings
 
@@ -154,25 +161,31 @@ Default setting is **all 'OFF'** - that is the right setting for a standard mach
 | Dip1 | reserved                                              | at boot     |
 | Dip2 | reserved                                              | at boot     |
 | Dip3 | **sound: OFF = Auxiliary Board, ON = on-board amplifier** | continuously |
-| Dip4 | reserved                                              | continuously |
+| Dip4 | **let FA-Control take over** - ON = allowed            | continuously |
 | Dip5 | reserved                                              | continuously |
 | Dip6 | reserved                                              | continuously |
 
 #### 4.2.1. Option 3 -> where the sound comes out
 
-This is the only option switch that does something today.
-
 - **'OFF'** - **the original path.** AtariFA feeds the Atari Auxiliary Board exactly as the original MPU does: the four audio lines and the four volume latch lines. The sound is then made by the Auxiliary Board and goes to the amplifier of your machine. **This is the setting for an unmodified pinball.**
 
 - **'ON'** - **the on-board path.** The sound is generated inside the FPGA, filtered and sent to the small amplifier (TDA7267) on the AtariFA PCB. Use this on the bench, or in a machine whose Auxiliary Board audio section is defective. The Auxiliary Board outputs are held in their idle state while this is selected.
 
-Unlike the other five, **this switch may be changed while the game is running** - it is read continuously. The sound moves over immediately.
+**This switch may be changed while the game is running** - it is read continuously. The sound moves over immediately.
 
-#### 4.2.2. Options 1, 2, 4, 5, 6 -> reserved
+#### 4.2.2. Option 4 -> let FA-Control take over
+
+- **'OFF'** - **nobody interferes.** A plugged in FA-Control module can watch the displays and switches, but it cannot switch anything. This is the setting for normal play, and it is the default.
+
+- **'ON'** - **FA-Control may drive the machine.** Only then does AtariFA hand over control when asked, and the game is stopped while it does. Everything else is in chapter 9.
+
+This switch is read continuously as well: turning it 'OFF' while FA-Control is in charge takes control away **immediately** and restarts the game. That is the emergency stop for a test tool that has locked up.
+
+#### 4.2.3. Options 1, 2, 5, 6 -> reserved
 
 Not used, leave them 'OFF'. They are wired, they are shown on the info display, and they are there for later software versions.
 
-Option 1 was used by an experimental credit/high score save feature that is currently on hold, see chapter 12. It has no effect in this software version.
+Option 1 was used by an experimental credit/high score save feature that is currently on hold, see chapter 13. It has no effect in this software version.
 
 ### 4.3. Six of the ten DIPs are read once, at boot
 
@@ -206,7 +219,7 @@ Everything stands right aligned, the unused digits stay dark.
 
 Example: player 1 showing `012`, player 2 showing `02`, player 3 showing `000000`, player 4 showing `0` is software 0.1.2 on the standard board, running Airborne Avenger, no options set, no free play.
 
-**The leading digit of the version tells you which board variant you have**, see chapter 11. `0` is the standard AtariFA board.
+**The leading digit of the version tells you which board variant you have**, see chapter 12. `0` is the standard AtariFA board.
 
 About two seconds into this window the board says its name over the on-board amplifier - see chapter 8.3.
 
@@ -240,7 +253,7 @@ Press the test switch - either the one in the coin door or the one on the board.
 
 When the machine is switched off, credits and scores are gone. **The original Atari Generation 1 MPU behaves the same way** - unlike later machines it has no battery buffered memory at all.
 
-The PCB does carry a FRAM chip to change that, but the feature is not finished and is switched off in this software version. See chapter 12.
+The PCB does carry a FRAM chip to change that, but the feature is not finished and is switched off in this software version. See chapter 13.
 
 If you want the machine to start without needing coins, use free play - chapter 7.
 
@@ -280,7 +293,58 @@ It always comes out of the **on-board amplifier**, regardless of option 3 - it i
 
 If you hear nothing here, check the on-board amplifier and its speaker connection before you look anywhere else.
 
-## 9. The status LEDs
+## 9. The FA-Control interface (ESP32)
+
+The board has a socket prepared for an **ESP32-C3 Super Mini**. It runs **FA-Control** - a small firmware that opens a WLAN and serves a test interface in your browser: switch every lamp individually, pulse every solenoid, watch all switches live, write digits to the displays, play sounds.
+
+This is a **tool for the bench and for fault finding**, not an accessory for normal play. If you plug nothing in, you will never notice this interface - the board behaves exactly as it does without.
+
+> This feature is new in software version 0.1.3 and has **not been tried on a real machine yet.**
+
+### 9.1. The permission: option 4
+
+A test tool must not be able to interfere with a running game unasked. So **two things** have to come together:
+
+1. The ESP32 module actively asks ("I would like to take over").
+2. **Option DIP 4 is ON.**
+
+With option 4 OFF, the web interface says in plain words *"control refused - set option DIP 4 to ON"*, and the game carries on undisturbed. Reading is still allowed: you can follow switch states during a running game without giving anything up.
+
+### 9.2. What happens while it has control
+
+**The game is stopped.** The processor is held in reset, and everything - lamps, solenoids, displays, sound - now comes from the web interface. It has to work that way: if the game kept running it would overwrite every lamp you set by hand within a few milliseconds.
+
+**The game then starts over.** It cannot be paused and resumed. A game in progress is lost, so only take control in attract mode or on the bench.
+
+### 9.3. How control is handed back
+
+Three ways, and all three make every output drop and the game restart immediately:
+
+- **In the web interface**, press "hand back control".
+- **Set option DIP 4 to OFF.** The switch is read continuously - this is the emergency stop.
+- **Do nothing.** If the module goes quiet for two seconds, AtariFA hands back by itself. Pull the USB cable of the ESP32 and two seconds later you have an ordinary pinball again.
+
+### 9.4. What the web interface learns from the board
+
+On connecting, FA-Control asks the board what it is made of and configures itself - nothing has to be typed in. AtariFA answers:
+
+| | |
+|---|---|
+| Identification | `AtariFA` |
+| Software version | the same one the info display shows, e.g. `0.1.3` |
+| Lamps | 84 |
+| Solenoids | 22 (20 playfield + coin counter + lockout coil) |
+| Switches | 80 |
+| Sounds | 16 |
+| Displays | 5 (status with 4 digits, four players with 6 each) |
+
+The numbering follows the board: switches carry the same number as in the game's self test, and solenoids 0 to 19 are the twenty playfield outputs in schematic order.
+
+### 9.5. Connecting it
+
+The ESP32 module simply plugs in; there is nothing to solder. The board powers it. For the initial WLAN setup FA-Control opens its own access point on first start - see the FA-Control documentation for that.
+
+## 10. The status LEDs
 
 The board has three status LEDs, wired in parallel to the LEDs of the piggy-back board. They are the fastest diagnosis without a logic analyser.
 
@@ -294,9 +358,9 @@ Read them together:
 
 - **D2 and D3 blinking** - board and game are alive. This is what you want to see.
 - **D3 blinking, D2 steady** - the hardware runs but the CPU is not executing. Check game select and the reset switch.
-- **Nothing blinking at all** - the FPGA is not configured or has no clock. Reprogram it (chapter 10).
+- **Nothing blinking at all** - the FPGA is not configured or has no clock. Reprogram it (chapter 11).
 
-## 10. Programming the FPGA
+## 11. Programming the FPGA
 
 Everything you need to get the software onto the board is described on my website, and it is kept up to date there:
 
@@ -304,11 +368,11 @@ Everything you need to get the software onto the board is described on my websit
 
 You will find there the latest FPGA program for download, which programmer software you need, how to install the driver for the USB Blaster, and how to program the FPGA.
 
-**Make sure you take the AtariFA version** and, if there is more than one, the one for your board variant - see chapter 11. The board variant is the leading digit of the version on the info display.
+**Make sure you take the AtariFA version** and, if there is more than one, the one for your board variant - see chapter 12. The board variant is the leading digit of the version on the info display.
 
 There is no SD card image for AtariFA. The game roms are part of the FPGA program.
 
-## 11. Board variants
+## 12. Board variants
 
 The same design runs on two piggy-back boards. The FPGA program is **not** interchangeable between them - the pin assignment differs.
 
@@ -323,12 +387,11 @@ Apart from the pin assignment the two are identical, with two small differences 
 
 **The `dev_open` variant has not been tested on a machine.**
 
-## 12. Not implemented yet
+## 13. Not implemented yet
 
 These are on the PCB, wired, and not used by this software version. They do nothing, and they do no harm - the FPGA holds all of them in a safe idle state.
 
 - **FRAM (credits and high scores over a power cycle).** The chip is fitted and the low level driver works, but making it reliable across all five games turned out to need more reverse engineering of the game roms than expected. The feature is switched off; option switch 1, which used to control it, has no effect. Chapter 6.3.
-- **The ESP32-C3 interface.** The connector and the serial lines exist and are meant to carry a web interface for testing later on.
 - **The MP3 background player.** A second, independent audio path on the PCB. Not driven by this software version; it has nothing to do with the game sound of chapter 8.
 
 ## Appendix A 'game select'
@@ -357,12 +420,14 @@ bank of 4                          bank of 6
  1  game select bit 0  (+1)         1  reserved              read at boot
  2  game select bit 1  (+2)         2  reserved              read at boot
  3  game select bit 2  (+4)         3  sound path            live
- 4  free play, ON = active          4  reserved              live
+ 4  free play, ON = active          4  FA-Control allowed    live
                                     5  reserved              live
  all four read at boot only         6  reserved              live
 ```
 
 **Sound path, option 3:** OFF = Auxiliary Board (standard) · ON = on-board amplifier
+
+**FA-Control, option 4:** OFF = nobody interferes (standard) · ON = the ESP32 test tool may drive the machine (chapter 9)
 
 **After changing a switch that is read at boot: power off, power on.**
 

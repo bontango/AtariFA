@@ -9,6 +9,14 @@
 set_global_assignment -name VHDL_FILE variant_pkg.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/version_pkg.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/display_pkg.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/common/lamp_map_pkg.vhd
+# FA-Control interface (ESP32-C3 with a web UI, N:\Projekte\FA_Control). Self contained
+# folder on purpose: porting the interface to WillFA/GottFA is "copy rtl/fa_control/,
+# add these four lines, instantiate". Nothing in there is Atari specific.
+set_global_assignment -name VHDL_FILE ../../rtl/fa_control/fa_control_pkg.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/fa_control/uart_rx.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/fa_control/uart_tx.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/fa_control/fa_control.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/read_the_dips.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/switch_matrix.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/solenoid_driver.vhd
