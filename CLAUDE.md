@@ -392,7 +392,7 @@ Atari-Verhalten). Bisher nur **Airborne** (`game_idx=2`). SW-Version **0.0.9**.
 - **HW-Tuning-Hebel (`AtariFA.vhd`):** `DELAY_CLEAR`, `HALT_SETTLE`, `INJ_SCORES`, `INJ_DEBUG_LED`
   (LED_D1 = `injected` statt `save_seen`).
 
-## FA-Control-Schnittstelle (rtl/fa_control, 2026-08-08, SW 0.1.3, **noch nicht HW-getestet**)
+## FA-Control-Schnittstelle (rtl/fa_control, 2026-08-08, SW 0.1.3, **HW-getestet OK**)
 LISY-Slave am ESP32-C3, Gegenstelle zu `N:\Projekte\FA_Control` (Weboberfläche zum Testen).
 **Ausführliche Doku: `docs/FA_Control_Interface.md`** — dort stehen Protokoll, Nummerierung,
 HW-Tuning-Stellen und die Inbetriebnahme-Reihenfolge.
@@ -410,7 +410,10 @@ HW-Tuning-Stellen und die Inbetriebnahme-Reihenfolge.
   (`LISY_INIT`); dessen Antwort nennt den Grund (0 gewährt / 1 DIP aus / 2 Anforderung fehlt).
   Fällt eine Bedingung weg (DIP wirkt fortlaufend!) oder kommt **2 s kein Byte** (Totmann,
   Reset bei JEDEM Byte, nicht nur beim Watchdog-Opcode) → Kontrolle sofort weg, alle Sollwerte
-  gelöscht.
+  gelöscht. **Der Totmann ist im Alltag nicht gezielt auslösbar:** der ESP hängt an den 5 V der
+  AtariFA und braucht kein USB-Kabel (ein „Kabel ziehen"-Test geht also nicht), und der Watchdog
+  läuft bei aktiver Kontrolle absichtlich unabhängig von der Einstellung in der Weboberfläche.
+  Denselben Rückfallpfad prüft man gefahrlos über **DIP 4 auf OFF**.
 - **Übernahmemodell: CPU wird angehalten.** `reset_l_stable <= boot_phase(2) and not fa_ctrl_active`.
   **Neu und wichtig: `io_live <= reset_l_stable or fa_ctrl_active`** — Schaltermatrix,
   Lampenmatrix, `sound.vhd` und `solenoids_enable` hängen jetzt an `io_live`, NICHT mehr an

@@ -299,7 +299,7 @@ The board has a socket prepared for an **ESP32-C3 Super Mini**. It runs **FA-Con
 
 This is a **tool for the bench and for fault finding**, not an accessory for normal play. If you plug nothing in, you will never notice this interface - the board behaves exactly as it does without.
 
-> This feature is new in software version 0.1.3 and has **not been tried on a real machine yet.**
+> This feature is new in software version 0.1.3 and has been tried on a real machine.
 
 ### 9.1. The permission: option 4
 
@@ -322,7 +322,7 @@ Three ways, and all three make every output drop and the game restart immediatel
 
 - **In the web interface**, press "hand back control".
 - **Set option DIP 4 to OFF.** The switch is read continuously - this is the emergency stop.
-- **Do nothing.** If the module goes quiet for two seconds, AtariFA hands back by itself. Pull the USB cable of the ESP32 and two seconds later you have an ordinary pinball again.
+- **Do nothing.** If the module goes quiet for two seconds, AtariFA hands back by itself. That is the safety net for a module that locks up, reboots or loses contact - the machine does not stay stuck in the handover, it comes back as an ordinary pinball.
 
 ### 9.4. What the web interface learns from the board
 
@@ -342,7 +342,7 @@ The numbering follows the board: switches carry the same number as in the game's
 
 ### 9.5. Connecting it
 
-The ESP32 module simply plugs in; there is nothing to solder. The board powers it. For the initial WLAN setup FA-Control opens its own access point on first start - see the FA-Control documentation for that.
+The ESP32 module simply plugs in; there is nothing to solder. The board powers it - **no USB cable is needed in normal operation.** You only plug one in to load the FA-Control firmware or to read the boot log. For the initial WLAN setup FA-Control opens its own access point on first start - see the FA-Control documentation for that.
 
 ## 10. The status LEDs
 

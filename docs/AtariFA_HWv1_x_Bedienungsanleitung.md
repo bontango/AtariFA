@@ -298,7 +298,7 @@ Auf der Platine ist ein Steckplatz für ein **ESP32-C3 Super Mini** vorbereitet.
 
 Das ist ein **Werkzeug für die Werkbank und die Fehlersuche**, kein Zubehör für den Spielbetrieb. Wer nichts einsteckt, merkt von dieser Schnittstelle nichts — die Platine verhält sich exakt so wie ohne.
 
-> Diese Funktion ist neu in Software-Version 0.1.3 und **noch nicht an einem echten Automaten erprobt.**
+> Diese Funktion ist neu in Software-Version 0.1.3 und am Automaten erprobt.
 
 ### 9.1. Die Freigabe: Option 4
 
@@ -321,7 +321,7 @@ Auf drei Wegen, und alle drei führen sofort dazu, dass alle Ausgänge abfallen 
 
 - **In der Weboberfläche** auf „Kontrolle zurückgeben".
 - **Option-DIP 4 auf OFF stellen.** Der Schalter wird fortlaufend gelesen — das ist der Not-Aus.
-- **Nichts tun.** Meldet sich das Modul zwei Sekunden lang nicht mehr, gibt AtariFA von selbst zurück. Wer das USB-Kabel des ESP32 zieht, hat also nach zwei Sekunden wieder einen normalen Flipper.
+- **Nichts tun.** Meldet sich das Modul zwei Sekunden lang nicht mehr, gibt AtariFA von selbst zurück. Das ist die Sicherung für den Fall, dass das Modul sich aufhängt, neu startet oder den Kontakt verliert — der Automat bleibt dann nicht in der Übernahme hängen, sondern läuft wieder als Flipper an.
 
 ### 9.4. Was die Weboberfläche von der Platine erfährt
 
@@ -341,7 +341,7 @@ Die Nummerierung folgt dabei der Platine: Schalter tragen dieselbe Nummer wie im
 
 ### 9.5. Anschluss
 
-Das ESP32-Modul wird nur aufgesteckt; es sind keine Kabel zu löten. Versorgt wird es von der Platine. Für die Ersteinrichtung des WLAN macht FA-Control beim ersten Start einen eigenen Zugangspunkt auf — Näheres in der Anleitung von FA-Control selbst.
+Das ESP32-Modul wird nur aufgesteckt; es sind keine Kabel zu löten. Versorgt wird es von der Platine — **im Betrieb wird kein USB-Kabel gebraucht.** Eines anzustecken ist nur zum Aufspielen der FA-Control-Firmware oder zum Mitlesen des Boot-Logs nötig. Für die Ersteinrichtung des WLAN macht FA-Control beim ersten Start einen eigenen Zugangspunkt auf — Näheres in der Anleitung von FA-Control selbst.
 
 ## 10. Die Status-LEDs
 

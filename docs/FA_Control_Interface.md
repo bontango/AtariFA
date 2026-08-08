@@ -2,8 +2,8 @@
 
 Stand 2026-08-08, AtariFA SW 0.1.3, Modul `rtl/fa_control/`.
 
-**Noch nicht an Hardware getestet.** Der Abschnitt „Inbetriebnahme" unten sagt, in welcher
-Reihenfolge geprüft werden sollte.
+**Am Prototyp getestet (2026-08-08), funktioniert.** Der Abschnitt „Inbetriebnahme" unten führt
+die Schritte auf, in der Reihenfolge, in der sie geprüft wurden.
 
 ## 1. Wozu
 
@@ -66,10 +66,16 @@ woran es lag:
 
 Die Kontrolle endet **sofort**, wenn eine der beiden Bedingungen wegfällt (der DIP-Schalter wirkt
 also auch im laufenden Betrieb), und außerdem, wenn **2 Sekunden lang kein einziges Byte** mehr
-ankam. Das ist die Totmannschaltung: USB-Kabel des ESP ziehen, und die Platine läuft von selbst
-wieder als Flipper an. FA_Control sendet dafür alle 500 ms den Watchdog-Befehl 0x65 — der
-Zähler wird aber von **jedem** empfangenen Byte zurückgesetzt, nicht nur vom Watchdog, damit ein
-in der Weboberfläche abgeschalteter Watchdog die Verbindung nicht kappt.
+ankam. Das ist die Totmannschaltung — sie greift, wenn der Host verstummt: Modul aus der Fassung
+gezogen, ESP abgestürzt oder neu gestartet, Kontaktfehler auf der seriellen Leitung. Danach läuft
+die Platine von selbst wieder als Flipper an. FA_Control sendet dafür alle 500 ms den
+Watchdog-Befehl 0x65 — der Zähler wird aber von **jedem** empfangenen Byte zurückgesetzt, nicht
+nur vom Watchdog, damit ein in der Weboberfläche abgeschalteter Watchdog die Verbindung nicht
+kappt.
+
+**Nicht durch Stromlosmachen des ESP provozierbar:** das Modul wird von AtariFA mit 5 V versorgt
+und braucht kein USB-Kabel. Wer den Automaten ausschaltet, nimmt beiden Seiten gleichzeitig den
+Strom — dabei ist nichts zu beobachten.
 
 In allen drei Fällen (Bedingung weg, Timeout, Reset) werden alle Sollwerte gelöscht: Lampen aus,
 Spulen aus, Ton aus, Displays leer.
@@ -233,7 +239,8 @@ wechselt nur die Richtung.
 
 ## 9. Inbetriebnahme
 
-In dieser Reihenfolge, weil jeder Schritt den nächsten absichert:
+**Am Prototyp durchlaufen und bestanden (2026-08-08, SW 0.1.3).** Die Reihenfolge ist so gewählt,
+dass jeder Schritt den nächsten absichert:
 
 1. **Ohne ESP.** Alle fünf Spiele booten und spielen wie mit SW 0.1.2. `ESP32_ctrl_req` liegt
    über den Weak-Pull-Up auf high, es ändert sich also nichts. Das ist der Regressionstest.
@@ -246,9 +253,24 @@ In dieser Reihenfolge, weil jeder Schritt den nächsten absichert:
    Anzeigen bleiben an.
 4. **Einzelne Lampe, Spule, Display schalten; Schalter am Spielfeld betätigen** und im Browser
    verfolgen.
-5. **USB-Kabel des ESP ziehen.** Nach ~2 s müssen alle Ausgänge abfallen und das Spiel neu
-   anlaufen.
-6. **DIP 4 im Betrieb auf OFF.** Die Übernahme muss sofort enden.
+5. **DIP 4 im Betrieb auf OFF.** Die Übernahme muss sofort enden, das Spiel neu anlaufen.
+
+### Die Totmannschaltung lässt sich so nicht nebenbei prüfen
+
+Hier stand ursprünglich „USB-Kabel des ESP ziehen". **Das geht nicht:** das Modul wird von
+AtariFA mit 5 V versorgt und braucht überhaupt kein USB-Kabel. Ein steckendes Kabel ist der
+Ausnahmefall (Flashen, serielles Log), nicht der Normalbetrieb.
+
+Über die Weboberfläche geht es ebenfalls nicht: solange FA-Control die Kontrolle hat, hält
+`fa_connect.c` den Watchdog **absichtlich** unabhängig von der Einstellung am Laufen — er ist die
+Sicherung selbst und darf sich nicht wegklicken lassen. Und der Zähler im FPGA wird von *jedem*
+empfangenen Byte zurückgesetzt, nicht nur vom Watchdog-Opcode.
+
+Wer sie trotzdem gezielt auslösen will: **das ESP-Modul im laufenden Betrieb aus der Fassung
+ziehen.** Genau das ist der Fall, gegen den sie schützt — Modul lose, ESP abgestürzt oder im
+Neustart, Kontaktfehler auf der seriellen Leitung. Für den Alltag reicht Schritt 5: DIP 4 auf OFF
+prüft denselben Rückfallpfad (Kontrolle weg, alle Ausgänge aus, Spiel läuft neu an), nur über
+eine Bedingung, die man gefahrlos schalten kann.
 
 ### Wenn etwas nicht stimmt
 
