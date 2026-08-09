@@ -4,7 +4,7 @@
 
 **Hardware version v1.x**
 
-**Software Version 0.1.3**
+**Software Version 0.1.4**
 
 **user manual**
 
@@ -331,7 +331,7 @@ On connecting, FA-Control asks the board what it is made of and configures itsel
 | | |
 |---|---|
 | Identification | `AtariFA` |
-| Software version | the same one the info display shows, e.g. `0.1.3` |
+| Software version | the same one the info display shows, e.g. `0.1.4` |
 | Lamps | 84 |
 | Solenoids | 22 (20 playfield + coin counter + lockout coil) |
 | Switches | 80 |

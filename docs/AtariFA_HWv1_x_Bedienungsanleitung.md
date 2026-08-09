@@ -4,7 +4,7 @@
 
 **Hardware-Version v1.x**
 
-**Software-Version 0.1.3**
+**Software-Version 0.1.4**
 
 **Bedienungsanleitung**
 
@@ -330,7 +330,7 @@ Beim Verbinden fragt FA-Control die Ausstattung ab und stellt sich selbst darauf
 | | |
 |---|---|
 | Kennung | `AtariFA` |
-| Software-Version | dieselbe wie auf der Info-Anzeige, z. B. `0.1.3` |
+| Software-Version | dieselbe wie auf der Info-Anzeige, z. B. `0.1.4` |
 | Lampen | 84 |
 | Spulen | 22 (20 Spielfeld + Münzzähler + Sperrspule) |
 | Schalter | 80 |
