@@ -46,7 +46,8 @@ zurückgesetzt werden musste. `gen_qsf.ps1 -Check` zeigt den Unterschied, ohne z
    Elaborationsfehler und vergleicht schon hier Comb/Reg/Memory gegen die Baseline.
 3. `scripts\check.ps1 -Fit` — Fitter und Timing dazu. **Comb/Register/Memory müssen exakt
    stimmen**, sonst ist etwas anderes passiert als beabsichtigt; die LE-Zahl des Fitters
-   ist nur Information (sie schwankt mit der Packung, siehe `VARIANTEN.md`).
+   ist nur Information — sie schwankt schon dann, wenn sich die Packung ändert (ein
+   einzelner zusätzlicher `VIRTUAL_PIN` genügt).
 4. `scripts\build.ps1 cyclone_10_pcb` → `.jic` flashen → auf der Platine testen.
 5. Version in `rtl/common/version_pkg.vhd` hochziehen.
 6. `scripts\release.ps1 -Note "..."` → alle Varianten bauen, nach `bin/` kopieren,

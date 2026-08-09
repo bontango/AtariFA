@@ -29,6 +29,14 @@ greybox_tmp/
 # Build/verification logs
 *.log
 
+# Internal working notes - they stay on the workstation, not in the public repo.
+# CLAUDE.md is the context file for the assistant, PLAN_Zielstruktur.md documents why
+# the source tree looks the way it does, VARIANTEN.md tracks which board variant has
+# actually been on hardware. How to work in this tree is public: docs/WORKFLOW.md.
+CLAUDE.md
+PLAN_Zielstruktur.md
+VARIANTEN.md
+
 # Windows junk
 Thumbs.db
 desktop.ini

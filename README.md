@@ -59,7 +59,7 @@ In German: [`docs/AtariFA_HWv1_x_Bedienungsanleitung.md`](docs/AtariFA_HWv1_x_Be
 Same chapter numbering, so a hint like "see chapter 4.3" fits both.
 
 Everything else in `docs/` is development material: measurements, schematic extracts and the
-analyses behind individual design decisions. `WORKFLOW.md` and `VARIANTEN.md` are for working
+analyses behind individual design decisions. [`docs/WORKFLOW.md`](docs/WORKFLOW.md) is for working
 on the source, not for using the board.
 
 ## Build
