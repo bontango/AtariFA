@@ -44,6 +44,13 @@ package lamp_map_pkg is
 		      8,   5,  16,  10,  12,   0,   -- L=2 : 0x1008
 		      2,  13,  19,  21,  11,   0);  -- L=3 : 0x100C
 
+	-- HW-TUNBAR: Strobe-Index s (0..3) -> 2-Bit-Code an strobe_sel (Aux-Board dekodiert 1-of-4).
+	-- Stand frueher in der Architecture von lamp_matrix.vhd; liegt aus demselben Grund wie GRP_OF
+	-- jetzt hier: das Top-Level muss die Kodierung mitlesen koennen (Lampen-Trace DBG_MODE 4/5
+	-- rekonstruiert aus strobe_sel, welche Strobe-Phase gerade sichtbar ist).
+	type enc_t is array(0 to LAMP_STROBES - 1) of std_logic_vector(1 downto 0);
+	constant STROBE_ENC : enc_t := ("00", "01", "10", "11");
+
 	-- Umkehrung fuer die FA-Control-Schnittstelle.
 	-- Lampennummer n (0..83) = (Gruppe-1) * 4 + Strobe, also Gruppe 1 Strobe 0 = 0,
 	-- Gruppe 1 Strobe 3 = 3, Gruppe 2 Strobe 0 = 4, ... Gruppe 21 Strobe 3 = 83.

@@ -16,7 +16,10 @@
 the lamps at all — it only maintains a static on/off image in RAM `0x30–0x3F`.**
 
 Consequently, the forum claim ("the refresh routine injects on-phases for off-lamps") **does not apply
-to Atari Gen1** — there is no software refresh loop into which on-phases could be injected. The
+to Atari Gen1** — there is no software refresh loop into which on-phases could be injected.
+**Measured and confirmed on 2026-08-09** with a logic-analyser capture on the prototype: with a ball
+sitting in the shooter lane the CPU wrote to lamp RAM *not once in 25.7 s* while the matrix kept
+driving lit lamps — see §6. The
 "pre-glow" is therefore a **hardware artifact** of the original strobed 20 V lamp-matrix driver
 (leakage / half-select current), invisible on a hot incandescent filament but above an LED's turn-on
 threshold. AtariFA re-implements the driver cleanly (with hard blanking) and does not reproduce this
@@ -184,7 +187,204 @@ Two concerns raised, both resolved:
 
 ---
 
-## 6. Sources
+## 6. Measurement-based verification (8-channel logic analyser)
+
+Sections 1–4 are a paper argument (PinMAME model, ROM disassembly, architecture). This section
+turns it into a measurement on the AtariFA prototype. The lever: **AtariFA executes the very same
+game ROM as the original machine**, and the only way software can influence lamps at all is a write
+into RAM `0x30–0x3F`. Capture those writes without gaps and the software side is settled.
+
+`DBG_MODE = 4` in `AtariFA.vhd` provides the channel assignment. The whole trace logic lives inside
+the `gen_dbg4` / `gen_dbg5` generate blocks, so with the default `DBG_MODE = 0` nothing of it is
+elaborated and the synthesis baseline (`scripts/baseline.csv`) is unaffected.
+
+### 6.1 `DBG_MODE = 4` — long capture (main measurement)
+
+Designed for 500 kHz…1 MHz sampling over seconds to minutes on a simple 8-channel LA. The three
+event channels are stretched to ~1 ms (`DBG_STRETCH_CYCLES`) so they survive that sample raster;
+the matrix channels are raw (250 µs / ~10 µs, comfortably visible at 1 MHz).
+
+| Ch | Pin (`cyclone_10_pcb`) | Signal | What it proves |
+|---|---|---|---|
+| 0 | PIN_66 | `lamp_wr` — CPU write to RAM `0x30–0x3F`, stretched | Are there periodic lamp writes at all? No pulse over seconds ⇒ no software refresh, end of discussion. |
+| 1 | PIN_68 | `lamp_wr_chg` — written value differs from the stored byte | Separates a real change from re-writing the same value. |
+| 2 | PIN_75 | `lamp_wr_set` — at least one bit goes 0→1 | **The key channel.** The forum claim requires periodic 0→1 edges for lamps that are off. |
+| 3 | PIN_59 | `watch_state` — `lamp_state` bit of `DBG_WATCH_LAMP` | Software-side state of the chosen off-lamp: must stay flat `'0'`. |
+| 4 | PIN_55 | `watch_drive` — drive of that lamp (row bit AND strobe phase AND not blanked) | Shows *when* that lamp would be due, and catches short blips in channel 3. **Do not over-read it:** inside the FPGA it is derived from channel 3, so a flat channel 3 forces a flat channel 4. It cannot reveal a sneak path — there is none here (see §6.5). |
+| 5 | PIN_53 | `any_drive` — **any** of the 84 lamps currently driven | Counter-check against the negative-proof trap: ~250 µs pulse every ~1.04 ms (~24 % duty). Without it, channels 3/4 are worthless. Deliberately not tied to a named reference lamp, so the counter-check needs no lamp number and holds in any state where something is lit. |
+| 6 | PIN_51 | `lamp_oe_n` | The blanking window: high during shift/latch (~10 µs), low during dwell. |
+| 7 | PIN_49 | 244 Hz NMI pulse | Time base. If the lamp writes sit on this raster, it *is* a refresh. |
+
+`DBG_WATCH_LAMP` is a lamp number in the FA-Control numbering (`n = (595 group − 1) × 4 + strobe`,
+0…83, see `rtl/common/lamp_map_pkg.vhd`). It is the only lamp number the trace needs, and it only
+feeds channels 3/4 — the channels that decide the question (0/1/2/7) do not depend on it at all.
+Channel 3 tells you directly whether the chosen lamp really is off during the capture; if it blinks,
+pick another number and repeat.
+
+`cyclone_10_dev_open` only routes three debug lines; the measurement needs `cyclone_10_pcb`.
+
+**Deliberate detail:** channels 0–2 qualify on the RAM-decoded address
+(`ram_wren = '1' and cpu_addr(8 downto 4) = "00011"`), *not* on the sniffer condition
+`cpu_addr(15 downto 4) = x"003"`. That also catches writes through the RAM mirror
+(`0x1030–0x103F`), which the sniffer would miss — otherwise "no pulse" would not be a complete
+proof. (Channel 0 firing without a corresponding page-0 write would itself be a finding: the
+sniffer would then not see the lamps.)
+
+### 6.2 `DBG_MODE = 5` — detail capture (optional)
+
+`ser` / `srck` / `rck` / `oe_n` / `strobe_sel(1:0)` / `watch_drive` / `lamp_wr` (stretched to
+~200 ns). Shows one complete multiplex phase at 24 MHz. The same signals are also available at the
+board pins — `oe_595` (PIN_38), `clk_595` (PIN_39), `rclk_595` (PIN_42), `aux_lamp_strobe` — this
+mode merely bundles them on the LA header and adds the reconstructed lamp drive.
+
+### 6.3 Procedure
+
+1. Set `DBG_MODE := 4` plus `DBG_WATCH_LAMP`, run
+   `scripts\build.ps1 cyclone_10_pcb`, program the prototype.
+2. LA on PIN_66/68/75/59/55/53/51/49 + GND, 500 kHz…1 MHz, 30–60 s, free-run in attract mode.
+3. **Counter-check first:** channel 5 must show the ~250 µs / ~1.04 ms pattern and channel 6 the
+   blanking window. Without that the rest is not interpretable.
+4. Capture **during a game** and **in attract**, both are needed:
+   - *During a game* few lamps are lit, so a stable off-lamp is easy to pick. The quietest moment is
+     the ball sitting in the shooter lane right after start — play state, few lamps, no events.
+     This is the better capture for channels 3/4.
+   - *In attract* many lamps blink, which makes the lamp choice awkward — but this is the state the
+     forum claim is actually about, so it cannot be skipped. The lamp choice matters less here:
+     channels 0/1/2/7 (the ones that decide the question) do not depend on it at all, and channel 3
+     tells you directly whether the chosen watch lamp is really off — if it blinks, pick another
+     number and repeat.
+   - Optionally the lamp self-test as a contrast capture.
+5. Afterwards set `DBG_MODE` back to `0` and run `scripts\check.ps1 -Fit` against the baseline
+   before committing anything.
+
+### 6.4 Reading the result
+
+| Observation | Interpretation |
+|---|---|
+| **Ch 0 silent while ch 5 keeps pulsing** | Decisive. Lamps stay lit with *zero* CPU writes ⇒ the lit state comes from the static RAM image alone, there is no software refresh. |
+| Ch 3 and 4 flat `'0'` throughout while ch 5 pulses cleanly | The watch lamp stays off for the whole capture — and ch 5 proves the capture was live while it did |
+| Ch 0 periodic, but ch 1 pulses with it | Periodic writes that *change* the byte every time = an animation stepping on a timer, **not** a refresh. A refresh rewrites identical values, which would show as ch 0 without ch 1. |
+| Ch 0 periodic **and ch 1 mostly silent** | That would be a genuine rewrite loop — then look at ch 3 to see whether an off-lamp bit is part of it. |
+| Ch 3 shows short spikes during its off period, spaced on the ch 0 raster | **This document would be wrong** — that is the claimed keep-warm injection; revise sections 1–4. |
+
+Note that "ch 0 is periodic" alone proves nothing. Attract animations are stepped by a timer derived
+from the 244 Hz NMI, so their lamp writes are strictly periodic *by construction* — see the measured
+result in §6.6, where they land on exactly every 20th NMI. The refresh question is decided by ch 1
+(does the value actually change?) and by the in-play capture (are there any writes at all?).
+
+### 6.5 What this trace does *not* cover
+
+It settles the **software** side — the falsification of the forum claim — because the same ROM code
+runs here as on the original machine. It does **not** positively prove the driver-side cause of the
+original pre-glow. That would need either a capture on the original MPU's lamp driver signals
+(9334 latches / SA–SD strobes, looking for the row-data/strobe overlap) or a controlled counter-
+experiment: make the blanking in `lamp_matrix.vhd` switchable, drop it, and see whether the glow
+reappears on the real playfield.
+
+### 6.6 Results — measured 2026-08-09, `DBG_MODE = 4`, `DBG_WATCH_LAMP = 8`
+
+**Airborne Avenger** (`game_idx = 2`) on the prototype, SW 0.1.3. Two captures, Saleae-style edge
+export, 25.7 s (in play) and 27.5 s (attract).
+
+**Sanity of the capture itself** (identical in both, and matching the design):
+`oe_n` blanking 9.8 µs, dwell 250 µs ⇒ 260 µs per strobe phase, 1.04 ms per lamp frame;
+NMI period 4096.9 µs = **244.1 Hz**, exactly the value `Display_Timing.md` derives.
+
+| State | Ch 0 (writes) | Ch 1 (changed) | Ch 2 (0→1) | Ch 3 (lamp 8) | Ch 5 (any lamp) |
+|---|---|---|---|---|---|
+| **In play**, ball in shooter lane, 25.7 s | **none at all** | none | none | flat `'0'` | pulsing the whole time |
+| **Attract**, 27.5 s | 203 bursts, every **81.94 ms** | 203 — identical to ch 0 | 139 | clean 1.31 s on / 1.72 s off | pulsing |
+
+**Verdict: the forum claim is refuted; sections 1–4 hold.**
+
+1. *In play the CPU does not touch lamp RAM at all* — not one write in 25.7 s, while ch 5 shows the
+   matrix driving lit lamps throughout. A software refresh that is absent for 25 seconds is not a
+   refresh. The lit state comes from the static RAM image alone, exactly as sections 1–4 describe.
+2. *The attract writes are an animation, not a refresh.* They are strictly periodic —
+   81.94 ms = **exactly 20 NMI periods** (12.2 Hz), phase-locked to ch 7 with a spread of 0.001 —
+   which is what a timer-stepped attract animation looks like. What rules out a refresh is ch 1:
+   it fires on **every single** one of the 203 bursts, i.e. every write actually changes the byte.
+   A keep-warm refresh would rewrite identical values and leave ch 1 silent.
+3. *No on-phase injection for an off lamp.* Lamp 8's own bit is a clean square wave (9 pulses,
+   1.31 s on, 1.72 s off) with no short spikes during its off periods — no 81.94 ms blips, nothing.
+   Had the ROM injected keep-warm pulses, they would appear right here.
+
+The 0→1 events on ch 2 (139 of them) are other lamps in the animation being switched on; they are
+byte-wide events and carry no information about a specific lamp, which is what ch 3 is for.
+
+### 6.7 Overlap window — `DBG_MODE = 5`, 10 s at 24 MHz, attract
+
+The one thing §6.6 cannot answer: is there an instant at which the row data has already been
+switched while the column strobe still belongs to the previous phase *and the outputs are live*?
+That is the half-select mechanism the original's pre-glow is attributed to. Capture: 10.005 s,
+1.9 M edges, **38 503 complete strobe phases**.
+
+| Quantity | Measured | Design value |
+|---|---|---|
+| Blanking window (`oe_n` high) | 9.792 µs [9.791 … 9.834] | 24 × 400 ns shift + latch ≈ 9.8 µs |
+| Visible window (`oe_n` low) | 250.042 µs [250.041 … 250.084] | `DWELL_CYCLES` 12500 × 20 ns = 250 µs |
+| Phase period / frame | 259.8 µs / 1.039 ms | ~962 Hz frame rate |
+| Shift bit clock | 416 ns → 2.40 MHz | `SHIFT_DIV` 10 → 2.5 MHz |
+| `rck` → output enable | 208 ns [166 … 209] | one shift tick |
+| strobe change → output enable | 208 ns [166 … 209] | same tick — `rck` and strobe switch together |
+
+**Violations (event while `oe_n` = 0, i.e. outputs live), over 38 503 phases:**
+
+| Event | Count |
+|---|---|
+| `rck` (latch) while live | **0** |
+| strobe change while live | **0** (see note) |
+| `srck` (shifting) while live | **0** |
+
+*Note on the strobe count:* the raw scan reports exactly one hit — at **row 1 of the file**, the
+first recorded transition, at t = 85.333 µs. That is 2048 samples at 24 MHz, i.e. the capture
+device's first block boundary; the `t = 0` row is the placeholder initial state, and `Aufnahme1`
+shows its first transition at the identical 85.333 µs. It is a capture-start artifact, not a signal
+event — a real strobe glitch during dwell would not occur exactly once in 10 s, precisely on the
+first block boundary. Every one of the 38 503 genuine phase changes is blanked.
+
+**Result:** `rck` and the strobe switch happen in the *same* clock edge, 208 ns before the outputs
+are released, and the outputs were already blanked 9.8 µs earlier. There is no window in which live
+outputs see a row/column mismatch. The original has no such blanking at all — its 9334 latches drive
+continuously while the strobe demultiplexer switches — which is exactly the structural difference
+that makes LEDs work on AtariFA and pre-glow on the original.
+
+#### 6.7.1 Side finding: the 24th shift pulse is only 20 ns wide
+
+The `srck` count per blanking window splits **23 (20 008 windows) / 24 (18 495)**. Cause: in
+`lamp_matrix.vhd` the `St_Latch` state clears `srck` on the very next `clk_50` edge instead of
+waiting for a shift tick, so the final (24th) `SRCK` high pulse lasts **one clock period = 20 ns**
+instead of 200 ns. Against the analyser's 41.7 ns sampling grid such a pulse is caught with
+probability 20/41.7 = 48.0 % — and it was caught in 18 495 / 38 503 = **48.0 %** of windows. The
+agreement confirms the width to be exactly one `clk_50` period.
+
+It worked on this board (lamps HW-tested OK, and a missed 24th pulse would shift the whole cascade by
+one group, which would be unmissable), but 20 ns sits right at the 74HC595's minimum clock pulse
+width (~20 ns at 4.5 V, more over temperature) — there was no margin.
+
+**Fixed 2026-08-09:** `lamp_matrix.vhd` got one extra FSM state, `St_ShiftLast`, which waits for a
+shift tick with `srck` still high before entering `St_Latch`. The 24th pulse is now 220 ns wide,
+like the other 23. Cost: +1 register (one-hot), +6 combinational, memory unchanged, slack
+3.142 → 2.683 ns (inside the 1.5 ns tolerance); `scripts/baseline.csv` updated accordingly.
+
+**Verified on hardware the same day** (`DBG_MODE = 5`, 1.813 s, 6973 windows, attract):
+
+| Quantity | before the fix | after |
+|---|---|---|
+| `srck` edges per window | 23 / 24 split 52 : 48 | **24 in all 6972 genuine windows** |
+| Blanking window | 9.792 µs | **10.000 µs** (+208 ns, as predicted) |
+| Visible window (dwell) | 250.042 µs | 250.042 µs — unchanged to the nanosecond |
+| Bit clock / release margin | 2.40 MHz / 208 ns | unchanged |
+| Violations (latch/strobe/shift while live) | 0 | 0 |
+
+The single window reported with 22 edges, an 8.916 µs blank and a 130 µs dwell sits at
+t = 0.076…0.085 ms — the truncated first window at the capture-start block boundary, the same
+artifact discussed in §6.7. Per-lamp duty went 24.06 % → 24.04 %, frame rate 962.2 → 961.4 Hz;
+both differences are 0.08 % and cannot be seen.
+
+---
+
+## 7. Sources
 
 - PinMAME reference: `doc/atari.c` (`ram_w` lamp handler, `ATARI1_nmihi`, `ATARI1_vblank`).
 - ROM disassembly: `tools/dis6800.py airborne.e00.hex airborne.e0.hex` (Airborne Avenger; routine

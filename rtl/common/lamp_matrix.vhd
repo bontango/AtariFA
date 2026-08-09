@@ -30,6 +30,7 @@
 -- Scan-FSM (clk_50): je Strobe-Phase s: (a) oe_n=1 blanken -> (b) 24 Bit schieben (21 genutzt,
 --   3 = '0') -> (c) rck-Latch -> (d) strobe_sel<=enc(s) -> (e) oe_n=0 (Phase sichtbar) -> (f) Dwell.
 --   Blanken waehrend Schieben/Umschalten verhindert Ghosting. Native ~25% Duty (4-fach-Multiplex).
+--   St_ShiftLast haelt den LETZTEN Schiebetakt eine volle Tick-Haelfte high -- s. Kommentar dort.
 --
 -- Sicherheit: reset='1' ODER enable='0' -> oe_n='1' (alle Lampen AUS), strobe_sel="00".
 --   (In AtariFA.vhd: enable=reset_l_stable -> Lampen erst mit laufender CPU; Boot/Reset sicher AUS.)
@@ -41,14 +42,16 @@
 --                  Die dortige Umkehrtabelle FA_LAMP_BIT wird daraus berechnet und faellt
 --                  automatisch mit -- GRP_OF bleibt die EINE Stelle zum Tunen.
 --   * STROBE_ENC : Strobe-Index s (0..3) -> 2-Bit-Code (Aux-Decoder-Permutation; die
---                  74HCT540-Invertierung von aux_lamp_strobe passiert im Top).
+--                  74HCT540-Invertierung von aux_lamp_strobe passiert im Top). Steht seit
+--                  08.2026 ebenfalls in rtl/common/lamp_map_pkg.vhd, weil der Lampen-Trace
+--                  im Top (DBG_MODE 4/5) dieselbe Kodierung braucht.
 --   * Latch=offset[3:2]/Strobe=offset[1:0] : Annahme aus 9334-Adressierung (unten im idx).
 --   * Shift-Reihenfolge (vec(23) zuerst = MSB) bzw. welcher 74HC595 zuerst in der Kaskade.
 
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.std_logic_unsigned.all;
-use work.lamp_map_pkg.all;        -- GRP_OF (HW-TUNBAR)
+use work.lamp_map_pkg.all;        -- GRP_OF, STROBE_ENC (HW-TUNBAR)
 
 entity lamp_matrix is
 	generic (
@@ -69,7 +72,7 @@ entity lamp_matrix is
 end lamp_matrix;
 
 architecture rtl of lamp_matrix is
-	type state_t is (St_Load, St_ShiftLo, St_ShiftHi, St_Latch, St_Enable, St_Dwell);
+	type state_t is (St_Load, St_ShiftLo, St_ShiftHi, St_ShiftLast, St_Latch, St_Enable, St_Dwell);
 	signal state     : state_t := St_Load;
 	signal shiftreg  : std_logic_vector(23 downto 0) := (others => '0');
 	signal bit_cnt   : integer range 0 to 23 := 0;
@@ -81,9 +84,9 @@ architecture rtl of lamp_matrix is
 	-- GRP_OF (595-Ausgang je Latch/Bit) kommt aus work.lamp_map_pkg -- dort steht auch
 	-- die daraus berechnete Umkehrung, die das Top-Level fuer FA-Control braucht.
 
-	-- HW-TUNBAR: Strobe-Index s (0..3) -> 2-Bit-Code an strobe_sel (Aux-Board dekodiert 1-of-4).
-	type enc_t is array(0 to 3) of std_logic_vector(1 downto 0);
-	constant STROBE_ENC : enc_t := ("00", "01", "10", "11");
+	-- STROBE_ENC (Strobe-Index s -> 2-Bit-Code an strobe_sel) kommt ebenfalls aus
+	-- work.lamp_map_pkg -- der Lampen-Trace im Top (DBG_MODE 4/5) muss dieselbe Kodierung
+	-- kennen, um aus strobe_sel auf die sichtbare Phase zurueckzurechnen.
 begin
 
 	-- Shift-Takt-Tick: ein Puls alle SHIFT_DIV clk_50-Zyklen (paced die SRCK-Flanken)
@@ -150,11 +153,23 @@ begin
 							srck     <= '1';                            -- steigende Flanke taktet das Bit ein
 							shiftreg <= shiftreg(22 downto 0) & '0';
 							if bit_cnt = 23 then
-								state <= St_Latch;
+								state <= St_ShiftLast;
 							else
 								bit_cnt <= bit_cnt + 1;
 								state   <= St_ShiftLo;
 							end if;
+						end if;
+
+					when St_ShiftLast =>
+						-- Haelt den 24. SRCK-Puls eine volle Tick-Haelfte (200 ns) high. Ohne diesen
+						-- Zustand raeumt St_Latch srck schon in der naechsten clk_50-Flanke ab: der
+						-- letzte Puls waere dann nur EINE Taktperiode = 20 ns breit und laege damit
+						-- auf der Mindest-Taktpulsbreite des 74HC595 (~20 ns @4,5 V, ueber Temperatur
+						-- mehr) -- ohne jeden Spielraum. Am Logikanalysator nachgemessen 2026-08-09
+						-- (48 % Trefferquote gegen das 41,7-ns-Raster = exakt 20 ns), Details in
+						-- docs/Lamp_Refresh_Analysis.md 6.7.1. srck haelt hier seinen Wert '1'.
+						if tick = '1' then
+							state <= St_Latch;
 						end if;
 
 					when St_Latch =>

@@ -350,7 +350,19 @@ constant DISPLAY_TEST : boolean := false;
 --   2 = cpu_addr(15:8) — PC-High-Byte; steht → hängt in dieser ROM/RAM-Page
 --   3 = Boot-Trace (cpu_clk/boot_phase0/por_active/boot_phase1/boot_phase2/reset_h/
 --       dip_strobe0/i_disp_Load) — zeigt Fortschritt der Power-on-/Boot-Sequenz
-constant DBG_MODE : integer range 0 to 3 := 0;
+--   4 = Lampen-Langzeit — Messung zu docs/Lamp_Refresh_Analysis.md (Software-Refresh?)
+--   5 = Lampen-Detail   — eine Multiplex-Phase in Feinauflösung
+constant DBG_MODE : integer range 0 to 5 := 0;
+-- Lampen-Trace (nur DBG_MODE 4/5, sonst ohne Wirkung — die Logik steckt in den generate-Bloecken
+-- und wird bei DBG_MODE=0 gar nicht elaboriert, die Baseline bleibt also unberuehrt).
+--   DBG_WATCH_LAMP : Lampe, die waehrend der Messung AUS ist (Beweis-Lampe, Kanaele 3+4)
+-- Nummerierung wie in rtl/fa_control / lamp_map_pkg: n = (595-Gruppe - 1) * 4 + Strobe, 0..83.
+-- Eine Referenzlampe wird NICHT mehr gewaehlt: Kanal 5 zeigt "irgendeine Lampe wird getrieben"
+-- und braucht dafuer keine Nummer -- ein Rebuild nur zum Umwaehlen entfaellt damit.
+constant DBG_WATCH_LAMP    : integer range 0 to LAMP_COUNT - 1 := 8;   -- Gruppe 3, Strobe 0
+                                                                       -- (am Prototyp per FA-Control
+                                                                       --  identifiziert, im Spiel AUS)
+constant DBG_STRETCH_CYCLES : integer := 50000;   -- 1 ms @ clk_50 — Pulsdehnung fuer langsame LAs
 signal heartbeat_div  : std_logic_vector(24 downto 0) := (others => '0');
    -- Bit 24 toggelt alle 2^24/50e6 ≈ 0.67s → ~0.75 Hz Heartbeat; nur als FPGA-Takt-Fallback genutzt
 signal cpu_fetch_cnt  : std_logic_vector(20 downto 0) := (others => '0');
@@ -420,6 +432,9 @@ begin
 --  [7] ROM-CS     CPU in ROM          — wechselt mit RAM/IO: CPU läuft
 -- DBG_MODE=1: cpu_addr(7:0)   → PC-Low-Byte stehend am LA ablesen
 -- DBG_MODE=2: cpu_addr(15:8)  → PC-High-Byte stehend am LA ablesen
+-- DBG_MODE=3: Boot-Trace      → s. Kommentar am generate-Block weiter unten
+-- DBG_MODE=4: Lampen-Langzeit → Lampen-Refresh-Messung (docs/Lamp_Refresh_Analysis.md §6)
+-- DBG_MODE=5: Lampen-Detail   → eine Multiplex-Phase in Feinauflösung
 gen_dbg0: if DBG_MODE = 0 generate
 	debug_signal(0) <= cpu_clk;
 	debug_signal(1) <= cpu_vma;
@@ -455,6 +470,155 @@ gen_dbg3: if DBG_MODE = 3 generate
 	debug_signal(6) <= dip_strobe(0);
 	debug_signal(7) <= i_disp_Load;
 end generate gen_dbg3;
+
+-- DBG_MODE=4 (Lampen-Langzeit): messtechnische Verifikation zu docs/Lamp_Refresh_Analysis.md.
+-- Frage: frischt der Spielcode die Lampen periodisch auf und streut dabei "An-Phasen" fuer
+-- AUSGESCHALTETE Lampen ein (Forenthese zum Vorglimmen der Original-Matrix)? Der einzige Weg,
+-- auf dem Software die Lampen ueberhaupt beeinflussen kann, ist ein Write ins RAM 0x30-0x3F --
+-- genau der wird hier lueckenlos sichtbar gemacht. Auslegung fuer 500 kHz..1 MHz Abtastung
+-- ueber Sekunden bis Minuten; die drei Ereigniskanaele sind deshalb auf ~1 ms gedehnt.
+--  [0] lamp_wr      CPU-Write nach RAM 0x30-0x3F (gedehnt) -- keiner ueber Sekunden = kein Refresh
+--  [1] lamp_wr_chg  ... und der Wert weicht vom bisherigen Byte ab -- echte Aenderung statt Rewrite
+--  [2] lamp_wr_set  ... und mind. ein Bit geht 0->1 -- DAS waere die behauptete An-Phasen-Injektion
+--  [3] watch_state  lamp_state-Bit von DBG_WATCH_LAMP -- muss ueber den Mitschnitt flach '0' bleiben
+--  [4] watch_drive  Ansteuerung derselben Lampe (Zeilenbit UND Strobe-Phase UND nicht ausgetastet).
+--                   ACHTUNG, nicht ueberinterpretieren: das ist im FPGA aus [3] ABGELEITET, bei
+--                   flachem [3] also zwangslaeufig flach. Der Kanal zeigt, WANN die Lampe drankaeme,
+--                   und faengt kurze Blips in [3] ein -- einen Schleichpfad kann er nicht zeigen,
+--                   den gibt es hier nicht. Ob es ein unausgetastetes Ueberlappfenster gibt,
+--                   beantwortet das Timing in DBG_MODE=5, nicht dieser Kanal.
+--  [5] any_drive    "IRGENDEINE der 84 Lampen wird gerade getrieben" -- Gegenprobe gegen die
+--                   Negativbeweis-Falle (fehlt das ~250-us-Muster, sind [3]/[4] wertlos).
+--                   Bewusst NICHT an eine benannte Referenzlampe gebunden: so braucht die
+--                   Gegenprobe keine Lampennummer und traegt in jedem Spielzustand, in dem
+--                   ueberhaupt etwas leuchtet -- kein Rebuild nur zum Umwaehlen.
+--  [6] lamp_oe_n    Austastfenster der Matrix (high = alle Zeilen dunkel)
+--  [7] NMI-Puls     244-Hz-Zeitbasis -- liegen die Writes auf diesem Raster, IST es ein Refresh
+gen_dbg4: if DBG_MODE = 4 generate
+	constant W_IDX   : integer := FA_LAMP_BIT(DBG_WATCH_LAMP);
+	constant W_PHASE : integer := DBG_WATCH_LAMP mod LAMP_STROBES;
+	type cnt_t is array(0 to 2) of integer range 0 to DBG_STRETCH_CYCLES;
+	signal evt       : std_logic_vector(2 downto 0) := "000";
+	signal cnt       : cnt_t := (others => 0);
+	signal evt_str   : std_logic_vector(2 downto 0);
+	signal any_drive : std_logic;
+begin
+	-- Ereigniserkennung. Bewusst NICHT die Sniffer-Bedingung (cpu_addr(15 downto 4)=x"003"),
+	-- sondern die RAM-dekodierte Adresse: so faellt auch ein Schreibzugriff ueber den RAM-Mirror
+	-- (0x1030-0x103F) auf, den der Sniffer verpasst -- sonst waere "kein Puls" kein Beweis.
+	-- lamp_state fuehrt in dieser Taktflanke noch den ALTEN Bytewert (der Sniffer registriert
+	-- auf derselben Flanke), der Vergleich alt<->neu ist also gueltig.
+	dbg4_evt : process(clk_50)
+		variable old        : std_logic_vector(7 downto 0);
+		variable chg, set01 : std_logic;
+	begin
+		if rising_edge(clk_50) then
+			evt <= "000";
+			if ram_wren = '1' and cpu_addr(8 downto 4) = "00011" then
+				for i in 0 to 7 loop
+					old(i) := lamp_state(conv_integer(cpu_addr(3 downto 0)) * 8 + i);
+				end loop;
+				chg   := '0';
+				set01 := '0';
+				for i in 0 to 7 loop
+					if old(i) /= cpu_dout(i) then
+						chg := '1';
+					end if;
+					if old(i) = '0' and cpu_dout(i) = '1' then
+						set01 := '1';
+					end if;
+				end loop;
+				evt(0) <= '1';
+				evt(1) <= chg;
+				evt(2) <= set01;
+			end if;
+		end if;
+	end process;
+
+	-- Retriggerbare One-Shots: 20-ns-Ereignisse auf ~1 ms dehnen, damit sie eine Abtastung
+	-- im 500-kHz..1-MHz-Raster ueberleben (einfacher 8-Kanal-LA, lange Aufnahme).
+	dbg4_stretch : process(clk_50)
+	begin
+		if rising_edge(clk_50) then
+			for i in 0 to 2 loop
+				if evt(i) = '1' then
+					cnt(i) <= DBG_STRETCH_CYCLES;
+				elsif cnt(i) /= 0 then
+					cnt(i) <= cnt(i) - 1;
+				end if;
+			end loop;
+		end if;
+	end process;
+	evt_str(0) <= '1' when cnt(0) /= 0 else '0';
+	evt_str(1) <= '1' when cnt(1) /= 0 else '0';
+	evt_str(2) <= '1' when cnt(2) /= 0 else '0';
+
+	-- Gegenprobe ohne Lampennummer: erst je Strobe-Phase oder-verknuepfen, was in dieser Phase
+	-- an waere, dann die gerade ausgegebene Phase heraussuchen. Andersherum (84 Einzelvergleiche
+	-- gegen strobe_sel) waere dasselbe Ergebnis fuer deutlich mehr Logik.
+	dbg4_anylamp : process(lamp_state_mux, lamp_strobe_sel)
+		variable per_phase : std_logic_vector(0 to LAMP_STROBES - 1);
+		variable v         : std_logic;
+	begin
+		per_phase := (others => '0');
+		for n in 0 to LAMP_COUNT - 1 loop
+			if lamp_state_mux(FA_LAMP_BIT(n)) = '1' then
+				per_phase(n mod LAMP_STROBES) := '1';
+			end if;
+		end loop;
+		v := '0';
+		for s in 0 to LAMP_STROBES - 1 loop
+			if lamp_strobe_sel = STROBE_ENC(s) then
+				v := v or per_phase(s);
+			end if;
+		end loop;
+		any_drive <= v;
+	end process;
+
+	debug_signal(0) <= evt_str(0);
+	debug_signal(1) <= evt_str(1);
+	debug_signal(2) <= evt_str(2);
+	debug_signal(3) <= lamp_state(W_IDX);
+	debug_signal(4) <= (lamp_state_mux(W_IDX) and not lamp_oe_n)
+	                   when lamp_strobe_sel = STROBE_ENC(W_PHASE) else '0';
+	debug_signal(5) <= any_drive and not lamp_oe_n;
+	debug_signal(6) <= lamp_oe_n;
+	debug_signal(7) <= not dma_int;
+end generate gen_dbg4;
+
+-- DBG_MODE=5 (Lampen-Detail): eine komplette Multiplex-Phase in Feinaufloesung (24 MHz, kurze
+-- Aufnahme) -- Schiebefenster, Latch, Phasenwechsel, Austastung. Dieselben Signale liegen auch
+-- an den Board-Pins (oe_595/clk_595/rclk_595/aux_lamp_strobe); dieser Modus buendelt sie nur am
+-- LA-Header und ergaenzt die rekonstruierte Ansteuerung der Beobachtungslampe.
+--  [0] ser  [1] srck  [2] rck  [3] oe_n  [4] strobe_sel(0)  [5] strobe_sel(1)
+--  [6] watch_drive (DBG_WATCH_LAMP)  [7] lamp_wr (auf ~200 ns gedehnt, sonst bei 41,7 ns
+--      Abtastperiode nicht sicher zu treffen)
+gen_dbg5: if DBG_MODE = 5 generate
+	constant W_IDX   : integer := FA_LAMP_BIT(DBG_WATCH_LAMP);
+	constant W_PHASE : integer := DBG_WATCH_LAMP mod LAMP_STROBES;
+	signal wr_cnt : integer range 0 to 9 := 0;
+begin
+	dbg5_wr : process(clk_50)
+	begin
+		if rising_edge(clk_50) then
+			if ram_wren = '1' and cpu_addr(8 downto 4) = "00011" then
+				wr_cnt <= 9;
+			elsif wr_cnt /= 0 then
+				wr_cnt <= wr_cnt - 1;
+			end if;
+		end if;
+	end process;
+
+	debug_signal(0) <= lamp_ser;
+	debug_signal(1) <= lamp_srck;
+	debug_signal(2) <= lamp_rck;
+	debug_signal(3) <= lamp_oe_n;
+	debug_signal(4) <= lamp_strobe_sel(0);
+	debug_signal(5) <= lamp_strobe_sel(1);
+	debug_signal(6) <= (lamp_state_mux(W_IDX) and not lamp_oe_n)
+	                   when lamp_strobe_sel = STROBE_ENC(W_PHASE) else '0';
+	debug_signal(7) <= '1' when wr_cnt /= 0 else '0';
+end generate gen_dbg5;
 
 -------------------------------
 -- CPU-Release erst nach DIP-Read (Phase 1) + Info-Anzeige (Phase 2) -- und nur solange
