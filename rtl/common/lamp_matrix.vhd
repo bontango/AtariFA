@@ -30,6 +30,7 @@
 -- Scan-FSM (clk_50): je Strobe-Phase s: (a) oe_n=1 blanken -> (b) 24 Bit schieben (21 genutzt,
 --   3 = '0') -> (c) rck-Latch -> (d) strobe_sel<=enc(s) -> (e) oe_n=0 (Phase sichtbar) -> (f) Dwell.
 --   Blanken waehrend Schieben/Umschalten verhindert Ghosting. Native ~25% Duty (4-fach-Multiplex).
+--   Zeitraster seit SW 0.1.5 = Original: 512 us je Phase, 2,048 ms je Frame (488,3 Hz), s. DWELL_CYCLES.
 --   St_ShiftLast haelt den LETZTEN Schiebetakt eine volle Tick-Haelfte high -- s. Kommentar dort.
 --
 -- Sicherheit: reset='1' ODER enable='0' -> oe_n='1' (alle Lampen AUS), strobe_sel="00".
@@ -55,7 +56,19 @@ use work.lamp_map_pkg.all;        -- GRP_OF, STROBE_ENC (HW-TUNBAR)
 
 entity lamp_matrix is
 	generic (
-		DWELL_CYCLES : integer := 12500;  -- clk_50-Zyklen je Strobe-Phase (~250us) -> ~1kHz Frame
+		-- Sichtbares Fenster je Strobe-Phase (oe_n low). Zusammen mit dem Schiebe-Overhead
+		-- ergibt das die Phasendauer und damit den Lampen-Frame:
+		--   Overhead je Phase (FSM, bei SHIFT_DIV=10):
+		--     St_Load 1 + 24 x (ShiftLo+ShiftHi) 480 + ShiftLast 10 + Latch 10 + Enable 1
+		--     = ~500 clk = 10 us  (am LA gemessen: 10,000 us Blankfenster seit St_ShiftLast,
+		--      docs/Lamp_Refresh_Analysis.md 6.7.1)
+		--   Phase = 25100 + 500 = 25600 clk x 20 ns = 512,0 us = EIN Digit-Slot wie im Original
+		--   Frame = 4 Phasen = 2,048 ms = 488,3 Hz,  Duty = 25100/25600/4 = 24,5 %
+		-- Damit laeuft die Matrix im selben Raster wie die Original-DMA-Kette (Troubleshooting
+		-- Guide: 512 us je Spalte, "duty cycle of only 25 %"). Bis SW 0.1.4 stand hier 12500
+		-- (250 us, ~961 Hz) -- doppelt so schnell wie das Original bei gleicher Helligkeit.
+		-- DWELL_CYCLES ist der einzige Software-seitige HELLIGKEITSHEBEL (Duty, nicht Spannung).
+		DWELL_CYCLES : integer := 25100;  -- clk_50-Zyklen je Strobe-Phase (~502us) -> 488Hz Frame
 		SHIFT_DIV    : integer := 10      -- clk_50 je SRCK-Halbperiode (SHIFT_DIV=10 -> ~2.5MHz Bit-Takt)
 	);
 	port (

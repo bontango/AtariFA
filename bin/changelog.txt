@@ -3,3 +3,8 @@
   lamp_matrix: 24th shift clock widened from one clock period (20 ns, right at the 74HC595 minimum) to a full tick - measured on a logic analyser, see docs/Lamp_Refresh_Analysis.md 6.7.1. No behaviour change. cyclone_10_pcb verified on the prototype up to 0.1.3; 0.1.4 itself not yet played on the machine. cyclone_10_dev_open NEVER hardware tested.
   cyclone_10_dev_open    1.1.4    AtariFA_v114.jic  sha256:E5FEFDB46FF49BE3
   cyclone_10_pcb         0.1.4    AtariFA_v014.jic  sha256:F22304F14500A849
+
+2026-08-10 10:32  version .1.5
+  lamp matrix now scans at the original 488 Hz frame - 512 us per strobe column, DWELL_CYCLES 12500 to 25100
+  cyclone_10_dev_open    1.1.5    AtariFA_v115.jic  sha256:DF8A8896A30A32B9
+  cyclone_10_pcb         0.1.5    AtariFA_v015.jic  sha256:F8D339644CAC3FE9

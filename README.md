@@ -20,11 +20,11 @@ locations and one constant.
 
 | Variant | Board | FPGA | Status |
 |---|---|---|---|
-| `cyclone_10_pcb` | AtariFA PCB v1.0 with the lisy.dev Cyclone 10 piggy-back board | 10CL006YE144C8G | lead variant, hardware tested through SW 0.1.2 |
+| `cyclone_10_pcb` | AtariFA PCB v1.0 with the lisy.dev Cyclone 10 piggy-back board | 10CL006YE144C8G | lead variant, hardware tested through SW 0.1.4 |
 | `cyclone_10_dev_open` | AtariFA PCB v1.0 carrying the 'dev_open' Cyclone 10 board | 10CL006YE144C8G | **not** hardware tested |
 
 The version on the boot info display reads `<BoardId>.<SW_SUB1>.<SW_SUB2>`, so the leading
-digit tells you which board you are looking at: `0.1.2` is the PCB board, `1.1.2` the
+digit tells you which board you are looking at: `0.1.5` is the PCB board, `1.1.5` the
 dev_open one.
 
 Differences between the two boards, in full: pin-out; the dev_open board has four on-board

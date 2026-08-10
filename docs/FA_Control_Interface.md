@@ -150,7 +150,7 @@ Connect-Handshake:
 | Op | Name | Parameter | Antwort | AtariFA liefert |
 |---|---|---|---|---|
 | 0 | `G_HW` | – | String+NUL | `AtariFA` |
-| 1 | `G_LISY_VER` | – | String+NUL | `0.1.4` (aus `BOARD_ID`/`SW_SUB1`/`SW_SUB2`) |
+| 1 | `G_LISY_VER` | – | String+NUL | `0.1.5` (aus `BOARD_ID`/`SW_SUB1`/`SW_SUB2`) |
 | 2 | `G_API_VER` | – | String+NUL | `0.12` |
 | 3 | `G_NO_LAMPS` | – | 1 Byte | 84 |
 | 4 | `G_NO_SOL` | – | 1 Byte | 22 |
@@ -247,7 +247,7 @@ dass jeder Schritt den nächsten absichert:
 2. **ESP gesteckt, DIP 4 = OFF.** „VERBINDEN" in der Weboberfläche muss
    *„Kontrolle verweigert — Option-DIP 4 auf ON stellen"* melden, und das Spiel darf **nicht**
    stehenbleiben.
-3. **DIP 4 = ON.** Verbinden. Die Infozeile muss `AtariFA / 0.1.4 / 0.12` zeigen und
+3. **DIP 4 = ON.** Verbinden. Die Infozeile muss `AtariFA / 0.1.5 / 0.12` zeigen und
    **84 Lampen, 22 Spulen, 80 Schalter, 16 Sounds, 5 Displays (4,6,6,6,6)** — diese Zahlen kommen
    jetzt vom FPGA und stehen in der Oberfläche auf „nicht änderbar". Das Spiel bleibt stehen, die
    Anzeigen bleiben an.

@@ -170,12 +170,18 @@ hardware does — so there is no loop into which on-phases could be injected.
 
 ### 3.1 The guide's own numbers confirm the DMA model (and correct one of ours)
 
-| | Troubleshooting Guide | derived from the DMA chain | AtariFA, measured (§6.7) |
-|---|---|---|---|
-| Strobe pulse | "about 500 µs" | 512 µs = **one digit slot** | 250.04 µs |
-| Strobe period | "every 2 ms" | 2.048 ms = 4 digit slots = **½ display frame** | 1.039 ms |
-| Duty per lamp | "only 25 %" | 25 % | 24.04 % |
-| Lamp frame rate | ~500 Hz | 488.3 Hz | 961.4 Hz |
+| | Troubleshooting Guide | derived from the DMA chain | AtariFA ≤ SW 0.1.4, measured (§6.7) | AtariFA ≥ SW 0.1.5, design value |
+|---|---|---|---|---|
+| Strobe pulse | "about 500 µs" | 512 µs = **one digit slot** | 250.04 µs | 512.0 µs (502 µs visible + 10 µs blank) |
+| Strobe period | "every 2 ms" | 2.048 ms = 4 digit slots = **½ display frame** | 1.039 ms | 2.048 ms |
+| Duty per lamp | "only 25 %" | 25 % | 24.04 % | 24.5 % |
+| Lamp frame rate | ~500 Hz | 488.3 Hz | 961.4 Hz | 488.3 Hz |
+
+The last column is **calculated, not yet measured** — `DWELL_CYCLES` went 12500 → 25100 in SW 0.1.5
+so that the phase *including* the shift overhead lands on the original's 512 µs digit slot. The
+arithmetic is exact because the overhead is: the blanking window measured 10.000 µs = 500 clocks
+after the `St_ShiftLast` fix (§6.7.1), so 25100 + 500 = 25600 × 20 ns = 512.00 µs. The
+re-measurement that turns it into a measured column is the `DBG_MODE = 5` run described in §6.7.
 
 The digit slot of 512 µs and the 4.10 ms display frame are measured values from
 [`Display_Timing.md`](Display_Timing.md) (§ "Digit-Periode" / "Frame-Periode"). The lamp strobes
@@ -187,9 +193,13 @@ four bytes `0x30+s`, `0x34+s`, `0x38+s`, `0x3C+s` being written to the four row 
 `0x1000/1004/1008/100C`.
 
 **This corrects §5(a)**, which used to compare AtariFA against "the original ~244 Hz": that is the
-**display** frame. The original *lamp* frame is ~488 Hz, so AtariFA runs 2× faster than the original,
-not 4×. The duty cycle, which is what actually sets brightness, is identical (25 % vs. 24 %) and is
-now confirmed verbatim by Atari.
+**display** frame. The original *lamp* frame is ~488 Hz, so AtariFA up to SW 0.1.4 ran 2× faster than
+the original, not 4×. The duty cycle, which is what actually sets brightness, was identical anyway
+(25 % vs. 24 %) and is now confirmed verbatim by Atari — brightness was never the reason to change
+anything. **SW 0.1.5 nevertheless moved AtariFA onto the original raster** (512 µs column, 2.048 ms
+frame): it costs nothing, and it makes the side-by-side comparison of the two MPUs on one playfield —
+the pre-glow observation of [`Lamp_Preglow_Experiment.md`](Lamp_Preglow_Experiment.md) — a comparison
+of one variable instead of two.
 
 ### 3.2 Is there a keep-alive circuit on the Aux board? No — and there cannot be one
 
@@ -271,14 +281,16 @@ Two concerns raised, both resolved:
 **(a) Are the original incandescent lamps driven too hard / too bright by AtariFA?** No.
 - Incandescent brightness depends on **average power**; the filament's thermal time constant (many ms)
   integrates over many pulses, so the **refresh frequency is irrelevant** to brightness.
-- Duty cycle is what matters: AtariFA runs **~24 %** per lamp (one of four strobe phases,
-  `DWELL_CYCLES = 12500` ≈ 250 µs of ~1040 µs/frame), structurally capped at ~25 % because only one
-  strobe is ever active at a time. The original 4-fold multiplex is likewise **~25 %** — stated
-  verbatim in the Troubleshooting Guide ("each strobe has an 'on' duty cycle of only 25 %", §3.1).
-  → essentially identical average power → same brightness (if anything marginally dimmer on AtariFA
-  due to shift overhead). AtariFA's lamp frame rate is ~961 Hz vs. the original **~488 Hz**
-  (2.048 ms, §3.1 — the 244 Hz figure is the *display* frame, not the lamp frame), but that only
-  changes flicker frequency, not average power.
+- Duty cycle is what matters: AtariFA runs **~24.5 %** per lamp (one of four strobe phases,
+  `DWELL_CYCLES = 25100` ≈ 502 µs of ~2048 µs/frame; it was 24.04 % up to SW 0.1.4 with
+  `DWELL_CYCLES = 12500`), structurally capped at ~25 % because only one strobe is ever active at a
+  time. The original 4-fold multiplex is likewise **~25 %** — stated verbatim in the Troubleshooting
+  Guide ("each strobe has an 'on' duty cycle of only 25 %", §3.1). → essentially identical average
+  power → same brightness (if anything marginally dimmer on AtariFA due to shift overhead). Since
+  SW 0.1.5 the lamp frame rate matches the original at **~488 Hz** (2.048 ms, §3.1 — the 244 Hz
+  figure is the *display* frame, not the lamp frame); up to 0.1.4 it was ~961 Hz, which changed
+  flicker frequency only, not average power. **Changing `DWELL_CYCLES` from 12500 to 25100 therefore
+  did not make the lamps brighter** — duty moved by half a percentage point, the frame rate halved.
 
 **(b) Can the refresh logic over-voltage the 5 V test LEDs?** No.
 - The FPGA refresh logic only controls **timing (on/off), never voltage**. The peak voltage across a
@@ -428,7 +440,7 @@ NMI period 4096.9 µs = **244.1 Hz**, exactly the value `Display_Timing.md` deri
 The 0→1 events on ch 2 (139 of them) are other lamps in the animation being switched on; they are
 byte-wide events and carry no information about a specific lamp, which is what ch 3 is for.
 
-### 6.7 Overlap window — `DBG_MODE = 5`, 10 s at 24 MHz, attract
+### 6.7 Overlap window — `DBG_MODE = 5`, 10 s at 24 MHz, attract (measured on SW 0.1.4)
 
 The one thing §6.6 cannot answer: is there an instant at which the row data has already been
 switched while the column strobe still belongs to the previous phase *and the outputs are live*?
@@ -440,6 +452,7 @@ That is the half-select mechanism the original's pre-glow is attributed to. Capt
 | Blanking window (`oe_n` high) | 9.792 µs [9.791 … 9.834] | 24 × 400 ns shift + latch ≈ 9.8 µs |
 | Visible window (`oe_n` low) | 250.042 µs [250.041 … 250.084] | `DWELL_CYCLES` 12500 × 20 ns = 250 µs |
 | Phase period / frame | 259.8 µs / 1.039 ms | ~962 Hz frame rate |
+| ↑ both of these doubled in SW 0.1.5 | not re-measured yet | `DWELL_CYCLES` 25100 → 502 µs visible, 512.0 µs phase, 2.048 ms frame |
 | Shift bit clock | 416 ns → 2.40 MHz | `SHIFT_DIV` 10 → 2.5 MHz |
 | `rck` → output enable | 208 ns [166 … 209] | one shift tick |
 | strobe change → output enable | 208 ns [166 … 209] | same tick — `rck` and strobe switch together |
@@ -462,6 +475,10 @@ first block boundary. Every one of the 38 503 genuine phase changes is blanked.
 **Result:** `rck` and the strobe switch happen in the *same* clock edge, 208 ns before the outputs
 are released, and the outputs were already blanked 9.8 µs earlier. There is no window in which live
 outputs see a row/column mismatch.
+
+The longer dwell of SW 0.1.5 does not weaken this: blanking happens *at the switch*, not during the
+dwell, so the blanking window, the bit clock, the `rck`→enable delay and above all the violation
+counts are independent of `DWELL_CYCLES`. Only the visible window and the frame period scale.
 
 **The original has no such blanking at all** — and that is not an assumption but follows from two
 independent sources (§3.2/§3.3): the Aux board decodes `LAMP BIT 0/1` with a 7402 NOR array that has
@@ -502,6 +519,11 @@ The single window reported with 22 edges, an 8.916 µs blank and a 130 µs dwell
 t = 0.076…0.085 ms — the truncated first window at the capture-start block boundary, the same
 artifact discussed in §6.7. Per-lamp duty went 24.06 % → 24.04 %, frame rate 962.2 → 961.4 Hz;
 both differences are 0.08 % and cannot be seen.
+
+Those are SW 0.1.4 figures. The 10.000 µs blanking window measured here is what makes the SW 0.1.5
+timing exact: it is 500 clocks, so `DWELL_CYCLES = 25100` puts the phase at 25600 clocks = 512.00 µs,
+the original's digit slot (§3.1). Everything else in this table is independent of the dwell and
+carries over unchanged.
 
 ---
 

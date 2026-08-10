@@ -50,7 +50,9 @@ Genau dieser Unterschied trennt „Zeilen/Spalten-Versatz" (§3.3) von „allgem
    Viererblock ansehen. Notieren: glimmen die Nachbarn stärker als der dunkle Block?
 3. Dasselbe im **Spiel** (wenige Lampen an) — dort ist die Zuordnung eindeutiger als im Attract.
 4. Mit **AtariFA** im selben Spielfeld gegenprüfen: Erwartung ist „nichts glimmt". Das ist die
-   eigentliche Gegenprobe und schon für sich ein Ergebnis.
+   eigentliche Gegenprobe und schon für sich ein Ergebnis. Ab **SW 0.1.5** scannt die AtariFA im
+   selben Zeitraster wie das Original (512 µs Spalte, 488 Hz Frame) — der Vergleich hängt damit nur
+   noch am Blanking, nicht mehr zusätzlich an einer doppelten Frequenz.
 5. Wenn möglich Handyvideo mit kurzer Belichtung / hoher ISO — auf dem Standbild sieht man
    schwaches Glimmen oft besser als mit dem Auge, und es ist dokumentierbar.
 6. Notieren, **welche** Lampennummern (nicht nur „eine Lampe hinten links") — sonst lässt sich
@@ -83,7 +85,7 @@ Zustand, den das Original zu Beginn jeder Phase hat.
 
 ```vhdl
 generic (
-    DWELL_CYCLES   : integer := 12500;
+    DWELL_CYCLES   : integer := 25100;   -- seit SW 0.1.5 (Original-Raster, s. unten)
     SHIFT_DIV      : integer := 10;
     PREGLOW_CYCLES : integer := 0    -- 0 = aus (Serienstand); >0 = Original-Artefakt nachbilden
 );
@@ -111,9 +113,12 @@ benutzt. Im Preglow-Zweig muss `strobe_sel` **vor** dem Nachladen der 595 auf di
 gehen, `St_Latch` setzt es danach ohnehin auf denselben Wert — es darf also kein zweiter
 Strobe-Wechsel entstehen.
 
-**Fensterbreite:** 20 ns je Zyklus. Das Original hat ~4 µs Versatz auf 512 µs Phase (≈0,8 %);
-bei 260 µs Phasendauer auf der AtariFA entspricht das **`PREGLOW_CYCLES = 100`** (2 µs ≈ 0,8 %).
-`200` (4 µs) macht denselben absoluten Versatz wie das Original — beides ausprobieren.
+**Fensterbreite:** 20 ns je Zyklus. Das Original hat ~4 µs Versatz auf 512 µs Phase (≈0,8 %).
+Seit **SW 0.1.5** läuft die AtariFA im selben Raster (512 µs Phase, `DWELL_CYCLES = 25100`,
+s. [`Lamp_Refresh_Analysis.md`](Lamp_Refresh_Analysis.md) §3.1), also fallen relativer und
+absoluter Versatz zusammen: **`PREGLOW_CYCLES = 200`** (4 µs) ist beides zugleich. Vorher, bei
+260 µs Phase, musste man sich zwischen `100` (relativ 0,8 %) und `200` (absolut 4 µs) entscheiden —
+diese Doppeldeutigkeit ist weg.
 
 ### Abnahme
 
