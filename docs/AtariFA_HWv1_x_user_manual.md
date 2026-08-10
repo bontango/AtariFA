@@ -30,7 +30,8 @@ v1.0 06.08.2026
   - [4.2. The 6 switch bank: options](#42-the-6-switch-bank-options)
     - [4.2.1. Option 3 -> where the sound comes out](#421-option-3---where-the-sound-comes-out)
     - [4.2.2. Option 4 -> let FA-Control take over](#422-option-4---let-fa-control-take-over)
-    - [4.2.3. Options 1, 2, 5, 6 -> reserved](#423-options-1-2-5-6---reserved)
+    - [4.2.3. Options 1, 2, 6 -> reserved](#423-options-1-2-6---reserved)
+    - [4.2.4. Option 5 -> lamp timing like the original MPU](#424-option-5---lamp-timing-like-the-original-mpu)
   - [4.3. Six of the ten DIPs are read once, at boot](#43-six-of-the-ten-dips-are-read-once-at-boot)
 - [5. Boot sequence](#5-boot-sequence)
   - [5.1. Phase 1: reading the DIP switches](#51-phase-1-reading-the-dip-switches)
@@ -162,7 +163,7 @@ Default setting is **all 'OFF'** - that is the right setting for a standard mach
 | Dip2 | reserved                                              | at boot     |
 | Dip3 | **sound: OFF = Auxiliary Board, ON = on-board amplifier** | continuously |
 | Dip4 | **let FA-Control take over** - ON = allowed            | continuously |
-| Dip5 | reserved                                              | continuously |
+| Dip5 | **lamp timing: OFF = quiet, ON = like the original MPU** | continuously |
 | Dip6 | reserved                                              | continuously |
 
 #### 4.2.1. Option 3 -> where the sound comes out
@@ -181,11 +182,23 @@ Default setting is **all 'OFF'** - that is the right setting for a standard mach
 
 This switch is read continuously as well: turning it 'OFF' while FA-Control is in charge takes control away **immediately** and restarts the game. That is the emergency stop for a test tool that has locked up.
 
-#### 4.2.3. Options 1, 2, 5, 6 -> reserved
+#### 4.2.3. Options 1, 2, 6 -> reserved
 
 Not used, leave them 'OFF'. They are wired, they are shown on the info display, and they are there for later software versions.
 
 Option 1 was used by an experimental credit/high score save feature that is currently on hold, see chapter 13. It has no effect in this software version.
+
+#### 4.2.4. Option 5 -> lamp timing like the original MPU
+
+Atari drives the lamps in a time multiplex: four columns are switched on in turn, half a millisecond each. On the original MPU the column is switched at the very moment the new lamp values become valid. Because the column drivers on the Auxiliary Board take a few microseconds to turn off, the *wrong* lamp gets a very short pulse of current every time — the neighbouring lamp in the same driver group, from the previous column.
+
+On an incandescent bulb you will never notice. **LED replacement lamps, however, glow visibly** even though they are switched off. This is the well-known effect that LEDs in an Atari "never go fully dark"; the Atari manual describes it as a supposed "keep-alive" circuit, but it is the same thing.
+
+- **'OFF'** - **quiet lamps. Default.** AtariFA switches the column while all lamps are blanked, and gives the old column about 20 microseconds to decay. Switched-off LEDs stay off. **This is the setting for a machine fitted with LED replacement lamps.**
+
+- **'ON'** - **the timing of the original MPU**, glow included. Useful if you want to compare AtariFA against the original board, or if you prefer the original behaviour. Brightness is practically unaffected (24.0 % against 24.5 % duty cycle), and incandescent lamps do not care at all.
+
+This switch is read continuously, so it may be changed while the game is running — which makes the difference easy to compare on the spot.
 
 ### 4.3. Six of the ten DIPs are read once, at boot
 
@@ -421,13 +434,15 @@ bank of 4                          bank of 6
  2  game select bit 1  (+2)         2  reserved              read at boot
  3  game select bit 2  (+4)         3  sound path            live
  4  free play, ON = active          4  FA-Control allowed    live
-                                    5  reserved              live
+                                    5  lamp timing           live
  all four read at boot only         6  reserved              live
 ```
 
 **Sound path, option 3:** OFF = Auxiliary Board (standard) · ON = on-board amplifier
 
 **FA-Control, option 4:** OFF = nobody interferes (standard) · ON = the ESP32 test tool may drive the machine (chapter 9)
+
+**Lamp timing, option 5:** OFF = quiet lamps, switched-off LEDs stay off (standard) · ON = timing of the original MPU, LED replacement lamps glow as on the original (chapter 4.2.4)
 
 **After changing a switch that is read at boot: power off, power on.**
 

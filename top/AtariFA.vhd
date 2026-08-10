@@ -230,6 +230,10 @@ signal lamp_srck       : std_logic;
 signal lamp_rck        : std_logic;
 signal lamp_oe_n       : std_logic;
 signal lamp_strobe_sel : std_logic_vector(1 downto 0);
+-- '1' = Zeilen sind aus. Seit SW 0.1.6 blankt die Matrix durch Nullen-Latchen statt ueber
+-- oe_n (das ist nur noch der Reset-Blank), also ist DIES das Austastfenster -- der
+-- Lampen-Trace (DBG_MODE 4/5) muss es benutzen, nicht lamp_oe_n.
+signal lamp_blank      : std_logic;
 signal boot_phase	: 	std_logic_vector(3 downto 0) := "0000";
 signal game_select : std_logic_vector(2 downto 0);
 signal freeplay 	 : std_logic;
@@ -492,7 +496,9 @@ end generate gen_dbg3;
 --                   Bewusst NICHT an eine benannte Referenzlampe gebunden: so braucht die
 --                   Gegenprobe keine Lampennummer und traegt in jedem Spielzustand, in dem
 --                   ueberhaupt etwas leuchtet -- kein Rebuild nur zum Umwaehlen.
---  [6] lamp_oe_n    Austastfenster der Matrix (high = alle Zeilen dunkel)
+--  [6] lamp_blank   Austastfenster der Matrix (high = alle Zeilen dunkel). NICHT oe_n: seit
+--                   SW 0.1.6 blankt die Matrix durch Nullen-Latchen, oe_n ist nur der Reset-Blank
+--                   und liegt im Betrieb dauerhaft auf '0'.
 --  [7] NMI-Puls     244-Hz-Zeitbasis -- liegen die Writes auf diesem Raster, IST es ein Refresh
 gen_dbg4: if DBG_MODE = 4 generate
 	constant W_IDX   : integer := FA_LAMP_BIT(DBG_WATCH_LAMP);
@@ -579,10 +585,10 @@ begin
 	debug_signal(1) <= evt_str(1);
 	debug_signal(2) <= evt_str(2);
 	debug_signal(3) <= lamp_state(W_IDX);
-	debug_signal(4) <= (lamp_state_mux(W_IDX) and not lamp_oe_n)
+	debug_signal(4) <= (lamp_state_mux(W_IDX) and not lamp_blank)
 	                   when lamp_strobe_sel = STROBE_ENC(W_PHASE) else '0';
-	debug_signal(5) <= any_drive and not lamp_oe_n;
-	debug_signal(6) <= lamp_oe_n;
+	debug_signal(5) <= any_drive and not lamp_blank;
+	debug_signal(6) <= lamp_blank;
 	debug_signal(7) <= not dma_int;
 end generate gen_dbg4;
 
@@ -590,9 +596,14 @@ end generate gen_dbg4;
 -- Aufnahme) -- Schiebefenster, Latch, Phasenwechsel, Austastung. Dieselben Signale liegen auch
 -- an den Board-Pins (oe_595/clk_595/rclk_595/aux_lamp_strobe); dieser Modus buendelt sie nur am
 -- LA-Header und ergaenzt die rekonstruierte Ansteuerung der Beobachtungslampe.
---  [0] ser  [1] srck  [2] rck  [3] oe_n  [4] strobe_sel(0)  [5] strobe_sel(1)
+--  [0] ser  [1] srck  [2] rck  [3] blank  [4] strobe_sel(0)  [5] strobe_sel(1)
 --  [6] watch_drive (DBG_WATCH_LAMP)  [7] lamp_wr (auf ~200 ns gedehnt, sonst bei 41,7 ns
 --      Abtastperiode nicht sicher zu treffen)
+-- Kanal 3 ist seit SW 0.1.6 das echte Austastfenster (Nullen-Latch), nicht mehr oe_n -- das
+-- liegt im Betrieb dauerhaft auf '0' und waere ein toter Kanal. Je Phase sind jetzt ZWEI
+-- rck-Pulse zu sehen: der erste blankt (Nullen), der zweite schaltet die Zeilen ein. Der
+-- Abstand zwischen der strobe_sel-Flanke (Kanal 4/5) und dem Ende von Kanal 3 ist die
+-- gesuchte Totzeit: ~20 us bei Options-DIP 5 = OFF, ~20 ns bei DIP 5 = ON.
 gen_dbg5: if DBG_MODE = 5 generate
 	constant W_IDX   : integer := FA_LAMP_BIT(DBG_WATCH_LAMP);
 	constant W_PHASE : integer := DBG_WATCH_LAMP mod LAMP_STROBES;
@@ -612,10 +623,10 @@ begin
 	debug_signal(0) <= lamp_ser;
 	debug_signal(1) <= lamp_srck;
 	debug_signal(2) <= lamp_rck;
-	debug_signal(3) <= lamp_oe_n;
+	debug_signal(3) <= lamp_blank;
 	debug_signal(4) <= lamp_strobe_sel(0);
 	debug_signal(5) <= lamp_strobe_sel(1);
-	debug_signal(6) <= (lamp_state_mux(W_IDX) and not lamp_oe_n)
+	debug_signal(6) <= (lamp_state_mux(W_IDX) and not lamp_blank)
 	                   when lamp_strobe_sel = STROBE_ENC(W_PHASE) else '0';
 	debug_signal(7) <= '1' when wr_cnt /= 0 else '0';
 end generate gen_dbg5;
@@ -709,7 +720,9 @@ aux_sol_latch(1) <= not fa_sol_ovr(21) when fa_ctrl_active = '1' else not lockou
 solenoids_enable <= not io_live;
 -- Lamp-Matrix (Phase B, lamp_matrix.vhd, Instanz LAMP): treibt die 74HC595-Kaskade ueber den
 -- NICHT-invertierenden 74HCT541. oe_595 aktiv-low ('0'=Ausgaenge frei). Bei Boot/Reset haelt
--- das Modul (enable='0') oe_595='1' => Lampen sicher AUS.
+-- das Modul (enable='0') oe_595='1' => Lampen sicher AUS. Im Betrieb bleibt oe_595 dauerhaft
+-- '0': geblankt wird seit SW 0.1.6 durch Nullen-Latchen, damit die ULN-Eingaenge nie floaten
+-- (s. lamp_matrix.vhd-Kopf).
 oe_595      <= lamp_oe_n;
 g_serin_595 <= lamp_ser;
 g_clk_595   <= lamp_srck;
@@ -1119,17 +1132,27 @@ port map(
 ------------------------------------------------------------------------------
 -- reset/enable an io_live: der Scan laeuft auch waehrend einer FA-Control-Uebernahme,
 -- gespeist dann aus fa_lamp_state (Lampennummer -> RAM-Bit-Lage, s. fa_lamp_map).
+-- Seit SW 0.1.6 blankt das Modul durch Nullen-Latchen statt ueber oe_n, und Options-DIP 5
+-- schaltet das Zeitverhalten der Original-MPU wieder ein (s. orig_timing unten und den Kopf
+-- von lamp_matrix.vhd -- Messung: docs/Lamp_Preglow_Experiment.md).
 LAMP: entity work.lamp_matrix
 port map(
 	clk_50     => clk_50,
 	reset      => not io_live,
 	enable     => io_live,
 	lamp_state => lamp_state_mux,
+	-- Options-DIP 5 (active-low gelesen, ON = '0'): ON = Zeitverhalten der Original-MPU,
+	-- Spaltenwechsel gleichzeitig mit dem Zeilen-Latch, inkl. Vorgluehen bei LED-Retrofits.
+	-- OFF (Serienstand) = Spalte wechselt im Austastfenster, ~20 us bevor die Zeilen scharf
+	-- werden. Der DIP wird direkt gelesen und ist im Spiel umschaltbar -- damit laesst sich der
+	-- Unterschied am Spielfeld ohne Neustart vergleichen (docs/Lamp_Preglow_Experiment.md).
+	orig_timing => not options(5),
 	ser        => lamp_ser,
 	srck       => lamp_srck,
 	rck        => lamp_rck,
 	oe_n       => lamp_oe_n,
-	strobe_sel => lamp_strobe_sel
+	strobe_sel => lamp_strobe_sel,
+	blank      => lamp_blank
 );
 
 ----------------------

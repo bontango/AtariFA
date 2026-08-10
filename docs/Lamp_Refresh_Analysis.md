@@ -22,17 +22,29 @@ apply to Atari Gen1** — there is no software refresh loop into which on-phases
 **Measured and confirmed on 2026-08-09** with a logic-analyser capture on the prototype: with a ball
 sitting in the shooter lane the CPU wrote to lamp RAM *not once in 25.7 s* while the matrix kept
 driving lit lamps — see §6. The
-"pre-glow" is therefore a **hardware artifact** of the original strobed lamp matrix
-(row latches reloaded while a column is live, plus driver leakage — §3.3), invisible on a hot
-incandescent filament but above an LED's turn-on
-threshold. AtariFA re-implements the driver cleanly (with hard blanking) and does not reproduce this
-artifact — which is exactly why LEDs work as test lamps.
+"pre-glow" is therefore a **hardware artifact** of the strobed lamp matrix — **row data live while
+the wrong column still conducts** (§3.3) — invisible on a hot incandescent filament but above an
+LED's turn-on threshold.
 
-**What the Troubleshooting Guide got right and wrong:** its *observation* ("a faint pulsing of the
-lamp filament" on lamps that are supposedly off) is correct and reproducible on the original. Its
-*explanation* — that this is a deliberate routine — is not. Nothing in the machine can pulse an
-individual off-lamp except the RAM image, and the RAM image demonstrably does not do it (§6.6). The
-Aux board, the only other candidate, cannot do it either: it never sees a lamp, only a column (§3.2).
+> **Update 2026-08-10 — measured on the playfield, and it corrects this document.** The artifact is
+> **not** confined to the original: an Airborne Avenger fitted with LED retrofits showed it on
+> **AtariFA** too, and in exactly the predicted pattern ("same row, previous column"). §3.3 is
+> therefore **proven rather than merely argued** — but the sentence that used to stand here, "AtariFA
+> blanks hard and does not reproduce this artifact", was **wrong**, and §4/§6.7 have been corrected
+> accordingly. What was measured in §6.7 is that AtariFA blanks cleanly **at the FPGA pins**; the
+> overlap happens *behind* the connector, because the Aux board's saturated 2N5883 column driver
+> needs tens of microseconds to turn off. Full write-up:
+> [`Lamp_Preglow_Experiment.md`](Lamp_Preglow_Experiment.md) §3. Fixed in SW 0.1.6, with the original
+> timing still selectable at run time via **Options DIP 5** (ibid. §4).
+
+**What the Troubleshooting Guide got right and wrong:** its *explanation* — that this is a deliberate
+routine — is not correct. Nothing in the machine can pulse an individual off-lamp except the RAM
+image, and the RAM image demonstrably does not do it (§6.6). The Aux board, the only other candidate,
+cannot do it either: it never sees a lamp, only a column (§3.2). Its *observation* ("a faint pulsing
+of the lamp filament") turns out to be shaky as well: on the 2026-08-10 playfield test **incandescent
+lamps showed nothing at all**, and the effect only became visible after fitting LEDs. The energy per
+event is orders of magnitude below what a hot filament would register — so whatever the service
+department saw, it was not a pulsing filament.
 
 ---
 
@@ -249,10 +261,25 @@ phase gets a short pulse, every 2 ms. Order of magnitude: four DMA write cycles 
 an LED needs to conduct. Add the leakage of the three un-driven PNP high-side drivers (R42…R45 hold
 them firmly off, so only collector leakage reaches the column) and the picture is complete.
 
-That is precisely the "faint pulsing of the lamp filament" the guide describes. It is a side effect
-of an unblanked design that Atari's service department rationalised as a feature. AtariFA blanks
-(`oe_n`) during shifting *and* during the strobe change, measured with **0 violations in 38 503
-phases** (§6.7) — which is why LEDs are cleanly off here.
+**Confirmed on the playfield, 2026-08-10** — and with a source this section had missed. Driving a
+single lamp `n` over FA-Control made **exactly** the LED at "same row, previous column" glow, and
+nothing else: lamp 22 lit ⇒ 21 glowed, 58 ⇒ 57, while the other two neighbours of the four-block
+stayed dark. That selectivity is the tell. A column that stayed charged for the whole phase would
+light all three neighbours; only the **just-deselected** column does, because it is the only one with
+an active source still feeding it.
+
+And that source needs no latch reload at all: **the column driver's turn-off delay alone opens the
+window**. Q6…Q9 (2N5883) are driven hard into saturation — the MC1413 pulls the base through 39 Ω,
+i.e. ~0.2 A of base current — and are turned off by nothing but the 8.2 K base-emitter resistors
+(R42…R45). That is a storage time in the tens of microseconds. The original has this on top of its
+latch-reload overlap; **AtariFA had it even though it blanks**, because up to SW 0.1.5 it released the
+rows ~20 ns after switching the column (see §4). Two consequences: the mechanism of this section is
+now measured rather than argued, and the open question of §6.5 ("which of the two switches first")
+turns out not to matter — the slow column makes the window either way.
+
+That is precisely the "faint pulsing" the guide describes — except that on real filaments there was
+nothing to see (TL;DR). It is a side effect of an unblanked, slow-switching column stage that Atari's
+service department rationalised as a feature.
 
 ---
 
@@ -262,15 +289,34 @@ phases** (§6.7) — which is why LEDs are cleanly off here.
   `lamp_state(127:0)` — identical in spirit to PinMAME's `ram_w`. It captures only the *true* static
   on/off image.
 - **Scan / multiplex:** `lamp_matrix.vhd` re-creates the 21×4 matrix (three cascaded 74HC595 →
-  12× ULN2003A rows, four SA/SB/SC/SD strobes) with a free-running FSM. During shifting and strobe
-  switching it **hard-blanks all rows** (`oe_n = '1'`), so an off-lamp bit produces exactly **0 mA** —
-  no sneak path, no pre-glow.
+  12× ULN2003A rows, four SA/SB/SC/SD strobes) with a free-running FSM. It blanks all rows while
+  shifting and while the column changes, so an off-lamp bit contributes **no drive current of its
+  own**.
 
-**Empirical cross-check (decisive):** AtariFA executes the *original* game ROM. If the pre-glow were a
-software effect (the ROM writing on-patterns into `0x30–0x3F`), the sniffer would faithfully reproduce
-it and the test LEDs would glow. They do not (HW-tested, `lamp_matrix.vhd`, Phase B). This is a direct
-empirical confirmation that the original pre-glow is a **hardware** artifact, consistent with the ROM
-disassembly above.
+**But blanking the rows is not enough, and this is where the earlier version of this section was
+wrong.** It claimed "exactly 0 mA — no sneak path, no pre-glow". Two corrections from the 2026-08-10
+playfield test ([`Lamp_Preglow_Experiment.md`](Lamp_Preglow_Experiment.md) §3):
+
+1. **The blanking window sat on the wrong side of the strobe change.** Up to SW 0.1.5 the sequence was
+   *blank → shift 24 bits (~10 µs) → latch → switch column → un-blank 20 ns later*. So the 10 µs of
+   blanking protected the shifting, and the column change got none of it — the rows went live
+   essentially together with the new column, while the old one was still conducting (§3.3). Fixed in
+   **SW 0.1.6**: the column now switches at the *start* of the blank, ~20 µs before the rows go live.
+   Options **DIP 5 = ON** restores the old, original-faithful timing for A/B comparison.
+2. **`oe_n = '1'` is not "0 mA", it is high-Z.** The 595 outputs float, and so do the Darlington
+   inputs behind them — µA of leakage, which is nothing for a filament and plenty for an LED retrofit.
+   The original never had this state: its row inputs come from **9334** addressable latches, i.e.
+   permanently driven totem-pole outputs, so an off-row there is a hard `'0'` 100 % of the time. Also
+   fixed in SW 0.1.6, in **both** timing modes, by blanking through *latching zeros* instead of
+   `/OE` — this makes AtariFA more faithful, not less. `oe_n` is now only the reset/boot blank, where
+   the 595 content is unknown and high-Z is the only safe state.
+
+**Empirical cross-check (still decisive, and unaffected):** AtariFA executes the *original* game ROM.
+If the pre-glow were a software effect (the ROM writing on-patterns into `0x30–0x3F`), the sniffer
+would faithfully reproduce it — measured absent in §6.6, and the pattern actually observed on the
+playfield (§3.3: strictly "same row, previous column") is not something a RAM image could produce
+selectively. The original pre-glow is a **hardware** artifact, consistent with the ROM disassembly
+above.
 
 ---
 
@@ -281,9 +327,10 @@ Two concerns raised, both resolved:
 **(a) Are the original incandescent lamps driven too hard / too bright by AtariFA?** No.
 - Incandescent brightness depends on **average power**; the filament's thermal time constant (many ms)
   integrates over many pulses, so the **refresh frequency is irrelevant** to brightness.
-- Duty cycle is what matters: AtariFA runs **~24.5 %** per lamp (one of four strobe phases,
-  `DWELL_CYCLES = 25100` ≈ 502 µs of ~2048 µs/frame; it was 24.04 % up to SW 0.1.4 with
-  `DWELL_CYCLES = 12500`), structurally capped at ~25 % because only one strobe is ever active at a
+- Duty cycle is what matters: AtariFA runs **~24 %** per lamp (one of four strobe phases; since
+  SW 0.1.6 `DWELL_CYCLES = 24100` plus the ~10 µs zero-shift pass during which the lamp is still lit
+  ⇒ 24.0 %, or 24.5 % with Options DIP 5 = ON, where the settle window is not spent; it was 24.5 %
+  at 0.1.5 and 24.04 % up to 0.1.4), structurally capped at ~25 % because only one strobe is ever active at a
   time. The original 4-fold multiplex is likewise **~25 %** — stated verbatim in the Troubleshooting
   Guide ("each strobe has an 'on' duty cycle of only 25 %", §3.1). → essentially identical average
   power → same brightness (if anything marginally dimmer on AtariFA due to shift overhead). Since
@@ -391,23 +438,24 @@ result in §6.6, where they land on exactly every 20th NMI. The refresh question
 ### 6.5 What this trace does *not* cover
 
 It settles the **software** side — the falsification of the keep-alive claim — because the same ROM
-code runs here as on the original machine. Three things remain open:
+code runs here as on the original machine. What remained open, and what became of it:
 
-- It does **not** positively prove the driver-side cause of the original pre-glow. §3.3 makes the
-  row/column mismatch mechanism structurally compelling (schematic-supported: the Aux decoder cannot
-  blank, and the guide's own 4 × 500 µs in 2 ms leaves no gap), but "compelling" is not "measured".
-  That would need either a capture on the original MPU's lamp driver signals (9334 latches / SA–SD
-  strobes, looking for the row-data/strobe overlap) or a controlled counter-experiment: make the
-  blanking in `lamp_matrix.vhd` switchable, drop it, and see whether the glow reappears on the real
-  playfield. Both steps — what to look for on the machine first, and how the switchable version
-  would be built — are written up in
-  [`Lamp_Preglow_Experiment.md`](Lamp_Preglow_Experiment.md) (planned 2026-08-10, nothing built yet).
-- Only **Airborne Avenger** was captured. The Troubleshooting Guide is written for Gen1 in general,
-  so strictly speaking the other four ROMs are untested. Re-running §6.3 for each is cheap (one build
-  with `DBG_MODE = 4`, then switch `game_select`), and the decisive channel 0 needs no lamp number.
-- The exact ordering inside a strobe phase of the original — strobe switch first or latch reload
-  first — is not established. §3.3 does not depend on it (either order opens the same window), but a
-  capture on an original board would pin it down.
+- ~~It does **not** positively prove the driver-side cause of the original pre-glow.~~ **Closed
+  2026-08-10** by observation on the playfield instead of by capture: driving single lamps over
+  FA-Control reproduced the artifact on AtariFA with the exact signature §3.3 predicts ("same row,
+  previous column", and only that one neighbour) — see
+  [`Lamp_Preglow_Experiment.md`](Lamp_Preglow_Experiment.md) §3. The controlled counter-experiment
+  that was planned for this — a switchable blanking — exists now as the production fix plus **Options
+  DIP 5** for the original timing (ibid. §4), so the A/B test can be repeated at any time without a
+  rebuild.
+- Only **Airborne Avenger** was captured, and the same game was used for the 2026-08-10 observation.
+  The Troubleshooting Guide is written for Gen1 in general, so strictly speaking the other four ROMs
+  are untested. Re-running §6.3 for each is cheap (one build with `DBG_MODE = 4`, then switch
+  `game_select`), and the decisive channel 0 needs no lamp number. For the *hardware* artifact the
+  game does not matter at all — it lives in the driver stage.
+- ~~The exact ordering inside a strobe phase of the original — strobe switch first or latch reload
+  first — is not established.~~ **Moot** (§3.3): the column driver's turn-off delay opens the window
+  regardless of the order, so nothing hangs on it any more.
 
 ### 6.6 Results — measured 2026-08-09, `DBG_MODE = 4`, `DBG_WATCH_LAMP = 8`
 
@@ -472,20 +520,35 @@ shows its first transition at the identical 85.333 µs. It is a capture-start ar
 event — a real strobe glitch during dwell would not occur exactly once in 10 s, precisely on the
 first block boundary. Every one of the 38 503 genuine phase changes is blanked.
 
-**Result:** `rck` and the strobe switch happen in the *same* clock edge, 208 ns before the outputs
-are released, and the outputs were already blanked 9.8 µs earlier. There is no window in which live
-outputs see a row/column mismatch.
+**Result, as far as this capture reaches:** `rck` and the strobe switch happen in the *same* clock
+edge, 208 ns before the outputs are released, and the outputs were already blanked 9.8 µs earlier. At
+the **FPGA pins** there is no window in which live outputs see a row/column mismatch.
+
+> **Correction, 2026-08-10 — the conclusion drawn from this was too strong.** The table above already
+> contains the problem; it was simply not read as one. *"strobe change → output enable: 208 ns"* means
+> the column is told to switch **208 ns before the rows go live** — and behind the connector sits a
+> saturated 2N5883 that needs *tens of microseconds* to stop conducting (§3.3). The entire 9.8 µs of
+> blanking sits on the wrong side of that edge. So the correct reading of this measurement is: the
+> FPGA does exactly what it was told, and what it was told was wrong. An 8-channel capture of FPGA
+> outputs structurally cannot see this — it would take a probe on a strobe line at the lamp panel.
+> The playfield observation of [`Lamp_Preglow_Experiment.md`](Lamp_Preglow_Experiment.md) §3 did see
+> it. **SW 0.1.6** moves the strobe change to the *start* of the blanking window, so that row of the
+> table should read ~20 µs, and adds a second correction the table cannot show at all: `oe_n = '1'` is
+> high-Z, not 0 mA (§4). Since 0.1.6, channel 3 of `DBG_MODE = 5` carries the real blanking window
+> (`blank`) rather than `oe_n`, which now stays low during operation, and there are **two** `rck`
+> pulses per phase — the first latches zeros, the second the pattern.
 
 The longer dwell of SW 0.1.5 does not weaken this: blanking happens *at the switch*, not during the
 dwell, so the blanking window, the bit clock, the `rck`→enable delay and above all the violation
 counts are independent of `DWELL_CYCLES`. Only the visible window and the frame period scale.
 
-**The original has no such blanking at all** — and that is not an assumption but follows from two
+**The original has no blanking at all** — and that is not an assumption but follows from two
 independent sources (§3.2/§3.3): the Aux board decodes `LAMP BIT 0/1` with a 7402 NOR array that has
 **no enable input**, so exactly one of the four strobes is powered at every instant; and the
 Troubleshooting Guide's own figures leave no room for a gap (4 × ~500 µs in a 2 ms period). Its 9334
-row latches are therefore reloaded by the DMA while a column is live — exactly the structural
-difference that makes LEDs work on AtariFA and pre-glow on the original.
+row latches are therefore reloaded by the DMA while a column is live. AtariFA's blanking narrows that
+window but, up to SW 0.1.5, did not close it — the slow column stage is shared hardware and does not
+care which MPU drives it.
 
 #### 6.7.1 Side finding: the 24th shift pulse is only 20 ns wide
 

@@ -29,7 +29,8 @@ v1.0 06.08.2026
   - [4.2. Die 6er-Bank: Optionen](#42-die-6er-bank-optionen)
     - [4.2.1. Option 3 -> wo der Ton herauskommt](#421-option-3---wo-der-ton-herauskommt)
     - [4.2.2. Option 4 -> FA-Control darf übernehmen](#422-option-4---fa-control-darf-übernehmen)
-    - [4.2.3. Optionen 1, 2, 5, 6 -> reserviert](#423-optionen-1-2-5-6---reserviert)
+    - [4.2.3. Optionen 1, 2, 6 -> reserviert](#423-optionen-1-2-6---reserviert)
+    - [4.2.4. Option 5 -> Lampen-Timing wie bei der Original-MPU](#424-option-5---lampen-timing-wie-bei-der-original-mpu)
   - [4.3. Sechs der zehn DIPs werden nur beim Einschalten gelesen](#43-sechs-der-zehn-dips-werden-nur-beim-einschalten-gelesen)
 - [5. Der Startvorgang](#5-der-startvorgang)
   - [5.1. Phase 1: die DIP-Schalter werden gelesen](#51-phase-1-die-dip-schalter-werden-gelesen)
@@ -161,7 +162,7 @@ Grundeinstellung ist **alle „OFF"** — das ist bei einem Standardautomaten ri
 | Dip2 | reserviert                                                  | beim Einschalten  |
 | Dip3 | **Ton: OFF = Auxiliary Board, ON = Verstärker auf der Platine** | fortlaufend    |
 | Dip4 | **FA-Control darf übernehmen** — ON = erlaubt                | fortlaufend       |
-| Dip5 | reserviert                                                  | fortlaufend       |
+| Dip5 | **Lampen-Timing: OFF = ruhig, ON = wie die Original-MPU**    | fortlaufend       |
 | Dip6 | reserviert                                                  | fortlaufend       |
 
 #### 4.2.1. Option 3 -> wo der Ton herauskommt
@@ -180,11 +181,23 @@ Dieser Schalter **darf im laufenden Spiel umgestellt werden** — er wird fortla
 
 Auch dieser Schalter wird fortlaufend gelesen: wer ihn im laufenden Betrieb auf „OFF" stellt, nimmt FA-Control die Kontrolle **sofort** wieder weg, und das Spiel startet neu. Das ist der Not-Aus für den Fall, dass ein Testgerät sich aufhängt.
 
-#### 4.2.3. Optionen 1, 2, 5, 6 -> reserviert
+#### 4.2.3. Optionen 1, 2, 6 -> reserviert
 
 Nicht belegt, bitte auf „OFF" lassen. Sie sind verdrahtet, sie werden auf der Info-Anzeige dargestellt, und sie sind für spätere Software-Versionen vorgesehen.
 
 Option 1 gehörte zu einer versuchsweisen Speicherung von Credits und Highscores, die derzeit zurückgestellt ist, siehe Kapitel 13. In dieser Software-Version hat sie keine Wirkung.
+
+#### 4.2.4. Option 5 -> Lampen-Timing wie bei der Original-MPU
+
+Die Lampen laufen bei Atari im Zeitmultiplex: vier Spalten werden der Reihe nach je eine halbe Millisekunde eingeschaltet. An der Original-MPU wird die Spalte im selben Augenblick umgeschaltet, in dem die neuen Lampenwerte gültig werden. Weil die Spaltentreiber auf dem Auxiliary Board beim Abschalten ein paar Mikrosekunden nachhängen, bekommt dabei jedes Mal die *falsche* Lampe einen ganz kurzen Stromstoß — die Nachbarlampe in derselben Treibergruppe, aus der vorherigen Spalte.
+
+Bei einer Glühlampe merkt man davon nichts. **LED-Ersatzlampen glimmen dadurch aber sichtbar**, obwohl sie ausgeschaltet sind. Das ist der bekannte Effekt, dass LEDs in einem Atari „nie ganz ausgehen"; das Atari-Handbuch beschreibt ihn als angebliche „keep-alive"-Schaltung, gemeint ist aber dieselbe Sache.
+
+- **„OFF"** — **ruhige Lampen. Grundeinstellung.** AtariFA schaltet die Spalte um, während alle Lampen ausgetastet sind, und lässt der alten Spalte etwa 20 Mikrosekunden Zeit zum Abklingen. Ausgeschaltete LEDs bleiben aus. **Das ist die Einstellung für einen Automaten mit LED-Ersatzlampen.**
+
+- **„ON"** — **Zeitverhalten der Original-MPU**, einschließlich des Glimmens. Interessant, wenn Sie AtariFA mit der Originalplatine vergleichen wollen oder wenn Ihnen das Original-Verhalten lieber ist. Auf die Helligkeit hat der Schalter praktisch keinen Einfluss (24,0 % gegen 24,5 % Einschaltdauer), auf Glühlampen gar keinen.
+
+Dieser Schalter wird fortlaufend gelesen, darf also im laufenden Spiel umgestellt werden — damit lässt sich der Unterschied unmittelbar vergleichen.
 
 ### 4.3. Sechs der zehn DIPs werden nur beim Einschalten gelesen
 
@@ -420,13 +433,15 @@ Alle fünf laufen auch mit Freispiel (Kapitel 7).
  2  Spielauswahl Bit 1  (+2)         2  reserviert          beim Einschalten
  3  Spielauswahl Bit 2  (+4)         3  Tonweg              fortlaufend
  4  Freispiel, ON = aktiv            4  FA-Control erlaubt  fortlaufend
-                                     5  reserviert          fortlaufend
+                                     5  Lampen-Timing       fortlaufend
  alle vier nur beim Einschalten      6  reserviert          fortlaufend
 ```
 
 **Tonweg, Option 3:** OFF = Auxiliary Board (Standard) · ON = Verstärker auf der Platine
 
 **FA-Control, Option 4:** OFF = niemand redet dazwischen (Standard) · ON = das ESP32-Testwerkzeug darf die Anlage steuern (Kapitel 9)
+
+**Lampen-Timing, Option 5:** OFF = ruhige Lampen, ausgeschaltete LEDs bleiben aus (Standard) · ON = Zeitverhalten der Original-MPU, LED-Ersatzlampen glimmen wie am Original (Kapitel 4.2.4)
 
 **Nach dem Ändern eines Schalters, der beim Einschalten gelesen wird: aus- und wieder einschalten.**
 

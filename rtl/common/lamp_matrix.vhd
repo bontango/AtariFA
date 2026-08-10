@@ -27,14 +27,39 @@
 --   RAM-Offset einer (Latch L, Strobe s)-Zelle = L*4 + s
 --   => ser_bit(Gruppe N, Strobe s) = lamp_state[(L*4 + s)*8 + b]   mit N = GRP_OF(L*6 + b)
 --
--- Scan-FSM (clk_50): je Strobe-Phase s: (a) oe_n=1 blanken -> (b) 24 Bit schieben (21 genutzt,
---   3 = '0') -> (c) rck-Latch -> (d) strobe_sel<=enc(s) -> (e) oe_n=0 (Phase sichtbar) -> (f) Dwell.
---   Blanken waehrend Schieben/Umschalten verhindert Ghosting. Native ~25% Duty (4-fach-Multiplex).
---   Zeitraster seit SW 0.1.5 = Original: 512 us je Phase, 2,048 ms je Frame (488,3 Hz), s. DWELL_CYCLES.
---   St_ShiftLast haelt den LETZTEN Schiebetakt eine volle Tick-Haelfte high -- s. Kommentar dort.
+-- ============================== SCAN-FSM (clk_50) ==============================
+-- Je Strobe-Phase laufen ZWEI Schiebedurchlaeufe durch die 595-Kaskade (Register 'pass'):
+--   pass=0 "Clear":  24 Nullen schieben -> rck  => alle Zeilen AKTIV auf '0' (Blank beginnt)
+--   pass=1 "Daten":  Muster der Phase schieben -> rck  => Zeilen der Phase gehen an
+-- Dazwischen wird die Spalte umgeschaltet, und GENAU DAS ist der Unterschied der beiden Modi:
+--   orig_timing='0' (Serienstand): strobe_sel wechselt beim CLEAR-Latch, also waehrend die
+--     Zeilen aus sind. Bis die Zeilen wieder angehen liegen St_Settle + Datendurchlauf = ~20 us
+--     -- Zeit, in der die alte Spalte auf dem Aux-Board abklingen kann.
+--   orig_timing='1' (Options-DIP 5 ON): strobe_sel wechselt beim DATEN-Latch, also im selben
+--     Moment, in dem die Zeilen scharf werden -- das Zeitverhalten der Original-MPU.
+-- Warum das eine Rolle spielt (gemessen 2026-08-10 am Airborne-Spielfeld mit LED-Retrofits,
+-- s. docs/Lamp_Preglow_Experiment.md): die Spalten-PNP auf dem Aux-Board (2N5883, hart in
+-- Saettigung, Abschalten nur ueber 8,2 K Basis-Emitter) haengen zweistellige us nach. Wechseln
+-- Spalte und Zeilen gleichzeitig, sieht die noch leitende ALTE Spalte bereits das NEUE
+-- Zeilenmuster -> die Lampe "gleiche Zeile, vorhergehende Spalte" bekommt einen Stromstoss.
+-- Fuer einen Gluehfaden nichts, fuer eine LED deutlich sichtbar. Das ist das im Atari
+-- Troubleshooting Guide als "keep-alive routine" beschriebene Vorgluehen.
+--
+-- Blanken durch NULLEN-LATCHEN statt oe_n=Hi-Z: im Original haengen die ULN-Eingaenge an
+-- 9334-Latches, die permanent treiben -- eine Aus-Zeile ist dort 100 % der Zeit eine harte '0'.
+-- Unser frueheres oe_n-Blankfenster liess die 595-Ausgaenge und damit die ULN-Eingaenge floaten;
+-- die uA Leckstrom genuegen einer LED-Retrofit zum Glimmen (am Spielfeld beobachtet: 4 von 8
+-- LEDs glimmten OHNE jede Ansteuerung). oe_n ist deshalb nur noch der Reset-/Boot-Blank -- da
+-- ist der Inhalt der 595 unbekannt, Hi-Z also der einzige sichere Zustand -- und geht mit dem
+-- ersten Nullen-Latch dauerhaft auf '0'. Kostet keine Helligkeit: die Nullen werden geschoben,
+-- WAEHREND die Lampe noch leuchtet; die Ausgaenge aendern sich erst mit rck.
+--
+-- St_ShiftLast haelt den LETZTEN Schiebetakt eine volle Tick-Haelfte high -- s. Kommentar dort.
 --
 -- Sicherheit: reset='1' ODER enable='0' -> oe_n='1' (alle Lampen AUS), strobe_sel="00".
---   (In AtariFA.vhd: enable=reset_l_stable -> Lampen erst mit laufender CPU; Boot/Reset sicher AUS.)
+--   (In AtariFA.vhd: enable=io_live -> Lampen erst mit laufender CPU oder FA-Control-Uebernahme;
+--    Boot/Reset sicher AUS. Nach dem Loslassen ist der erste Durchlauf der Clear-Durchlauf, oe_n
+--    geht also erst frei, wenn nachweislich Nullen in den Ausgangslatches stehen.)
 --
 -- HW-TUNBAR (bei falscher Lampe/Strobe am Prototyp NUR die markierten Stellen aendern):
 --   * GRP_OF     : (Latch L, Bit b) -> 595-Ausgang N; direkte Abschrift der Excel-Mappe 'aktuell'.
@@ -48,6 +73,9 @@
 --                  im Top (DBG_MODE 4/5) dieselbe Kodierung braucht.
 --   * Latch=offset[3:2]/Strobe=offset[1:0] : Annahme aus 9334-Adressierung (unten im idx).
 --   * Shift-Reihenfolge (vec(23) zuerst = MSB) bzw. welcher 74HC595 zuerst in der Kaskade.
+--   * SETTLE_CYCLES : Totzeit zwischen Spaltenwechsel und Zeilen-Scharfwerden. Reicht das
+--                  Vorgluehen-Fenster nicht (LED glimmt trotz DIP 5 = OFF weiter), ist DAS der
+--                  Hebel -- s. Generic-Block unten.
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -56,43 +84,83 @@ use work.lamp_map_pkg.all;        -- GRP_OF, STROBE_ENC (HW-TUNBAR)
 
 entity lamp_matrix is
 	generic (
-		-- Sichtbares Fenster je Strobe-Phase (oe_n low). Zusammen mit dem Schiebe-Overhead
-		-- ergibt das die Phasendauer und damit den Lampen-Frame:
-		--   Overhead je Phase (FSM, bei SHIFT_DIV=10):
-		--     St_Load 1 + 24 x (ShiftLo+ShiftHi) 480 + ShiftLast 10 + Latch 10 + Enable 1
-		--     = ~500 clk = 10 us  (am LA gemessen: 10,000 us Blankfenster seit St_ShiftLast,
+		-- Ruhezeit je Strobe-Phase. Zusammen mit den ZWEI Schiebedurchlaeufen und der
+		-- Spalten-Totzeit ergibt das die Phasendauer und damit den Lampen-Frame:
+		--   Ein Schiebedurchlauf (FSM, bei SHIFT_DIV=10):
+		--     St_Load 1 + 24 x (ShiftLo+ShiftHi) 480 + ShiftLast 10 + Latch 10
+		--     = 501 clk = 10 us  (am LA gemessen: 10,000 us seit St_ShiftLast,
 		--      docs/Lamp_Refresh_Analysis.md 6.7.1)
-		--   Phase = 25100 + 500 = 25600 clk x 20 ns = 512,0 us = EIN Digit-Slot wie im Original
-		--   Frame = 4 Phasen = 2,048 ms = 488,3 Hz,  Duty = 25100/25600/4 = 24,5 %
+		--   Phase = Dwell + Clear-Durchlauf 501 + Settle + Daten-Durchlauf 501 + Enable 1
+		--   Serienstand   : 24100 + 501 + 497 + 501 + 1 = 25600 clk x 20 ns = 512,0 us
+		--   DIP 5 = ON    : 24597 + 501 +   0 + 501 + 1 = 25600 clk        = 512,0 us
+		--     (im Original-Modus ist St_Settle uebersprungen, die Zeit schlaegt statt dessen
+		--      auf den Dwell auf -- die Phasendauer ist in beiden Modi GLEICH, sonst
+		--      vergleicht man am Spielfeld zwei Variablen statt einer)
+		--   Phase = EIN Digit-Slot wie im Original, Frame = 4 Phasen = 2,048 ms = 488,3 Hz
+		--   Duty: Serienstand 24602/(4x25600) = 24,0 %, DIP 5 = ON 25099/... = 24,5 %
+		--     (0,5 Prozentpunkte = unsichtbar; das Settle-Fenster ist dunkel. Wer den
+		--      Unterschied ganz weghaben will, setzt SETTLE_CYCLES = 0 -- dann traegt schon
+		--      der Daten-Durchlauf 10 us Totzeit.)
 		-- Damit laeuft die Matrix im selben Raster wie die Original-DMA-Kette (Troubleshooting
 		-- Guide: 512 us je Spalte, "duty cycle of only 25 %"). Bis SW 0.1.4 stand hier 12500
 		-- (250 us, ~961 Hz) -- doppelt so schnell wie das Original bei gleicher Helligkeit.
 		-- DWELL_CYCLES ist der einzige Software-seitige HELLIGKEITSHEBEL (Duty, nicht Spannung).
-		DWELL_CYCLES : integer := 25100;  -- clk_50-Zyklen je Strobe-Phase (~502us) -> 488Hz Frame
-		SHIFT_DIV    : integer := 10      -- clk_50 je SRCK-Halbperiode (SHIFT_DIV=10 -> ~2.5MHz Bit-Takt)
+		DWELL_CYCLES  : integer := 24100; -- clk_50-Zyklen Ruhezeit je Strobe-Phase -> 488Hz Frame
+		-- Totzeit zwischen Spaltenwechsel und Scharfwerden der Zeilen (nur Serienstand).
+		-- Zusammen mit dem Daten-Durchlauf ergibt 497 rund 20 us, in denen die alte Spalte
+		-- abklingen kann. HW-TUNBAR: glimmt die "gleiche Zeile, vorhergehende Spalte"-Lampe
+		-- trotz DIP 5 = OFF weiter, ist die PNP-Speicherzeit laenger -> 1250 (25 us), dann 2500
+		-- (50 us) versuchen und DWELL_CYCLES um denselben Betrag senken (Phase bleibt 25600).
+		SETTLE_CYCLES : integer := 497;
+		SHIFT_DIV     : integer := 10     -- clk_50 je SRCK-Halbperiode (SHIFT_DIV=10 -> ~2.5MHz Bit-Takt)
 	);
 	port (
-		clk_50     : in  std_logic;
-		reset      : in  std_logic;                       -- active-high: alle Lampen AUS
-		enable     : in  std_logic;                       -- '1' = Scan aktiv (CPU laeuft)
-		lamp_state : in  std_logic_vector(127 downto 0);  -- RAM 0x30-0x3F Shadow (16 Byte)
-		ser        : out std_logic;                       -- 74HC595 SER   (-> g_serin_595)
-		srck       : out std_logic;                       -- 74HC595 SRCLK (-> g_clk_595)
-		rck        : out std_logic;                       -- 74HC595 RCLK  (-> g_rclk_595)
-		oe_n       : out std_logic;                       -- 74HC595 /OE   (-> oe_595), active-low
-		strobe_sel : out std_logic_vector(1 downto 0)     -- Strobe-Select (-> aux_lamp_strobe, Top invertiert)
+		clk_50      : in  std_logic;
+		reset       : in  std_logic;                       -- active-high: alle Lampen AUS
+		enable      : in  std_logic;                       -- '1' = Scan aktiv (CPU laeuft)
+		-- '1' = Zeitverhalten der Original-MPU (Spaltenwechsel gleichzeitig mit dem Zeilen-Latch,
+		-- inkl. Vorgluehen bei LED-Retrofits). Im Top an Options-DIP 5. Wird EINMAL JE FRAME
+		-- uebernommen, damit ein Umschalten mitten in der Phase keinen Glitch erzeugt; ein
+		-- mechanischer Schalter ist kein zeitkritischer Eingang.
+		orig_timing : in  std_logic;
+		lamp_state  : in  std_logic_vector(127 downto 0);  -- RAM 0x30-0x3F Shadow (16 Byte)
+		ser         : out std_logic;                       -- 74HC595 SER   (-> g_serin_595)
+		srck        : out std_logic;                       -- 74HC595 SRCLK (-> g_clk_595)
+		rck         : out std_logic;                       -- 74HC595 RCLK  (-> g_rclk_595)
+		oe_n        : out std_logic;                       -- 74HC595 /OE   (-> oe_595), active-low
+		strobe_sel  : out std_logic_vector(1 downto 0);    -- Strobe-Select (-> aux_lamp_strobe, Top invertiert)
+		-- Diagnose fuer den Lampen-Trace im Top (DBG_MODE 4/5): '1' = Zeilen sind aus.
+		-- Das ist direkt das 'pass'-Register, kostet also nichts. Seit das Blanken ueber die
+		-- Datenlatches laeuft, ist oe_n NICHT mehr das Austastfenster -- ohne diesen Ausgang
+		-- wuerde die Messung aus Lamp_Refresh_Analysis.md 6.7 ins Leere zeigen.
+		-- Genauigkeit: 'pass' kippt am ENDE des jeweiligen St_Latch, die Zeilen schalten aber
+		-- mit der rck-FLANKE an dessen Anfang -- beide Kanten liegen also ~200 ns (ein Tick) zu
+		-- spaet. Die BREITE des Fensters stimmt; wer auf ns genau messen will, nimmt rck (zwei
+		-- Pulse je Phase: der erste blankt, der zweite schaltet ein).
+		blank       : out std_logic
 	);
 end lamp_matrix;
 
 architecture rtl of lamp_matrix is
-	type state_t is (St_Load, St_ShiftLo, St_ShiftHi, St_ShiftLast, St_Latch, St_Enable, St_Dwell);
+	type state_t is (St_Load, St_ShiftLo, St_ShiftHi, St_ShiftLast, St_Latch, St_Settle,
+	                St_Enable, St_Dwell);
 	signal state     : state_t := St_Load;
 	signal shiftreg  : std_logic_vector(23 downto 0) := (others => '0');
 	signal bit_cnt   : integer range 0 to 23 := 0;
 	signal phase     : integer range 0 to 3 := 0;
-	signal dwell_cnt : integer range 0 to DWELL_CYCLES := 0;
+	-- zaehlt beide Wartezustaende (Dwell und Settle) -- ein Zaehler genuegt, sie sind nie
+	-- gleichzeitig aktiv. Obergrenze ist der Dwell im Original-Modus.
+	signal dwell_cnt : integer range 0 to DWELL_CYCLES + SETTLE_CYCLES := 0;
 	signal div_cnt   : integer range 0 to SHIFT_DIV := 0;
 	signal tick      : std_logic := '0';
+	-- '0' = Clear-Durchlauf (24 Nullen), '1' = Datendurchlauf (Muster der Phase).
+	-- pass='1' ist gleichzeitig das Austastfenster und geht als 'blank' nach draussen.
+	signal pass      : std_logic := '0';
+	-- orig_timing, einmal je Frame uebernommen (s. Portkommentar)
+	signal orig_mode : std_logic := '0';
+	-- Dwell-Ziel: im Original-Modus schlaegt die uebersprungene Settle-Zeit hier auf, damit die
+	-- Phase in beiden Modi 25600 clk lang ist.
+	signal dwell_lim : integer range 0 to DWELL_CYCLES + SETTLE_CYCLES := DWELL_CYCLES;
 
 	-- GRP_OF (595-Ausgang je Latch/Bit) kommt aus work.lamp_map_pkg -- dort steht auch
 	-- die daraus berechnete Umkehrung, die das Top-Level fuer FA-Control braucht.
@@ -101,6 +169,9 @@ architecture rtl of lamp_matrix is
 	-- work.lamp_map_pkg -- der Lampen-Trace im Top (DBG_MODE 4/5) muss dieselbe Kodierung
 	-- kennen, um aus strobe_sel auf die sichtbare Phase zurueckzurechnen.
 begin
+
+	blank     <= pass;
+	dwell_lim <= DWELL_CYCLES + SETTLE_CYCLES when orig_mode = '1' else DWELL_CYCLES;
 
 	-- Shift-Takt-Tick: ein Puls alle SHIFT_DIV clk_50-Zyklen (paced die SRCK-Flanken)
 	process(clk_50)
@@ -132,24 +203,29 @@ begin
 				phase      <= 0;
 				bit_cnt    <= 0;
 				dwell_cnt  <= 0;
+				pass       <= '0';            -- erster Durchlauf nach Reset/Freigabe = Clear
 			else
 				case state is
 
 					when St_Load =>
-						-- 24-Bit-Vektor fuer aktuelle Phase bauen (vec(N-1) = 595-Ausgang N, 1..24)
+						-- Clear-Durchlauf: 24 Nullen -> alle Zeilen aktiv aus.
+						-- Datendurchlauf: Muster der aktuellen Phase (vec(N-1) = 595-Ausgang N).
 						vec := (others => '0');
-						for L in 0 to 3 loop                     -- Latch-Index 0=1000..3=100C
-							for b in 0 to 5 loop                 -- Latch-Bit
-								N := GRP_OF(L * 6 + b);          -- 595-Ausgang (0 = unbenutzt)
-								if N /= 0 then
-									idx := (L * 4 + phase) * 8 + b;  -- RAM-Bit: offset = L*4 + s (HW-TUNBAR)
-									vec(N - 1) := lamp_state(idx);
-								end if;
+						if pass = '1' then
+							for L in 0 to 3 loop                     -- Latch-Index 0=1000..3=100C
+								for b in 0 to 5 loop                 -- Latch-Bit
+									N := GRP_OF(L * 6 + b);          -- 595-Ausgang (0 = unbenutzt)
+									if N /= 0 then
+										idx := (L * 4 + phase) * 8 + b;  -- RAM-Bit: offset = L*4 + s (HW-TUNBAR)
+										vec(N - 1) := lamp_state(idx);
+									end if;
+								end loop;
 							end loop;
-						end loop;
+						elsif phase = 0 then
+							orig_mode <= orig_timing;       -- Modus einmal je Frame uebernehmen
+						end if;
 						shiftreg <= vec;
 						bit_cnt  <= 0;
-						oe_n     <= '1';                    -- blanken waehrend Schieben/Umschalten
 						rck      <= '0';
 						srck     <= '0';
 						state    <= St_ShiftLo;
@@ -186,22 +262,60 @@ begin
 						end if;
 
 					when St_Latch =>
-						srck       <= '0';
-						rck        <= '1';                  -- Shift- -> Storage-Register uebernehmen
-						strobe_sel <= STROBE_ENC(phase);    -- Strobe dieser Phase waehlen
+						srck <= '0';
+						rck  <= '1';                        -- Shift- -> Storage-Register uebernehmen
+						if pass = '0' then
+							-- Dieser rck schaltet ALLE Zeilen aus -> sicheres Fenster fuer die Spalte
+							if orig_mode = '0' then
+								strobe_sel <= STROBE_ENC(phase);
+							end if;
+						else
+							-- Dieser rck schaltet die Zeilen der Phase EIN
+							if orig_mode = '1' then
+								strobe_sel <= STROBE_ENC(phase);   -- gleichzeitig = Original
+							end if;
+							-- ... und gibt die Ausgaenge dauerhaft frei. Erst HIER, nicht schon beim
+							-- Nullen-Latch: nach Reset/Freigabe ist der Inhalt der 595 unbekannt, also
+							-- bleibt der erste Clear-Durchlauf noch komplett hochohmig.
+							oe_n <= '0';
+						end if;
 						if tick = '1' then                  -- rck ~1 Tick breit halten (sichere Pulsbreite)
-							state <= St_Enable;
+							if pass = '0' then
+								pass      <= '1';
+								dwell_cnt <= 0;
+								if orig_mode = '0' then
+									state <= St_Settle;
+								else
+									state <= St_Load;       -- Original: keine Totzeit
+								end if;
+							else
+								pass  <= '0';
+								state <= St_Enable;
+							end if;
+						end if;
+
+					when St_Settle =>
+						-- Spalte ist umgeschaltet, Zeilen sind aus: der alten Spalte Zeit zum
+						-- Abklingen geben (2N5883-Speicherzeit, s. Kopf). Vergleich mit >=, damit
+						-- SETTLE_CYCLES = 0 nicht haengt, sondern nach einem Takt weitergeht.
+						rck <= '0';
+						if dwell_cnt >= SETTLE_CYCLES - 1 then
+							dwell_cnt <= 0;
+							state     <= St_Load;
+						else
+							dwell_cnt <= dwell_cnt + 1;
 						end if;
 
 					when St_Enable =>
 						rck       <= '0';
-						oe_n      <= '0';                   -- Ausgaenge frei -> Phase sichtbar
 						dwell_cnt <= 0;
 						state     <= St_Dwell;
 
 					when St_Dwell =>
-						if dwell_cnt = DWELL_CYCLES - 1 then
-							oe_n <= '1';                    -- blanken vor Phasenwechsel (Anti-Ghost)
+						-- Kein oe_n mehr am Phasenende: geblankt wird durch den Nullen-Latch des
+						-- naechsten Clear-Durchlaufs. Die Phase bleibt darum noch dessen ~10 us
+						-- sichtbar -- richtige Zeile, richtige Spalte, kein Ghosting.
+						if dwell_cnt >= dwell_lim - 1 then
 							if phase = 3 then
 								phase <= 0;
 							else
