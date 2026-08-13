@@ -23,7 +23,7 @@ Lampen im Aus-Zustand schwach pulsen, und verkauft das als absichtliche „keep-
 | AtariFA zeigt das Artefakt | **ja** — an den FPGA-Pins blankt sie sauber, an der Lampenfassung nicht (§3.3) |
 | Glühlampen zeigen es | **nein** (§3.1) — es ist ein LED-Retrofit-Phänomen |
 | Fix aus §4 wirkt am Spielfeld | **ja**, zwei Maschinen, SW 0.1.7 (§6.1): DIP 5 = OFF sauber, DIP 5 = ON bringt es zurück |
-| Restfall Lampe 21 / A20 | **offen** — glimmt dauernd, auch bei „alles aus"; Messplan in §6.3/§6.4 |
+| Restfall Lampe 21 / A20 | **offen**, aber eingekreist: Datenpfad am Bauteil **freigemessen** (§6.3.1), Spalten-Domäne bleibt ⇒ SW 0.1.8 entscheidet |
 
 ## 2. Schritt 1 — Beobachten, ohne irgendetwas zu ändern
 
@@ -310,10 +310,14 @@ je nach lit-Muster an Nummer 21 oder 22. A20 ist also nicht elektrisch besonders
 
 - **(A)** Der Nachbar leuchtet weiter, wenn der Tester „alle Lampen aus" sagt — im **Spiel-Selbsttest**
   ist das gut möglich, der garantiert nichts. Dann ist es §3.3, und der Hebel ist die Totzeit.
+  ⇒ **Nach der Schreibtischmessung (§6.3.1) der Hauptverdächtige**, weil der Datenpfad am Bauteil
+  freigemessen ist und der Schreibtisch (schnelle MOSFET-Spalten) das Artefakt nicht zeigt.
 - **(B)** Auch bei **FA-Control-Übernahme mit allen Lampen auf 0** (CPU angehalten, `lamp_state_mux`
   beweisbar 0) glimmt 21 weiter. Dann kann es §3.3 nicht sein, und übrig bleibt der analoge Reststrom
   (ULN-Kollektor-Restströmung, §4 „was bleiben darf") — der ist eine **Typeigenschaft, kein Defekt**,
   also auf jeder Platine da und nur an LEDs sichtbar, aber softwareseitig nicht abstellbar.
+  ⇒ Am Schreibtisch bei 5 V **0,0 µA** gemessen (§6.3.1); für die ~20 V am Spielfeld damit nicht
+  ausgeschlossen, aber unwahrscheinlicher geworden.
 
 Deshalb ist der FA-Control-Nullzustand die erste Frage an den Tester (§6.4) und Fall 2 der
 Schreibtischmessung (§6.3) — „alles aus" muss *bewiesen* aus sein, nicht *geglaubt* aus.
@@ -321,7 +325,7 @@ Schreibtischmessung (§6.3) — „alles aus" muss *bewiesen* aus sein, nicht *g
 Nebenbei: „zwei Maschinen ⇒ kein Hardwareproblem" trägt als Schluss ohnehin nicht — der ICEX ist auf
 jeder Platine gleich. Nur erklärt er die *Gruppe* nicht, und die Bonus-Gruppe erklärt sie.
 
-### 6.3 Schreibtischmessung (LA + Oszi + µA-DMM, ohne Spielfeld)
+### 6.3 Schreibtischmessung (LA + DMM, ohne Spielfeld) — gefahren 2026-08-13, Ergebnis in §6.3.1
 
 Diagnosebuild: `DBG_MODE := 5`, `DBG_WATCH_LAMP := 21` in `top/AtariFA.vhd`, dann
 `scripts\build.ps1 cyclone_10_pcb` (nur diese Variante routet alle 8 Debug-Pins,
@@ -342,6 +346,37 @@ Tastköpfe: `debug_signal` 0…6 = `ser`/`srck`/`rck`/`blank`/`strobe_sel(0)`/`s
 Fall 2/3 laufen bewusst **unter FA-Control**: die CPU steht, `lamp_state_mux` kommt aus
 `fa_lamp_state` und ist beweisbar 0 — der saubere Nullzustand, den der Spiel-Selbsttest nicht
 garantiert.
+
+**Ohne Oszilloskop geht das genauso** (so ist es gefahren worden): der Multiplex-Mittelwert am
+Gruppen-Netz ist genau das, was ein DMM anzeigt, und beide Instrumente greifen komplementär —
+**das DMM begrenzt die Energie** (Duty = U/4,6 V, daraus die Pulsbreite je 2,048-ms-Frame), **der LA
+begrenzt die Breite** (Tastkopf auf A20 Pin 1, Trigger auf steigende Flanke, 1 MHz, Minuten laufen
+lassen: triggert er nicht, ist alles ≥ 1 µs ausgeschlossen — und weniger als 1 µs kann keine LED
+sichtbar machen). Umrechnungstabelle: 10 mV ≙ 0,22 % ≙ ~4,5 µs/Frame · 25 mV ≙ 11 µs · 50 mV ≙ 22 µs ·
+1,0 V ≙ 22,1 % = eine ganze Phase (Lampe an).
+
+#### 6.3.1 Ergebnis (2026-08-13, cyclone_10_pcb, `.sof` per JTAG, Info-Anzeige `017`)
+
+| Prüfung | Messwert | Bedeutung |
+|---|---|---|
+| Zeitraster (LA) | Phase **512 µs**, Austastfenster **≈ 60 µs**, DIP-5-Sprung des `strobe_sel`-Wechsels vom Blank- auf den Daten-Latch **sichtbar** | 0.1.7-Zeitverhalten an den Pins bestätigt, Schalter greift im Betrieb |
+| Fall 1, nur Lampe 21 | Test-LED **hell**; A20 Pin 1 = **1,0 V** DC | Vorhersage für 22,1 % Duty war 1,0 V ⇒ Gruppen-Netz wird korrekt in **einer von vier** Phasen getrieben. **Fall (B) ist damit erledigt** |
+| Fall 2, alles aus | A20 Pin 1 = **0,2 mV** (Null-Referenz 0,0 mV); LA triggert über Minuten **nicht** | Duty ≤ **0,004 %** = höchstens ~90 ns/Frame (1/23000 der Einschalthelligkeit, unsichtbar; realistisch DMM-Offset), und alles ≥ 1 µs ausgeschlossen |
+| Fall 3, Reststrom | **0,0 µA** in der Rückleitung von Lampe 21 (und an den Vergleichskanälen) | am Box-Connector, also bei **5 V** Spaltenspannung — Untergrenze, s. Einschränkung unten |
+| Fall 4, dunkler Raum | **kein Glimmen** | reproduziert §3.5: am Schreibtisch ist der Effekt nicht nachstellbar |
+
+**Was damit erledigt ist:** der Datenpfad, und zwar gemessen statt argumentiert — am **Bauteil**, nicht
+am FPGA-Pin (das war die Lehre aus §3.3). Ein Scan-, Mapping- oder Sniffer-Fehler kann das Glimmen
+nicht erzeugen: bei „alles aus" liegt das Gruppen-Netz hart auf 0 V, und die Gegenprobe an derselben
+Messstelle zeigt 1,0 V, sobald die Lampe gesetzt ist — die Messung ist also nicht taub.
+
+**Was der Schreibtisch NICHT klären kann, und warum das Ergebnis trotzdem etwas sagt:** die Testspalten
+der Box-Connectors kommen von vier P-Kanal-MOSFETs bei **5 V** (§3.5), das Spielfeld von den 2N5883 bei
+~**20 V**. Der Kollektor-Reststrom wächst mit Spannung und Temperatur, 0,0 µA bei 5 V ist also nur eine
+Untergrenze für den Spielfeldfall. Aber: **derselbe ULN-Typ, dieselbe Logik, dieselbe Lampe — und hier
+glimmt nichts.** Der Unterschied zwischen Schreibtisch und Spielfeld ist genau die Spalten-Domäne. Per
+Ausschluss bleibt damit der Spalten-Nachlauf (§3.3) als Hauptverdächtiger, und **das entscheidet
+SW 0.1.8 am Spielfeld** (§4, §6.5) — nicht mehr der Schreibtisch.
 
 **Grenze des Aufbaus, sonst wird das Ergebnis falsch gelesen:** am Schreibtisch kommen die Spalten
 von den vier P-Kanal-MOSFETs der Box-Connectors (§3.5, ns-schnell, nA-Leckstrom), **nicht** von den
