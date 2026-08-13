@@ -31,8 +31,8 @@ v1.0 06.08.2026
     - [4.2.1. Option 3 -> where the sound comes out](#421-option-3---where-the-sound-comes-out)
     - [4.2.2. Option 4 -> let FA-Control take over](#422-option-4---let-fa-control-take-over)
     - [4.2.3. Options 1 and 2 -> reserved](#423-options-1-and-2---reserved)
-    - [4.2.4. Option 5 -> lamp timing like the original MPU](#424-option-5---lamp-timing-like-the-original-mpu)
-    - [4.2.5. Option 6 -> longer dead time for the lamp columns](#425-option-6---longer-dead-time-for-the-lamp-columns)
+    - [4.2.4. Options 5 and 6 -> dead time for the lamp columns](#424-options-5-and-6---dead-time-for-the-lamp-columns)
+    - [4.2.5. If the glow stays](#425-if-the-glow-stays)
   - [4.3. Six of the ten DIPs are read once, at boot](#43-six-of-the-ten-dips-are-read-once-at-boot)
 - [5. Boot sequence](#5-boot-sequence)
   - [5.1. Phase 1: reading the DIP switches](#51-phase-1-reading-the-dip-switches)
@@ -164,8 +164,8 @@ Default setting is **all 'OFF'** - that is the right setting for a standard mach
 | Dip2 | reserved                                              | at boot     |
 | Dip3 | **sound: OFF = Auxiliary Board, ON = on-board amplifier** | continuously |
 | Dip4 | **let FA-Control take over** - ON = allowed            | continuously |
-| Dip5 | **lamp timing: OFF = quiet, ON = like the original MPU** | continuously |
-| Dip6 | **lamp dead time: ON = longer** (only needed if LEDs still glow with Dip5 = OFF) | continuously |
+| Dip5 | **lamp dead time, high bit** - on its own = timing of the original MPU | continuously |
+| Dip6 | **lamp dead time, low bit** - four steps together with Dip5, only needed if LEDs glow | continuously |
 
 #### 4.2.1. Option 3 -> where the sound comes out
 
@@ -189,33 +189,40 @@ Not used, leave them 'OFF'. They are wired, they are shown on the info display, 
 
 Option 1 was used by an experimental credit/high score save feature that is currently on hold, see chapter 13. It has no effect in this software version.
 
-#### 4.2.4. Option 5 -> lamp timing like the original MPU
+#### 4.2.4. Options 5 and 6 -> dead time for the lamp columns
 
 Atari drives the lamps in a time multiplex: four columns are switched on in turn, half a millisecond each. On the original MPU the column is switched at the very moment the new lamp values become valid. Because the column drivers on the Auxiliary Board take a few microseconds to turn off, the *wrong* lamp gets a very short pulse of current every time — the neighbouring lamp in the same driver group, from the previous column.
 
 On an incandescent bulb you will never notice. **LED replacement lamps, however, glow visibly** even though they are switched off. This is the well-known effect that LEDs in an Atari "never go fully dark"; the Atari manual describes it as a supposed "keep-alive" circuit, but it is the same thing.
 
-- **'OFF'** - **quiet lamps. Default.** AtariFA switches the column while all lamps are blanked, and gives the old column about 60 microseconds to decay. Switched-off LEDs stay off. **This is the setting for a machine fitted with LED replacement lamps.**
+AtariFA therefore switches the column **while all lamps are blanked**, and then gives the old column a short **dead time** to decay before the new lamp values go live. How long a column driver needs to turn off differs from machine to machine — it depends on the components and on how much current the lamps of that column draw. The less current, the longer it takes. A column fitted with LED replacement lamps is therefore the worst case. That is why the dead time is selectable, through **options 5 and 6 together**:
 
-- **'ON'** - **the timing of the original MPU**, glow included. Useful if you want to compare AtariFA against the original board, or if you prefer the original behaviour. Brightness is practically unaffected (22.1 % against 24.5 % duty cycle), and incandescent lamps do not care at all.
+| Option 5 | Option 6 | Dead time | Brightness |
+|---|---|---|---|
+| **OFF** | **OFF** | **about 65 µs — default** | 21.8 % |
+| OFF | ON | about 250 µs | 12.8 % |
+| ON | OFF | *none* — timing of the original MPU | 24.5 % |
+| ON | ON | about 400 µs | 5.5 % |
 
-This switch is read continuously, so it may be changed while the game is running — which makes the difference easy to compare on the spot.
+**What to set:**
 
-#### 4.2.5. Option 6 -> longer dead time for the lamp columns
+- **Incandescent bulbs in the machine:** nothing. The default is right and the switches mean nothing to you.
 
-How long a column driver on the Auxiliary Board needs to turn off differs from machine to machine — it depends on the components and on how much current the lamps of that column draw. The less current, the longer it takes. A column fitted with LED replacement lamps is therefore the worst case, and there the 60 microseconds of option 5 = 'OFF' can be too short.
+- **LED replacement lamps, everything fine:** nothing either. The default is enough in most machines.
 
-- **'OFF'** - **default.** About 60 microseconds of dead time. That is enough in most machines.
+- **Single LEDs glow although they should be off:** go one step up — first option 6 = 'ON' (250 µs), and only if that is not enough, both to 'ON' (400 µs). **Use the smallest step that removes the glow**, because every step costs brightness. At 250 µs that is barely noticeable in the machine; **400 µs is clearly dimmer**, which is intended and not a fault.
 
-- **'ON'** - **a longer dead time**, to be used if single LED replacement lamps still glow with option 5 = 'OFF'. In software **0.1.7** that is about 110 microseconds; the lamps get marginally dimmer (19.6 % instead of 22.1 % duty cycle), which is not visible in the machine.
+- **Option 5 = 'ON' on its own** selects the **timing of the original MPU**, glow included. Useful if you want to compare AtariFA against the original board, or if you prefer the original behaviour. Incandescent lamps do not care at all.
 
-> **Software 0.1.8 is a measurement build.** There, option 6 = 'ON' gives about **400 microseconds**, and that costs **three quarters of the brightness** (5.0 % instead of 22.1 % duty cycle) - the lamps are clearly dimmer, and that is intended, not a fault. This build exists to answer **one** question once: whether a stubborn glow comes from the lamp column's turn-off time at all. If it disappears with option 6 = 'ON', it was the column; if it stays exactly as it was, it was something else (see the last paragraph of this chapter). **For playing, set option 6 to 'OFF'** or stay on version 0.1.7. Which build is running is shown on the info display at power on (chapter 5.2).
+Both switches are read continuously, so they may be changed while the game is running — which makes the difference easy to compare on the spot, without a power cycle. A column stays the same half millisecond long in all four positions; only how much of it is reserved for decay changes.
 
-**Option 5 overrides option 6:** with option 5 = 'ON' there is no dead time at all, so option 6 has no effect.
+> **The meaning of the combination changed against software 0.1.7 and 0.1.8.** Option 5 alone and option 6 alone still mean what they did; **both together** used to select the original timing and are now the longest dead time. Which build is running is shown on the info display at power on (chapter 5.2).
 
-This switch is read continuously as well.
+#### 4.2.5. If the glow stays
 
-**If option 6 = 'ON' changes nothing either:** then the column turn-off time is not the cause, and turning it up further will not help. There is a second reason that no software can do anything about: the lamp drivers (ULN2003A) pass a residual current of a few microamperes while switched off, and because one column is always powered, that is enough to make a modern LED glow. An incandescent bulb never shows it. The original MPU has the same residual current. The remedy at the affected socket: **a resistor of about 2.2 kΩ (½ W) in parallel with the lamp** — it drains the residual current without affecting the lamp in operation. Equally effective: use an incandescent bulb in that position, or an LED replacement lamp with a built-in bleeder resistor ('ghost free').
+**If even the longest step (options 5 and 6 both 'ON') changes nothing:** then the column turn-off time is not the cause, and turning it up further will not help — half a millisecond of column time does not allow much more than 400 microseconds anyway. There is a second reason that no software can do anything about: the lamp drivers (ULN2003A) pass a residual current of a few microamperes while switched off, and because one column is always powered, that is enough to make a modern LED glow. An incandescent bulb never shows it. The original MPU has the same residual current.
+
+The remedy at the affected socket: **a resistor of about 2.2 kΩ (½ W) in parallel with the lamp** — it drains the residual current without affecting the lamp in operation. Equally effective: use an incandescent bulb in that position, or an LED replacement lamp with a built-in bleeder resistor ('ghost free').
 
 ### 4.3. Six of the ten DIPs are read once, at boot
 
@@ -451,17 +458,24 @@ bank of 4                          bank of 6
  2  game select bit 1  (+2)         2  reserved              read at boot
  3  game select bit 2  (+4)         3  sound path            live
  4  free play, ON = active          4  FA-Control allowed    live
-                                    5  lamp timing           live
- all four read at boot only         6  lamp dead time        live
+                                    5  lamp dead time    \   live
+ all four read at boot only         6  lamp dead time    /   live
 ```
 
 **Sound path, option 3:** OFF = Auxiliary Board (standard) · ON = on-board amplifier
 
 **FA-Control, option 4:** OFF = nobody interferes (standard) · ON = the ESP32 test tool may drive the machine (chapter 9)
 
-**Lamp timing, option 5:** OFF = quiet lamps, switched-off LEDs stay off (standard) · ON = timing of the original MPU, LED replacement lamps glow as on the original (chapter 4.2.4)
+**Lamp dead time, options 5 and 6 together** (chapter 4.2.4) — against glowing LED replacement lamps, use the smallest step that works:
 
-**Lamp dead time, option 6:** OFF = about 60 µs (standard) · ON = longer, for machines where single LEDs still glow with option 5 = OFF - 110 µs in version 0.1.7, but 400 µs and clearly dimmer lamps in the 0.1.8 measurement build; option 5 overrides option 6 (chapter 4.2.5)
+| Option 5 | Option 6 | Dead time | Brightness |
+|---|---|---|---|
+| OFF | OFF | about 65 µs (standard) | 21.8 % |
+| OFF | ON | about 250 µs | 12.8 % |
+| ON | OFF | none - timing of the original MPU, LEDs glow as on the original | 24.5 % |
+| ON | ON | about 400 µs, visibly dimmer | 5.5 % |
+
+If it still glows at 400 µs, it is not the software - chapter 4.2.5.
 
 **After changing a switch that is read at boot: power off, power on.**
 

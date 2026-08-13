@@ -331,9 +331,13 @@ therefore reach hundreds of microseconds, in the worst case more than one strobe
 lighter the column load, the deeper the saturation and the longer the tail — an LED-populated column
 is the worst case of all. The consequence for diagnosis is uncomfortable but unavoidable:
 **"more dead time changed nothing" does not acquit the column.** The SW 0.1.7 field feedback (DIP 6 =
-ON ⇒ ~110 µs, no visible difference — [`Lamp_Preglow_Experiment.md`](Lamp_Preglow_Experiment.md) §6)
-is not yet a verdict; deciding it takes one diagnostic build at ~400 µs
-(`SETTLE_LONG_CYCLES = 20000`, duty ~5 %). Two consequences: the mechanism of this section is
+ON ⇒ ~110 µs, no visible difference — [`Lamp_Preglow_Experiment.md`](Lamp_Preglow_Experiment.md) §6;
+the tester has since confirmed it really was 0.1.7, so the report stands) is not yet a verdict; only a
+step an order of magnitude further out decides it. That is what **SW 0.1.9** provides: the dead time
+is now a four-position ladder on Options DIP 5 + 6 — ~65 µs series (duty 21.8 %), ~250 µs (12.8 %),
+~400 µs (5.5 %) and the original timing with no dead time at all (24.5 %), see
+[`Lamp_Preglow_Experiment.md`](Lamp_Preglow_Experiment.md) §6.6. ~492 µs is the hard ceiling, because
+dwell and settle share one 512 µs phase. Two consequences: the mechanism of this section is
 now measured rather than argued, and the open question of §6.5 ("which of the two switches first")
 turns out not to matter — the slow column makes the window either way.
 
@@ -387,10 +391,12 @@ Two concerns raised, both resolved:
 **(a) Are the original incandescent lamps driven too hard / too bright by AtariFA?** No.
 - Incandescent brightness depends on **average power**; the filament's thermal time constant (many ms)
   integrates over many pulses, so the **refresh frequency is irrelevant** to brightness.
-- Duty cycle is what matters: AtariFA runs **~24 %** per lamp (one of four strobe phases; since
-  SW 0.1.6 `DWELL_CYCLES = 24100` plus the ~10 µs zero-shift pass during which the lamp is still lit
-  ⇒ 24.0 %, or 24.5 % with Options DIP 5 = ON, where the settle window is not spent; it was 24.5 %
-  at 0.1.5 and 24.04 % up to 0.1.4), structurally capped at ~25 % because only one strobe is ever active at a
+- Duty cycle is what matters: AtariFA runs **~22 %** per lamp in the series setting (one of four
+  strobe phases; since SW 0.1.9 `DWELL_CYCLES = 21847` plus the ~10 µs zero-shift pass during which
+  the lamp is still lit ⇒ 21.8 %, and 24.5 % in the original-timing position, where no settle window
+  is spent; it was 24.0 % at 0.1.6, 24.5 % at 0.1.5 and 24.04 % up to 0.1.4). The longer dead-time
+  steps trade duty for decay time on purpose: 12.8 % at ~250 µs and 5.5 % at ~400 µs. All of it is
+  structurally capped at ~25 % because only one strobe is ever active at a
   time. The original 4-fold multiplex is likewise **~25 %** — stated verbatim in the Troubleshooting
   Guide ("each strobe has an 'on' duty cycle of only 25 %", §3.1). → essentially identical average
   power → same brightness (if anything marginally dimmer on AtariFA due to shift overhead). Since

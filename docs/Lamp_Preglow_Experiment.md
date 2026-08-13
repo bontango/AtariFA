@@ -190,15 +190,17 @@ die Nullen werden geschoben, *während* die Lampe noch leuchtet; die Ausgänge �
 
 **(b) Der Spaltenwechsel wandert ins Austastfenster, umschaltbar über Options-DIP 5.**
 
-| | DIP 5 = OFF (Serienstand) | DIP 5 = ON | DIP 6 = ON (Reserve, seit 0.1.7) |
-|---|---|---|---|
-| `strobe_sel` wechselt | beim **Clear**-Latch, Zeilen sind aus | beim **Daten**-Latch, gleichzeitig mit den Zeilen | wie DIP 5 = OFF |
-| Totzeit Spalte → Zeilen scharf | `St_Settle` + Datendurchlauf ≈ **60 µs** (0.1.6: 20 µs) | ~20 ns (Original-Zeitverhalten) | ≈ **110 µs** in 0.1.7, ≈ **400 µs** in 0.1.8 |
-| Vorglühen bei LED-Retrofits | weg | da | weg |
-| Phasendauer | 512,0 µs | 512,0 µs | 512,0 µs |
-| Duty | 22,1 % | 24,5 % | 19,6 % (0.1.7) / **5,0 %** (0.1.8) |
+| | DIP 5/6 = OFF/OFF (Serienstand) | ON/OFF | OFF/ON | ON/ON |
+|---|---|---|---|---|
+| `strobe_sel` wechselt | beim **Clear**-Latch, Zeilen sind aus | beim **Daten**-Latch, gleichzeitig mit den Zeilen | wie OFF/OFF | wie OFF/OFF |
+| Totzeit Spalte → Zeilen scharf | `St_Settle` + Datendurchlauf ≈ **65 µs** (0.1.6: 20 µs, 0.1.7/0.1.8: 60 µs) | ~20 ns (Original-Zeitverhalten) | ≈ **250 µs** | ≈ **400 µs** |
+| Vorglühen bei LED-Retrofits | weg | da | weg | weg |
+| Phasendauer | 512,0 µs | 512,0 µs | 512,0 µs | 512,0 µs |
+| Duty | 21,8 % | 24,5 % | 12,8 % | **5,5 %** |
 
-**DIP 5 sticht DIP 6** (im Original-Modus gibt es keine Totzeit, die DIP 6 verlängern könnte).
+Stand SW 0.1.9 (§6.6). In 0.1.7/0.1.8 gab es nur drei Stellungen, weil DIP 5 = ON die Totzeit
+unabhängig von DIP 6 abschaltete („DIP 5 sticht DIP 6"); seit 0.1.9 ist ON/ON stattdessen die
+längste Stufe, während DIP 5 allein weiterhin das Original-Zeitverhalten bedeutet.
 
 Die Phasendauer ist in allen Stellungen gleich (was die Totzeit nicht braucht, schlägt auf den Dwell
 auf) — sonst vergleicht man am Spielfeld zwei Variablen statt einer. Der Helligkeitsunterschied von
@@ -275,14 +277,12 @@ Gegenmaßnahme bestätigt — und der Hebel ist der richtige. *Offen dabei: stan
 Davon hängt ab, ob die **60 µs** des Serienstands genügen oder erst die **110 µs** von DIP 6 — und
 damit, welcher Wert Serienstand wird. Nachfragen.
 
-> **⚠ Zu prüfen beim Airborne-Tester: lief dort wirklich 0.1.7?** Sein Bericht liest sich Zeile für
-> Zeile wie **0.1.6**-Verhalten, denn dort ist Options-DIP 6 **gar nicht implementiert** („reserviert")
-> — „Dip 6 ON => kein Unterschied" ist auf 0.1.6 also der *erwartete* Befund, während dieselbe Aussage
-> auf 0.1.7 bedeutet, dass 110 µs nicht reichen. Nichts in seinem Text ist 0.1.7-spezifisch, beide
-> Lesarten passen, und die Auswertung hängt genau daran. Prüfen kann er es in zehn Sekunden: die
-> **Info-Anzeige** beim Einschalten (Display 1, letzte Ziffer = `7`) und die **Versionsmeldung von
-> FA-Control** beim Verbinden. Bis das geklärt ist, ist die Aussage „110 µs ändern am Airborne nichts"
-> **nicht belastbar**, und damit auch nicht die Notwendigkeit von 0.1.8.
+> **✓ Version geklärt (2026-08-13): es war 0.1.7.** Der Bericht liest sich zwar Zeile für Zeile auch
+> wie **0.1.6**-Verhalten — dort ist Options-DIP 6 gar nicht implementiert, „Dip 6 ON => kein
+> Unterschied" wäre also der *erwartete* Befund —, aber der Tester hat auf Nachfrage bestätigt, dass
+> er 0.1.7 geladen hatte. Damit ist die Aussage **belastbar: 110 µs reichen an dieser Maschine
+> nicht.** Genau darauf beruht die Stufenleiter in [§6.6](#66-was-daraus-gebaut-wurde--sw-019); die
+> in §6.5 als erster Schritt geführte Versionsprüfung ist erledigt.
 
 Damit ist bestätigt: (a) der A/B-Schalter DIP 5 arbeitet und reproduziert das Artefakt auf Kommando —
 die Diagnose aus §3.3 ist am zweiten Spielfeld
@@ -324,9 +324,9 @@ leitende Spalte sieht. Damit ist das Glimmen an Gruppe 6 nicht Streuung, sondern
 Spielfeld, an dem die Voraussetzung *permanent* erfüllt ist — auf jeder Maschine, in jedem Spiel, und
 je nach lit-Muster an Nummer 21 oder 22. A20 ist also nicht elektrisch besonders, sondern
 **statistisch**. Genau diese Gruppe ist am Middle Earth mit 0.1.7 verschwunden (§6.1) — die Erklärung
-trägt also. Bleibt sie am Airborne bestehen, heißt das nach `Lamp_Refresh_Analysis.md` §3.3 entweder
-„110 µs sind dort zu wenig" **oder** es lief nicht 0.1.7 (Kasten in §6.1) — und diese Reihenfolge
-ist einzuhalten: erst die Version klären, dann die Totzeit weiter hochdrehen.
+trägt also. Am Airborne besteht sie fort, und da die Version inzwischen bestätigt ist (Kasten in
+§6.1), bleibt nach `Lamp_Refresh_Analysis.md` §3.3 nur eine Lesart: **110 µs sind dort zu wenig.**
+Genau darauf antworten die Stufen 250 µs und 400 µs in SW 0.1.9 (§6.6).
 
 **Zu klären bleibt genau eine Lesart des Berichts**, und sie trennt die beiden Restursachen:
 
@@ -397,8 +397,8 @@ der Box-Connectors kommen von vier P-Kanal-MOSFETs bei **5 V** (§3.5), das Spie
 ~**20 V**. Der Kollektor-Reststrom wächst mit Spannung und Temperatur, 0,0 µA bei 5 V ist also nur eine
 Untergrenze für den Spielfeldfall. Aber: **derselbe ULN-Typ, dieselbe Logik, dieselbe Lampe — und hier
 glimmt nichts.** Der Unterschied zwischen Schreibtisch und Spielfeld ist genau die Spalten-Domäne. Per
-Ausschluss bleibt damit der Spalten-Nachlauf (§3.3) als Hauptverdächtiger, und **das entscheidet
-SW 0.1.8 am Spielfeld** (§4, §6.5) — nicht mehr der Schreibtisch.
+Ausschluss bleibt damit der Spalten-Nachlauf (§3.3) als Hauptverdächtiger, und **das entscheidet die
+400-µs-Stufe von SW 0.1.9 am Spielfeld** (§4, §6.5, §6.6) — nicht mehr der Schreibtisch.
 
 **Grenze des Aufbaus, sonst wird das Ergebnis falsch gelesen:** am Schreibtisch kommen die Spalten
 von den vier P-Kanal-MOSFETs der Box-Connectors (§3.5, ns-schnell, nA-Leckstrom), **nicht** von den
@@ -413,8 +413,9 @@ In dieser Reihenfolge; jede Zeile hat einen eigenen Aussagewert:
 0. **Welche Version läuft wirklich?** Info-Anzeige beim Einschalten (Display 1, dritte Ziffer) und die
    Versionsmeldung von FA-Control beim Verbinden. Das steht hier an erster Stelle, weil ein Bericht
    über einen Schalter, den die geladene Version nicht hat, systematisch in die Irre führt — und weil
-   es zehn Sekunden kostet. Für das Middle Earth ist zusätzlich nachzufragen, ob **DIP 6 ON oder OFF**
-   war, als es behoben war (entscheidet 60 µs gegen 110 µs als künftigen Serienstand).
+   es zehn Sekunden kostet. Für den Airborne ist das **erledigt** (0.1.7, s. §6.1). Für das Middle
+   Earth ist weiterhin nachzufragen, ob **DIP 6 ON oder OFF** war, als es behoben war — das
+   entscheidet, ob der Serienstand bei 65 µs bleiben kann.
 1. **Der Nullzustand — die wichtigste Frage:** in FA-Control die Kontrolle übernehmen (Options-DIP 4
    = ON, Verbinden, `LISY_INIT`), **alle Lampen auf 0**, damit steht die CPU und keine Lampe kann
    getrieben sein. Glimmt 21 **dann** noch? (entscheidet (A) gegen (B), s. §6.2 — im Spiel-Selbsttest
@@ -435,18 +436,16 @@ In dieser Reihenfolge; jede Zeile hat einen eigenen Aussagewert:
 
 ### 6.5 Fixpfade je Ergebnis
 
-- **Schritt 0, vor allem anderen: Version des Airborne-Testers klären** (Kasten in §6.1). Lief dort
-  0.1.6, ist sein „DIP 6 ändert nichts" gegenstandslos, und der nächste Schritt ist schlicht
-  **0.1.7 mit DIP 6 = ON** — nicht 0.1.8.
+- **Schritt 0, Version des Airborne-Testers: ✓ erledigt** (Kasten in §6.1) — es war 0.1.7, sein
+  „DIP 6 ändert nichts" steht also.
 - **Nachbar-abhängig / Fall (A)** — nach §6.2 der wahrscheinlichste Ausgang, weil Gruppe 6 die
-  Bonus-Gruppe ist, und am Middle Earth mit 0.1.7 bestätigt: **dafür ist SW 0.1.8 gebaut**
-  (`SETTLE_LONG_CYCLES = 20000`,
-  ≈400 µs auf DIP 6, Duty ~5 %, sichtbar dunkler — s. §4). Das ist der **erste** Schritt, nicht der
+  Bonus-Gruppe ist, und am Middle Earth mit 0.1.7 bestätigt: **dafür ist SW 0.1.9 gebaut**, die
+  Stufenleiter 65 / 250 / 400 µs auf DIP 5 + 6 (s. §6.6). Das ist der **erste** Schritt, nicht der
   letzte Ausweg: 60/110 µs sind nach der Abschaltzeit-Rechnung möglicherweise einfach zu kurz.
-  Abnahme im Feld: 0.1.8 programmieren, Info-Anzeige muss `018` zeigen, dann DIP 6 im laufenden Spiel
-  OFF↔ON schalten. Wird das Glimmen mit ON schwächer oder verschwindet es, war es die Spalte — dann
-  wird der **kleinste** noch wirksame Wert zum Serienstand für DIP 6 (mit dem Helligkeitsverlust als
-  bewusstem Preis), und 0.1.8 bleibt nicht, wie es ist. Ändert sich nichts, ist die Spalte erledigt.
+  Abnahme im Feld: 0.1.9 programmieren, Info-Anzeige muss `019` zeigen, dann im laufenden Spiel
+  DIP 6 = ON (250 µs) und, falls nötig, DIP 5 + 6 = ON (400 µs). Wird das Glimmen schwächer oder
+  verschwindet es, war es die Spalte — dann bleibt die **kleinste** noch wirksame Stufe stehen (mit
+  dem Helligkeitsverlust als bewusstem Preis). Ändert auch 400 µs nichts, ist die Spalte erledigt.
 - **Reststrom / Fall (B)** (Glimmen auch im FA-Control-Nullzustand, 5/6 im µA-Bereich): kein RTL-Fix
   möglich und keiner nötig — das ist der in §4 vorab benannte Rest, den auch die Original-MPU hat.
   Empfehlung an den Nutzer: 2,2 kΩ parallel, Glühlampe oder „ghost-free"-LED; gehört dann in **beide**
@@ -460,6 +459,48 @@ In dieser Reihenfolge; jede Zeile hat einen eigenen Aussagewert:
   gleich, und er passt zur Middle-Earth-Beschreibung „blieb halb an" besser als zu „glimmt".
   (b) Hängen A20 Pin 1–4 wirklich am selben Netz, und ist an Gruppe 6 irgendetwas anders bestückt
   als an den übrigen 20?
+
+### 6.6 Was daraus gebaut wurde — SW 0.1.9
+
+**Eine Leiter statt eines Extremwerts.** SW 0.1.8 war eine Messfassung mit *einem* Wert (400 µs auf
+DIP 6, Duty ~5 %) und der Ansage „damit spielt man nicht". Sie beantwortet die Ja/Nein-Frage aus
+§6.5, liefert aber keinen brauchbaren Betriebspunkt: fällt die Antwort „ja, es war die Spalte" aus,
+säße der Nutzer entweder auf 110 µs (zu wenig) oder auf 400 µs (zu dunkel). **SW 0.1.9 löst 0.1.8 ab**
+und macht die Totzeit stattdessen in vier Stufen wählbar — der Tester nimmt die kleinste, die an
+*seiner* Maschine wirkt, und kann darauf spielen.
+
+Beide Options-DIPs bilden dafür zusammen ein 2-Bit-Feld, DIP 5 höherwertig (`mode(1)`):
+
+| DIP 5 | DIP 6 | `mode` | Totzeit | `SETTLE` clk | Dwell clk | Duty |
+|---|---|---|---|---|---|---|
+| OFF | OFF | `"00"` | ~65 µs — **Serienstand** | 2750 | 21847 | 21,8 % |
+| OFF | ON | `"01"` | ~250 µs | 12000 | 12597 | 12,8 % |
+| ON | OFF | `"10"` | keine — **Original-Timing** | 0 | 24597 | 24,5 % |
+| ON | ON | `"11"` | ~400 µs | 19500 | 5097 | 5,5 % |
+
+**DIP 5 allein und DIP 6 allein behalten ihre Bedeutung aus 0.1.7** (Original-Timing bzw. „eine Stufe
+länger"); neu ist nur die Kombination, die früher „DIP 5 sticht DIP 6" war. Der A/B-Schalter aus §4
+bleibt damit erhalten — er ist das Werkzeug, mit dem beide Tester den Effekt überhaupt erst auf
+Kommando reproduziert haben, und ihn gegen eine dritte Zusatzstufe einzutauschen wäre ein schlechter
+Handel gewesen.
+
+Unverändert bleibt: **Phasendauer 25600 clk = 512 µs in allen vier Stellungen**, Frame 2,048 ms
+= 488 Hz. Der Dwell fängt auf, was die Totzeit nicht braucht (Invariante `Dwell + Settle = 24597`) —
+am Spielfeld ändert sich also genau eine Variable. Obergrenze für die Totzeit sind damit 24597 clk
+≈ 492 µs; die 400-µs-Stufe lässt noch 5097 clk = 102 µs Dwell übrig. **Weiter hochdrehen ist deshalb
+keine Option** und wäre auch keine: bleibt das Glimmen bei `"11"`, ist die Spalten-Abschaltzeit
+erledigt und es bleibt der ULN-Reststrom aus §6.5, Fall (B).
+
+Warum bis 400 µs und nicht feiner abgestuft: die Basisladungs-Abschätzung in
+[`Lamp_Refresh_Analysis.md`](Lamp_Refresh_Analysis.md) §3.3 (Einschalten ~0,2 A gegen Ausräumen
+~85 µA über 8,2 K) lässt Speicherzeiten von Hunderten von Mikrosekunden zu. Eine feine Leiter dicht
+über den 110 µs würde denselben Fehler wie 0.1.7 wiederholen, falls die wahre Zeitkonstante eine
+Größenordnung darüber liegt. Zwei Stufen im Verhältnis ~1:1,6 decken den plausiblen Bereich mit den
+zwei Handgriffen ab, die man einem Tester zumuten kann.
+
+Umsetzung: `rtl/common/lamp_matrix.vhd` (Generics `SETTLE_CYCLES`/`SETTLE_LONG_CYCLES`/
+`SETTLE_MAX_CYCLES`, Port `mode`, Auswahl über `with mode_r select`), Verdrahtung im Top-Level
+`top/AtariFA.vhd` an der `LAMP`-Instanz. Nutzerseitig: Kapitel 4.2.4 beider Handbücher.
 
 ## 7. Querverweise
 

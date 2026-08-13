@@ -30,8 +30,8 @@ v1.0 06.08.2026
     - [4.2.1. Option 3 -> wo der Ton herauskommt](#421-option-3---wo-der-ton-herauskommt)
     - [4.2.2. Option 4 -> FA-Control darf übernehmen](#422-option-4---fa-control-darf-übernehmen)
     - [4.2.3. Optionen 1 und 2 -> reserviert](#423-optionen-1-und-2---reserviert)
-    - [4.2.4. Option 5 -> Lampen-Timing wie bei der Original-MPU](#424-option-5---lampen-timing-wie-bei-der-original-mpu)
-    - [4.2.5. Option 6 -> längere Totzeit für die Lampenspalten](#425-option-6---längere-totzeit-für-die-lampenspalten)
+    - [4.2.4. Optionen 5 und 6 -> Totzeit der Lampenspalten](#424-optionen-5-und-6---totzeit-der-lampenspalten)
+    - [4.2.5. Wenn das Glimmen bleibt](#425-wenn-das-glimmen-bleibt)
   - [4.3. Sechs der zehn DIPs werden nur beim Einschalten gelesen](#43-sechs-der-zehn-dips-werden-nur-beim-einschalten-gelesen)
 - [5. Der Startvorgang](#5-der-startvorgang)
   - [5.1. Phase 1: die DIP-Schalter werden gelesen](#51-phase-1-die-dip-schalter-werden-gelesen)
@@ -163,8 +163,8 @@ Grundeinstellung ist **alle „OFF"** — das ist bei einem Standardautomaten ri
 | Dip2 | reserviert                                                  | beim Einschalten  |
 | Dip3 | **Ton: OFF = Auxiliary Board, ON = Verstärker auf der Platine** | fortlaufend    |
 | Dip4 | **FA-Control darf übernehmen** — ON = erlaubt                | fortlaufend       |
-| Dip5 | **Lampen-Timing: OFF = ruhig, ON = wie die Original-MPU**    | fortlaufend       |
-| Dip6 | **Lampen-Totzeit: ON = länger** (nur nötig, wenn LEDs trotz Dip5 = OFF glimmen) | fortlaufend |
+| Dip5 | **Lampen-Totzeit, höherwertiges Bit** — allein = Zeitverhalten der Original-MPU | fortlaufend |
+| Dip6 | **Lampen-Totzeit, niederwertiges Bit** — vier Stufen zusammen mit Dip5, nur nötig, wenn LEDs glimmen | fortlaufend |
 
 #### 4.2.1. Option 3 -> wo der Ton herauskommt
 
@@ -188,33 +188,40 @@ Nicht belegt, bitte auf „OFF" lassen. Sie sind verdrahtet, sie werden auf der 
 
 Option 1 gehörte zu einer versuchsweisen Speicherung von Credits und Highscores, die derzeit zurückgestellt ist, siehe Kapitel 13. In dieser Software-Version hat sie keine Wirkung.
 
-#### 4.2.4. Option 5 -> Lampen-Timing wie bei der Original-MPU
+#### 4.2.4. Optionen 5 und 6 -> Totzeit der Lampenspalten
 
 Die Lampen laufen bei Atari im Zeitmultiplex: vier Spalten werden der Reihe nach je eine halbe Millisekunde eingeschaltet. An der Original-MPU wird die Spalte im selben Augenblick umgeschaltet, in dem die neuen Lampenwerte gültig werden. Weil die Spaltentreiber auf dem Auxiliary Board beim Abschalten ein paar Mikrosekunden nachhängen, bekommt dabei jedes Mal die *falsche* Lampe einen ganz kurzen Stromstoß — die Nachbarlampe in derselben Treibergruppe, aus der vorherigen Spalte.
 
 Bei einer Glühlampe merkt man davon nichts. **LED-Ersatzlampen glimmen dadurch aber sichtbar**, obwohl sie ausgeschaltet sind. Das ist der bekannte Effekt, dass LEDs in einem Atari „nie ganz ausgehen"; das Atari-Handbuch beschreibt ihn als angebliche „keep-alive"-Schaltung, gemeint ist aber dieselbe Sache.
 
-- **„OFF"** — **ruhige Lampen. Grundeinstellung.** AtariFA schaltet die Spalte um, während alle Lampen ausgetastet sind, und lässt der alten Spalte etwa 60 Mikrosekunden Zeit zum Abklingen. Ausgeschaltete LEDs bleiben aus. **Das ist die Einstellung für einen Automaten mit LED-Ersatzlampen.**
+AtariFA schaltet die Spalte deshalb um, **während alle Lampen ausgetastet sind**, und lässt der alten Spalte anschließend eine kurze **Totzeit** zum Abklingen, bevor die neuen Lampenwerte scharf werden. Wie lange ein Spaltentreiber zum Abschalten braucht, ist aber von Automat zu Automat verschieden — es hängt an den Bauteilen und daran, wie viel Strom die Lampen dieser Spalte ziehen. Je weniger Strom, desto länger. Eine Spalte mit LED-Ersatzlampen ist deshalb der ungünstigste Fall. Darum ist die Totzeit einstellbar, über die **Optionen 5 und 6 gemeinsam**:
 
-- **„ON"** — **Zeitverhalten der Original-MPU**, einschließlich des Glimmens. Interessant, wenn Sie AtariFA mit der Originalplatine vergleichen wollen oder wenn Ihnen das Original-Verhalten lieber ist. Auf die Helligkeit hat der Schalter praktisch keinen Einfluss (22,1 % gegen 24,5 % Einschaltdauer), auf Glühlampen gar keinen.
+| Option 5 | Option 6 | Totzeit | Helligkeit |
+|---|---|---|---|
+| **OFF** | **OFF** | **etwa 65 µs — Grundeinstellung** | 21,8 % |
+| OFF | ON | etwa 250 µs | 12,8 % |
+| ON | OFF | *keine* — Zeitverhalten der Original-MPU | 24,5 % |
+| ON | ON | etwa 400 µs | 5,5 % |
 
-Dieser Schalter wird fortlaufend gelesen, darf also im laufenden Spiel umgestellt werden — damit lässt sich der Unterschied unmittelbar vergleichen.
+**Was einzustellen ist:**
 
-#### 4.2.5. Option 6 -> längere Totzeit für die Lampenspalten
+- **Glühlampen im Automaten:** nichts. Die Grundeinstellung passt, der Schalter ist für Sie ohne Bedeutung.
 
-Wie lange ein Spaltentreiber auf dem Auxiliary Board zum Abschalten braucht, ist von Automat zu Automat verschieden — es hängt an den Bauteilen und daran, wie viel Strom die Lampen dieser Spalte ziehen. Je weniger Strom, desto länger. Eine Spalte mit LED-Ersatzlampen ist deshalb der ungünstigste Fall, und dort können die 60 Mikrosekunden aus Option 5 = „OFF" zu kurz sein.
+- **LED-Ersatzlampen, alles in Ordnung:** ebenfalls nichts. Die Grundeinstellung genügt in den meisten Automaten.
 
-- **„OFF"** — **Grundeinstellung.** Etwa 60 Mikrosekunden Totzeit. Das genügt in den meisten Automaten.
+- **Einzelne LEDs glimmen, obwohl sie aus sein sollten:** eine Stufe höher gehen — erst Option 6 = „ON" (250 µs), und nur wenn das nicht reicht, beide auf „ON" (400 µs). **Nehmen Sie die kleinste Stufe, die das Glimmen beseitigt**, denn jede Stufe kostet Helligkeit. Bei 250 µs fällt das im Automaten kaum auf; **400 µs sind deutlich dunkler**, das ist so gewollt und kein Fehler.
 
-- **„ON"** — **längere Totzeit**, zu benutzen, wenn einzelne LED-Ersatzlampen trotz Option 5 = „OFF" noch glimmen. In Software **0.1.7** sind das etwa 110 Mikrosekunden; die Lampen werden dadurch geringfügig dunkler (19,6 % statt 22,1 % Einschaltdauer), im Automaten ist das nicht zu sehen.
+- **Option 5 = „ON" allein** schaltet das **Zeitverhalten der Original-MPU** ein, einschließlich des Glimmens. Interessant, wenn Sie AtariFA mit der Originalplatine vergleichen wollen oder wenn Ihnen das Original-Verhalten lieber ist. Auf Glühlampen hat das keinerlei Einfluss.
 
-> **Software 0.1.8 ist eine Messfassung.** Dort sind es auf Option 6 = „ON" etwa **400 Mikrosekunden**, und das kostet **drei Viertel der Helligkeit** (5,0 % statt 22,1 % Einschaltdauer) — die Lampen sind dann deutlich dunkler, und das ist Absicht, nicht ein Fehler. Diese Fassung ist dafür gedacht, **einmal** die Frage zu beantworten, ob ein hartnäckiges Glimmen überhaupt von der Abschaltzeit der Lampenspalte kommt: verschwindet es mit Option 6 = „ON", war es die Spalte; bleibt es unverändert, war es etwas anderes (siehe den letzten Absatz dieses Kapitels). **Zum Spielen bitte Option 6 auf „OFF" stellen** oder bei Version 0.1.7 bleiben. Welche Fassung läuft, zeigt die Info-Anzeige beim Einschalten (Kapitel 5.2).
+Beide Schalter werden fortlaufend gelesen, dürfen also im laufenden Spiel umgestellt werden — damit lässt sich der Unterschied unmittelbar vergleichen, ohne den Automaten aus- und wieder einzuschalten. Die Länge einer Spalte bleibt in allen vier Stellungen dieselbe halbe Millisekunde; es ändert sich nur, wie viel davon zum Abklingen reserviert ist.
 
-**Option 5 sticht Option 6:** steht Option 5 auf „ON", gibt es überhaupt keine Totzeit, und Option 6 bleibt ohne Wirkung.
+> **Gegenüber Software 0.1.7 und 0.1.8 hat sich die Bedeutung der Kombination geändert.** Option 5 allein und Option 6 allein bedeuten weiterhin dasselbe; **beide zusammen** ergaben früher das Original-Timing und sind jetzt die längste Totzeit. Welche Fassung läuft, zeigt die Info-Anzeige beim Einschalten (Kapitel 5.2).
 
-Auch dieser Schalter wird fortlaufend gelesen.
+#### 4.2.5. Wenn das Glimmen bleibt
 
-**Wenn auch Option 6 = „ON" nichts ändert:** dann liegt es nicht an der Abschaltzeit der Spalte, und weiter hochdrehen hilft nicht. Es gibt einen zweiten Grund, gegen den keine Software etwas ausrichtet: die Lampentreiber (ULN2003A) lassen im ausgeschalteten Zustand einen Reststrom von einigen Mikroampere durch, und weil immer eine Spalte unter Spannung steht, genügt das einer modernen LED zum Glimmen. Eine Glühlampe zeigt das nie. Die Original-MPU hat denselben Reststrom. Gegenmittel an der betroffenen Fassung: **ein Widerstand von etwa 2,2 kΩ (½ W) parallel zur Lampe** — er leitet den Reststrom ab, ohne die Lampe im Betrieb zu beeinflussen. Ebenso wirksam: an dieser Stelle eine Glühlampe verwenden oder eine LED-Ersatzlampe mit eingebautem Ableitwiderstand („ghost free").
+**Wenn auch die längste Stufe (Option 5 und 6 beide „ON") nichts ändert:** dann liegt es nicht an der Abschaltzeit der Spalte, und weiter hochdrehen hilft nicht — mehr als 400 Mikrosekunden gibt eine halbe Millisekunde Spaltendauer auch gar nicht her. Es gibt einen zweiten Grund, gegen den keine Software etwas ausrichtet: die Lampentreiber (ULN2003A) lassen im ausgeschalteten Zustand einen Reststrom von einigen Mikroampere durch, und weil immer eine Spalte unter Spannung steht, genügt das einer modernen LED zum Glimmen. Eine Glühlampe zeigt das nie. Die Original-MPU hat denselben Reststrom.
+
+Gegenmittel an der betroffenen Fassung: **ein Widerstand von etwa 2,2 kΩ (½ W) parallel zur Lampe** — er leitet den Reststrom ab, ohne die Lampe im Betrieb zu beeinflussen. Ebenso wirksam: an dieser Stelle eine Glühlampe verwenden oder eine LED-Ersatzlampe mit eingebautem Ableitwiderstand („ghost free").
 
 ### 4.3. Sechs der zehn DIPs werden nur beim Einschalten gelesen
 
@@ -450,17 +457,24 @@ Alle fünf laufen auch mit Freispiel (Kapitel 7).
  2  Spielauswahl Bit 1  (+2)         2  reserviert          beim Einschalten
  3  Spielauswahl Bit 2  (+4)         3  Tonweg              fortlaufend
  4  Freispiel, ON = aktiv            4  FA-Control erlaubt  fortlaufend
-                                     5  Lampen-Timing       fortlaufend
- alle vier nur beim Einschalten      6  Lampen-Totzeit      fortlaufend
+                                     5  Lampen-Totzeit  \  fortlaufend
+ alle vier nur beim Einschalten      6  Lampen-Totzeit  /  fortlaufend
 ```
 
 **Tonweg, Option 3:** OFF = Auxiliary Board (Standard) · ON = Verstärker auf der Platine
 
 **FA-Control, Option 4:** OFF = niemand redet dazwischen (Standard) · ON = das ESP32-Testwerkzeug darf die Anlage steuern (Kapitel 9)
 
-**Lampen-Timing, Option 5:** OFF = ruhige Lampen, ausgeschaltete LEDs bleiben aus (Standard) · ON = Zeitverhalten der Original-MPU, LED-Ersatzlampen glimmen wie am Original (Kapitel 4.2.4)
+**Lampen-Totzeit, Optionen 5 und 6 gemeinsam** (Kapitel 4.2.4) — gegen glimmende LED-Ersatzlampen die kleinste Stufe nehmen, die wirkt:
 
-**Lampen-Totzeit, Option 6:** OFF = etwa 60 µs (Standard) · ON = länger, für Automaten, in denen einzelne LEDs trotz Option 5 = OFF glimmen — 110 µs in Version 0.1.7, in der Messfassung 0.1.8 dagegen 400 µs und damit deutlich dunklere Lampen; Option 5 sticht Option 6 (Kapitel 4.2.5)
+| Option 5 | Option 6 | Totzeit | Helligkeit |
+|---|---|---|---|
+| OFF | OFF | etwa 65 µs (Standard) | 21,8 % |
+| OFF | ON | etwa 250 µs | 12,8 % |
+| ON | OFF | keine — Zeitverhalten der Original-MPU, LEDs glimmen wie am Original | 24,5 % |
+| ON | ON | etwa 400 µs, sichtbar dunkler | 5,5 % |
+
+Glimmt es auch bei 400 µs weiter, liegt es nicht an der Software — Kapitel 4.2.5.
 
 **Nach dem Ändern eines Schalters, der beim Einschalten gelesen wird: aus- und wieder einschalten.**
 

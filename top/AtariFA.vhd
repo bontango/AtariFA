@@ -1140,8 +1140,8 @@ port map(
 ------------------------------------------------------------------------------
 -- reset/enable an io_live: der Scan laeuft auch waehrend einer FA-Control-Uebernahme,
 -- gespeist dann aus fa_lamp_state (Lampennummer -> RAM-Bit-Lage, s. fa_lamp_map).
--- Seit SW 0.1.6 blankt das Modul durch Nullen-Latchen statt ueber oe_n, und Options-DIP 5
--- schaltet das Zeitverhalten der Original-MPU wieder ein (s. orig_timing unten und den Kopf
+-- Seit SW 0.1.6 blankt das Modul durch Nullen-Latchen statt ueber oe_n, und die Options-DIPs 5
+-- und 6 waehlen die Totzeit vor dem Scharfwerden der Zeilen (s. mode unten und den Kopf
 -- von lamp_matrix.vhd -- Messung: docs/Lamp_Preglow_Experiment.md).
 LAMP: entity work.lamp_matrix
 port map(
@@ -1149,16 +1149,16 @@ port map(
 	reset      => not io_live,
 	enable     => io_live,
 	lamp_state => lamp_state_mux,
-	-- Options-DIP 5 (active-low gelesen, ON = '0'): ON = Zeitverhalten der Original-MPU,
-	-- Spaltenwechsel gleichzeitig mit dem Zeilen-Latch, inkl. Vorgluehen bei LED-Retrofits.
-	-- OFF (Serienstand) = Spalte wechselt im Austastfenster, ~60 us bevor die Zeilen scharf
-	-- werden. Der DIP wird direkt gelesen und ist im Spiel umschaltbar -- damit laesst sich der
-	-- Unterschied am Spielfeld ohne Neustart vergleichen (docs/Lamp_Preglow_Experiment.md).
-	orig_timing => not options(5),
-	-- Options-DIP 6: ON = ~110 us statt ~60 us Totzeit. Reserve fuer Spielfelder, deren
-	-- Spaltentreiber laenger nachhaengt als der, an dem gemessen wurde -- ebenfalls im Spiel
-	-- umschaltbar, kostet Helligkeit (Duty 19,6 % statt 22,1 %). DIP 5 sticht DIP 6.
-	long_settle => not options(6),
+	-- Options-DIP 5 und 6 als 2-Bit-Betriebsart, DIP 5 hoeherwertig (die Info-Anzeige zeigt die
+	-- Optionen von links nach rechts, also liest sich mode dort als Binaerzahl). Beide DIPs
+	-- werden direkt gelesen (active-low, ON = '0') und sind im Spiel umschaltbar -- der
+	-- Unterschied laesst sich am Spielfeld ohne Neustart vergleichen:
+	--   OFF OFF "00" ~65 us Totzeit, Serienstand · OFF ON "01" ~250 us
+	--   ON  OFF "10" Zeitverhalten der Original-MPU (keine Totzeit, Vorgluehen inklusive)
+	--   ON  ON  "11" ~400 us, sichtbar dunkler -- Ausnahme-, keine Dauerstellung
+	-- DIP 5 allein und DIP 6 allein bedeuten damit dasselbe wie in SW 0.1.7; neu ist nur die
+	-- Kombination (frueher "DIP 5 sticht DIP 6"). Tabelle mit Duty: Kopf von lamp_matrix.vhd.
+	mode       => (not options(5)) & (not options(6)),
 	ser        => lamp_ser,
 	srck       => lamp_srck,
 	rck        => lamp_rck,
