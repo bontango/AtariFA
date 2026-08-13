@@ -356,6 +356,9 @@ constant DISPLAY_TEST : boolean := false;
 --       dip_strobe0/i_disp_Load) — zeigt Fortschritt der Power-on-/Boot-Sequenz
 --   4 = Lampen-Langzeit — Messung zu docs/Lamp_Refresh_Analysis.md (Software-Refresh?)
 --   5 = Lampen-Detail   — eine Multiplex-Phase in Feinauflösung
+-- Fuer die Messung "Lampe 21 / A20" auf 5 stellen (Prozedur, Sondenplan und Auswertung:
+-- docs/Lamp_Preglow_Experiment.md 6.3) -- danach WIEDER AUF 0 und scripts\check.ps1 -Fit
+-- gegen scripts/baseline.csv fahren, sonst wandert Diagnoselogik in ein Release.
 constant DBG_MODE : integer range 0 to 5 := 0;
 -- Lampen-Trace (nur DBG_MODE 4/5, sonst ohne Wirkung — die Logik steckt in den generate-Bloecken
 -- und wird bei DBG_MODE=0 gar nicht elaboriert, die Baseline bleibt also unberuehrt).
@@ -363,9 +366,14 @@ constant DBG_MODE : integer range 0 to 5 := 0;
 -- Nummerierung wie in rtl/fa_control / lamp_map_pkg: n = (595-Gruppe - 1) * 4 + Strobe, 0..83.
 -- Eine Referenzlampe wird NICHT mehr gewaehlt: Kanal 5 zeigt "irgendeine Lampe wird getrieben"
 -- und braucht dafuer keine Nummer -- ein Rebuild nur zum Umwaehlen entfaellt damit.
-constant DBG_WATCH_LAMP    : integer range 0 to LAMP_COUNT - 1 := 8;   -- Gruppe 3, Strobe 0
-                                                                       -- (am Prototyp per FA-Control
-                                                                       --  identifiziert, im Spiel AUS)
+constant DBG_WATCH_LAMP    : integer range 0 to LAMP_COUNT - 1 := 21;  -- Gruppe 6, Strobe 1
+                                                                       -- = Latch 0x1000 Bit 0 = RAM 0x31
+                                                                       --   Bit 0 = A20 Ausgang Pin 15
+                                                                       --   ("LAMP 31-B0-SB", Sheet 18D).
+                                                                       -- Feldfall 08.2026: glimmt dauernd,
+                                                                       -- auch bei alles-aus. Vorher stand
+                                                                       -- hier 8 (Gruppe 3, Strobe 0) fuer
+                                                                       -- die Refresh-Messung 6.6.
 constant DBG_STRETCH_CYCLES : integer := 50000;   -- 1 ms @ clk_50 — Pulsdehnung fuer langsame LAs
 signal heartbeat_div  : std_logic_vector(24 downto 0) := (others => '0');
    -- Bit 24 toggelt alle 2^24/50e6 ≈ 0.67s → ~0.75 Hz Heartbeat; nur als FPGA-Takt-Fallback genutzt
@@ -1143,10 +1151,14 @@ port map(
 	lamp_state => lamp_state_mux,
 	-- Options-DIP 5 (active-low gelesen, ON = '0'): ON = Zeitverhalten der Original-MPU,
 	-- Spaltenwechsel gleichzeitig mit dem Zeilen-Latch, inkl. Vorgluehen bei LED-Retrofits.
-	-- OFF (Serienstand) = Spalte wechselt im Austastfenster, ~20 us bevor die Zeilen scharf
+	-- OFF (Serienstand) = Spalte wechselt im Austastfenster, ~60 us bevor die Zeilen scharf
 	-- werden. Der DIP wird direkt gelesen und ist im Spiel umschaltbar -- damit laesst sich der
 	-- Unterschied am Spielfeld ohne Neustart vergleichen (docs/Lamp_Preglow_Experiment.md).
 	orig_timing => not options(5),
+	-- Options-DIP 6: ON = ~110 us statt ~60 us Totzeit. Reserve fuer Spielfelder, deren
+	-- Spaltentreiber laenger nachhaengt als der, an dem gemessen wurde -- ebenfalls im Spiel
+	-- umschaltbar, kostet Helligkeit (Duty 19,6 % statt 22,1 %). DIP 5 sticht DIP 6.
+	long_settle => not options(6),
 	ser        => lamp_ser,
 	srck       => lamp_srck,
 	rck        => lamp_rck,

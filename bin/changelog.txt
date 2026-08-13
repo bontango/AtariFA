@@ -8,3 +8,8 @@
   lamp matrix now scans at the original 488 Hz frame - 512 us per strobe column, DWELL_CYCLES 12500 to 25100
   cyclone_10_dev_open    1.1.5    AtariFA_v115.jic  sha256:DF8A8896A30A32B9
   cyclone_10_pcb         0.1.5    AtariFA_v015.jic  sha256:F8D339644CAC3FE9
+
+2026-08-13 11:36  version .1.7
+  lamp matrix: three dead-time steps for the Aux board column driver instead of one - series value now ~60 us (SETTLE_CYCLES 2500), Options DIP 6 adds ~110 us, DIP 5 = ON keeps the original timing, phase length unchanged at 512 us in all three positions. Field tested on an Airborne Avenger and a Middle Earth: the DIP 5 A/B reproduces the pre-glow on command and the base glow of the LED retrofits is gone, so both 0.1.6 fixes are confirmed on hardware. Still open: 595 group 6 (ULN2003A A20, FA-Control lamps 20..23) keeps glowing and DIP 6 makes no difference there - measurement plan in docs/Lamp_Preglow_Experiment.md 6. cyclone_10_dev_open NEVER hardware tested.
+  cyclone_10_dev_open    1.1.7    AtariFA_v117.jic  sha256:09EBA3001B8058FF
+  cyclone_10_pcb         0.1.7    AtariFA_v017.jic  sha256:2ADBE48048FCA496

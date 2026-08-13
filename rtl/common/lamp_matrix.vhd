@@ -33,10 +33,12 @@
 --   pass=1 "Daten":  Muster der Phase schieben -> rck  => Zeilen der Phase gehen an
 -- Dazwischen wird die Spalte umgeschaltet, und GENAU DAS ist der Unterschied der beiden Modi:
 --   orig_timing='0' (Serienstand): strobe_sel wechselt beim CLEAR-Latch, also waehrend die
---     Zeilen aus sind. Bis die Zeilen wieder angehen liegen St_Settle + Datendurchlauf = ~20 us
+--     Zeilen aus sind. Bis die Zeilen wieder angehen liegen St_Settle + Datendurchlauf = ~60 us
 --     -- Zeit, in der die alte Spalte auf dem Aux-Board abklingen kann.
 --   orig_timing='1' (Options-DIP 5 ON): strobe_sel wechselt beim DATEN-Latch, also im selben
 --     Moment, in dem die Zeilen scharf werden -- das Zeitverhalten der Original-MPU.
+--   long_settle='1' (Options-DIP 6 ON): wie Serienstand, aber ~110 us Totzeit. Reserve fuer
+--     Spielfelder, denen 60 us nicht genuegen -- s. Generic-Block und die Feldrueckmeldung unten.
 -- Warum das eine Rolle spielt (gemessen 2026-08-10 am Airborne-Spielfeld mit LED-Retrofits,
 -- s. docs/Lamp_Preglow_Experiment.md): die Spalten-PNP auf dem Aux-Board (2N5883, hart in
 -- Saettigung, Abschalten nur ueber 8,2 K Basis-Emitter) haengen zweistellige us nach. Wechseln
@@ -44,6 +46,22 @@
 -- Zeilenmuster -> die Lampe "gleiche Zeile, vorhergehende Spalte" bekommt einen Stromstoss.
 -- Fuer einen Gluehfaden nichts, fuer eine LED deutlich sichtbar. Das ist das im Atari
 -- Troubleshooting Guide als "keep-alive routine" beschriebene Vorgluehen.
+--
+-- Wie lange die Spalte nachhaengt, ist Bauteil- und Lastsache und daher NICHT fuer alle Maschinen
+-- gleich: die 20 us aus SW 0.1.6 haben am Airborne gereicht, an einem Middle Earth blieb EINE LED
+-- halb an (Feldrueckmeldung 08.2026, s. docs/Lamp_Preglow_Experiment.md). Deshalb sind es seit
+-- SW 0.1.7 ~60 us, und Options-DIP 6 legt ~110 us nach. Je weniger Strom die Spalte zieht, desto
+-- tiefer sitzt die PNP in der Saettigung und desto laenger die Speicherzeit -- eine mit LEDs
+-- bestueckte Spalte ist also genau der ungeguenstigste Fall.
+--
+-- Wie weit "laenger" reichen kann, sagt eine Abschaetzung ueber die Basisladung: eingeschaltet wird
+-- die Basis vom MC1413 ueber 39 Ohm gezogen (~0,2 A), ausgeschaltet wird sie NUR ueber die 8,2 K
+-- Basis-Emitter, also mit ~85 uA. Bei diesem Verhaeltnis von Ausraeum- zu Einschaltstrom kann die
+-- Speicherzeit Hunderte von us erreichen, im Extremfall mehr als eine Phase. Fuer die Fehlersuche
+-- heisst das: "DIP 6 = ON aendert nichts" belegt NICHT, dass die Spalte unschuldig ist -- es kann
+-- auch heissen, dass 110 us schlicht zu wenig sind. Wer das entscheiden will, baut EINMAL mit
+-- SETTLE_LONG_CYCLES = 20000 (~400 us, Duty ~5 %, deutlich dunkler -- Diagnose, kein Serienstand)
+-- und schaut, ob DIP 6 dann etwas aendert (docs/Lamp_Preglow_Experiment.md 4 und 6.5).
 --
 -- Blanken durch NULLEN-LATCHEN statt oe_n=Hi-Z: im Original haengen die ULN-Eingaenge an
 -- 9334-Latches, die permanent treiben -- eine Aus-Zeile ist dort 100 % der Zeit eine harte '0'.
@@ -73,9 +91,11 @@
 --                  im Top (DBG_MODE 4/5) dieselbe Kodierung braucht.
 --   * Latch=offset[3:2]/Strobe=offset[1:0] : Annahme aus 9334-Adressierung (unten im idx).
 --   * Shift-Reihenfolge (vec(23) zuerst = MSB) bzw. welcher 74HC595 zuerst in der Kaskade.
---   * SETTLE_CYCLES : Totzeit zwischen Spaltenwechsel und Zeilen-Scharfwerden. Reicht das
---                  Vorgluehen-Fenster nicht (LED glimmt trotz DIP 5 = OFF weiter), ist DAS der
---                  Hebel -- s. Generic-Block unten.
+--   * SETTLE_CYCLES / SETTLE_LONG_CYCLES : Totzeit zwischen Spaltenwechsel und Zeilen-Scharfwerden.
+--                  Reicht das Vorgluehen-Fenster nicht (LED glimmt trotz DIP 5 = OFF und DIP 6 = ON
+--                  weiter), ist DAS der erste Hebel -- aber erst nach EINEM Diagnosebuild mit
+--                  20000 (~400 us); bleibt das Glimmen auch dann, ist die Spalten-Abschaltzeit
+--                  nicht die Ursache. S. Generic-Block unten und die Basisladungs-Abschaetzung oben.
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -91,27 +111,38 @@ entity lamp_matrix is
 		--     = 501 clk = 10 us  (am LA gemessen: 10,000 us seit St_ShiftLast,
 		--      docs/Lamp_Refresh_Analysis.md 6.7.1)
 		--   Phase = Dwell + Clear-Durchlauf 501 + Settle + Daten-Durchlauf 501 + Enable 1
-		--   Serienstand   : 24100 + 501 + 497 + 501 + 1 = 25600 clk x 20 ns = 512,0 us
-		--   DIP 5 = ON    : 24597 + 501 +   0 + 501 + 1 = 25600 clk        = 512,0 us
-		--     (im Original-Modus ist St_Settle uebersprungen, die Zeit schlaegt statt dessen
-		--      auf den Dwell auf -- die Phasendauer ist in beiden Modi GLEICH, sonst
-		--      vergleicht man am Spielfeld zwei Variablen statt einer)
+		--   Serienstand   : 22097 + 501 + 2500 + 501 + 1 = 25600 clk x 20 ns = 512,0 us
+		--   DIP 5 = ON    : 24597 + 501 +    0 + 501 + 1 = 25600 clk        = 512,0 us
+		--   DIP 6 = ON    : 19597 + 501 + 5000 + 501 + 1 = 25600 clk        = 512,0 us
+		--     (der Dwell faengt auf, was die Totzeit gerade nicht braucht -- die Phasendauer ist
+		--      in ALLEN DREI Stellungen gleich, sonst vergleicht man am Spielfeld zwei Variablen
+		--      statt einer; s. dwell_lim unten)
 		--   Phase = EIN Digit-Slot wie im Original, Frame = 4 Phasen = 2,048 ms = 488,3 Hz
-		--   Duty: Serienstand 24602/(4x25600) = 24,0 %, DIP 5 = ON 25099/... = 24,5 %
-		--     (0,5 Prozentpunkte = unsichtbar; das Settle-Fenster ist dunkel. Wer den
-		--      Unterschied ganz weghaben will, setzt SETTLE_CYCLES = 0 -- dann traegt schon
-		--      der Daten-Durchlauf 10 us Totzeit.)
+		--   Duty (sichtbar = Phase - Totzeit, Totzeit = Settle + Daten-Durchlauf 501 + Enable 1):
+		--     Serienstand 22598/(4x25600) = 22,1 % · DIP 5 = ON 25099/... = 24,5 %
+		--     · DIP 6 = ON 20098/... = 19,6 %
 		-- Damit laeuft die Matrix im selben Raster wie die Original-DMA-Kette (Troubleshooting
 		-- Guide: 512 us je Spalte, "duty cycle of only 25 %"). Bis SW 0.1.4 stand hier 12500
 		-- (250 us, ~961 Hz) -- doppelt so schnell wie das Original bei gleicher Helligkeit.
 		-- DWELL_CYCLES ist der einzige Software-seitige HELLIGKEITSHEBEL (Duty, nicht Spannung).
-		DWELL_CYCLES  : integer := 24100; -- clk_50-Zyklen Ruhezeit je Strobe-Phase -> 488Hz Frame
-		-- Totzeit zwischen Spaltenwechsel und Scharfwerden der Zeilen (nur Serienstand).
-		-- Zusammen mit dem Daten-Durchlauf ergibt 497 rund 20 us, in denen die alte Spalte
-		-- abklingen kann. HW-TUNBAR: glimmt die "gleiche Zeile, vorhergehende Spalte"-Lampe
-		-- trotz DIP 5 = OFF weiter, ist die PNP-Speicherzeit laenger -> 1250 (25 us), dann 2500
-		-- (50 us) versuchen und DWELL_CYCLES um denselben Betrag senken (Phase bleibt 25600).
-		SETTLE_CYCLES : integer := 497;
+		DWELL_CYCLES  : integer := 22097; -- clk_50-Zyklen Ruhezeit je Strobe-Phase -> 488Hz Frame
+		-- Totzeit zwischen Spaltenwechsel und Scharfwerden der Zeilen (nicht im Original-Modus).
+		-- SETTLE_CYCLES gilt im Serienstand, SETTLE_LONG_CYCLES bei Options-DIP 6 = ON. Zusammen
+		-- mit dem Daten-Durchlauf sind das ~60 us bzw. ~110 us, in denen die alte Spalte abklingen
+		-- kann. Bis SW 0.1.6 stand hier 497 (~20 us) -- das genuegte am Airborne, an einem Middle
+		-- Earth blieb damit eine LED halb an (s. Kopf). HW-TUNBAR: glimmt die "gleiche Zeile,
+		-- vorhergehende Spalte"-Lampe auch mit DIP 6 = ON weiter, ist die Spalten-Abschaltzeit
+		-- damit NOCH NICHT freigesprochen -- die Basisladungs-Abschaetzung im Kopf laesst
+		-- Hunderte von us zu. Erst EIN Diagnosebuild mit SETTLE_LONG_CYCLES = 20000 (~400 us,
+		-- Duty ~5 %) entscheidet das; aendert auch der nichts, dann nicht weiter hochdrehen,
+		-- sondern docs/Lamp_Preglow_Experiment.md 3.3/6 neu aufrollen.
+		-- Rechnerisch: eine Erhoehung von SETTLE_LONG_CYCLES faengt der Dwell selbst auf
+		-- (dwell_lim = DWELL + SETTLE - settle_lim), die Phase bleibt 25600 clk -- nur muss
+		-- SETTLE_LONG_CYCLES unter DWELL_CYCLES + SETTLE_CYCLES bleiben (= 24597, sonst wird
+		-- dwell_lim negativ). Wer dagegen SETTLE_CYCLES anhebt, senkt DWELL_CYCLES um denselben
+		-- Betrag, weil dort beide Summanden mitwachsen.
+		SETTLE_CYCLES      : integer := 2500;
+		SETTLE_LONG_CYCLES : integer := 5000;
 		SHIFT_DIV     : integer := 10     -- clk_50 je SRCK-Halbperiode (SHIFT_DIV=10 -> ~2.5MHz Bit-Takt)
 	);
 	port (
@@ -123,6 +154,11 @@ entity lamp_matrix is
 		-- uebernommen, damit ein Umschalten mitten in der Phase keinen Glitch erzeugt; ein
 		-- mechanischer Schalter ist kein zeitkritischer Eingang.
 		orig_timing : in  std_logic;
+		-- '1' = lange Totzeit (SETTLE_LONG_CYCLES statt SETTLE_CYCLES) fuer Spielfelder, deren
+		-- Spaltentreiber laenger nachhaengt. Im Top an Options-DIP 6, wird wie orig_timing EINMAL
+		-- JE FRAME uebernommen. Ohne Wirkung, solange orig_timing='1' ist (dort gibt es keine
+		-- Totzeit) -- DIP 5 sticht also DIP 6.
+		long_settle : in  std_logic;
 		lamp_state  : in  std_logic_vector(127 downto 0);  -- RAM 0x30-0x3F Shadow (16 Byte)
 		ser         : out std_logic;                       -- 74HC595 SER   (-> g_serin_595)
 		srck        : out std_logic;                       -- 74HC595 SRCLK (-> g_clk_595)
@@ -149,18 +185,24 @@ architecture rtl of lamp_matrix is
 	signal bit_cnt   : integer range 0 to 23 := 0;
 	signal phase     : integer range 0 to 3 := 0;
 	-- zaehlt beide Wartezustaende (Dwell und Settle) -- ein Zaehler genuegt, sie sind nie
-	-- gleichzeitig aktiv. Obergrenze ist der Dwell im Original-Modus.
-	signal dwell_cnt : integer range 0 to DWELL_CYCLES + SETTLE_CYCLES := 0;
+	-- gleichzeitig aktiv. Obergrenze ist der Dwell im Original-Modus (bzw. SETTLE_LONG_CYCLES,
+	-- falls das jemand einmal groesser waehlt als den Dwell).
+	signal dwell_cnt : integer range 0 to DWELL_CYCLES + SETTLE_CYCLES + SETTLE_LONG_CYCLES := 0;
 	signal div_cnt   : integer range 0 to SHIFT_DIV := 0;
 	signal tick      : std_logic := '0';
 	-- '0' = Clear-Durchlauf (24 Nullen), '1' = Datendurchlauf (Muster der Phase).
 	-- pass='1' ist gleichzeitig das Austastfenster und geht als 'blank' nach draussen.
 	signal pass      : std_logic := '0';
-	-- orig_timing, einmal je Frame uebernommen (s. Portkommentar)
-	signal orig_mode : std_logic := '0';
-	-- Dwell-Ziel: im Original-Modus schlaegt die uebersprungene Settle-Zeit hier auf, damit die
-	-- Phase in beiden Modi 25600 clk lang ist.
-	signal dwell_lim : integer range 0 to DWELL_CYCLES + SETTLE_CYCLES := DWELL_CYCLES;
+	-- orig_timing und long_settle, einmal je Frame uebernommen (s. Portkommentare)
+	signal orig_mode  : std_logic := '0';
+	signal long_mode  : std_logic := '0';
+	-- Totzeit-Ziel dieser Phase: 0 im Original-Modus (St_Settle wird uebersprungen), sonst
+	-- SETTLE_CYCLES bzw. SETTLE_LONG_CYCLES.
+	signal settle_lim : integer range 0 to SETTLE_CYCLES + SETTLE_LONG_CYCLES := SETTLE_CYCLES;
+	-- Dwell-Ziel: was die Totzeit gerade nicht braucht, schlaegt hier auf, damit die Phase in
+	-- ALLEN Stellungen 25600 clk lang ist (Rechnung im Generic-Block).
+	signal dwell_lim  : integer range 0 to DWELL_CYCLES + SETTLE_CYCLES + SETTLE_LONG_CYCLES
+	                  := DWELL_CYCLES;
 
 	-- GRP_OF (595-Ausgang je Latch/Bit) kommt aus work.lamp_map_pkg -- dort steht auch
 	-- die daraus berechnete Umkehrung, die das Top-Level fuer FA-Control braucht.
@@ -170,8 +212,12 @@ architecture rtl of lamp_matrix is
 	-- kennen, um aus strobe_sel auf die sichtbare Phase zurueckzurechnen.
 begin
 
-	blank     <= pass;
-	dwell_lim <= DWELL_CYCLES + SETTLE_CYCLES when orig_mode = '1' else DWELL_CYCLES;
+	blank      <= pass;
+	settle_lim <= SETTLE_LONG_CYCLES when long_mode = '1' else SETTLE_CYCLES;
+	-- Original-Modus: keine Totzeit, der volle Betrag geht in den Dwell. Sonst bekommt der Dwell,
+	-- was die gewaehlte Totzeit uebrig laesst -- Summe immer DWELL_CYCLES + SETTLE_CYCLES.
+	dwell_lim  <= DWELL_CYCLES + SETTLE_CYCLES when orig_mode = '1'
+	              else DWELL_CYCLES + SETTLE_CYCLES - settle_lim;
 
 	-- Shift-Takt-Tick: ein Puls alle SHIFT_DIV clk_50-Zyklen (paced die SRCK-Flanken)
 	process(clk_50)
@@ -222,7 +268,8 @@ begin
 								end loop;
 							end loop;
 						elsif phase = 0 then
-							orig_mode <= orig_timing;       -- Modus einmal je Frame uebernehmen
+							orig_mode <= orig_timing;       -- Modi einmal je Frame uebernehmen
+							long_mode <= long_settle;
 						end if;
 						shiftreg <= vec;
 						bit_cnt  <= 0;
@@ -297,9 +344,9 @@ begin
 					when St_Settle =>
 						-- Spalte ist umgeschaltet, Zeilen sind aus: der alten Spalte Zeit zum
 						-- Abklingen geben (2N5883-Speicherzeit, s. Kopf). Vergleich mit >=, damit
-						-- SETTLE_CYCLES = 0 nicht haengt, sondern nach einem Takt weitergeht.
+						-- settle_lim = 0 nicht haengt, sondern nach einem Takt weitergeht.
 						rck <= '0';
-						if dwell_cnt >= SETTLE_CYCLES - 1 then
+						if dwell_cnt >= settle_lim - 1 then
 							dwell_cnt <= 0;
 							state     <= St_Load;
 						else

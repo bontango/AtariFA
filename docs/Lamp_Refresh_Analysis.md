@@ -149,6 +149,55 @@ writes lamp RAM:
 7DD5  RTI                                 ; ... else JMP $7000 (reboot)
 ```
 
+### 2.4 Second ROM checked — Middle Earth 608/609 (2026-08-12)
+
+Airborne alone leaves the possibility that another game does it differently, so the disassembly was
+repeated for the game the field report came from:
+
+```
+python tools/dis6800.py 609.hex 608.hex --name "Middle Earth 608/609" --out me_listing.txt --full
+```
+
+**The 244 Hz NMI handler does nothing at all.** Read straight out of the ROM image: vector `$7FFC`
+= `$7EC6`, and the byte at `$7EC6` is `3B` = **`RTI`**. Middle Earth does not even do Airborne's
+sentinel check — the only periodic interrupt in the machine returns immediately. Whatever refreshes
+the lamps, it is not interrupt code.
+
+**Lamp control is the same single-bit read-modify-write**, here factored into two subroutines:
+
+```
+7C09  STX  $DB          ; LAMP ON      save X
+7C0B  BSR  $7C14        ;              decode lamp id in A
+7C0D  ORAA $00,X        ;              set the bit
+7C0F  STAA $00,X        ;              write back
+7C11  LDX  $DB / RTS
+
+7C2A  STX  $DB          ; LAMP OFF     save X
+7C2C  BSR  $7C14        ;              same decode
+7C2E  COMA              ;              invert the mask
+7C2F  ANDA $00,X        ;              clear the bit
+7C31  BRA  $7C0F        ;              share the write-back
+
+7C14  BSR  $7C22        ; DECODE       high nibble of the lamp id -> B
+7C16  ADDB #$30         ;              *** base = page-0 $30 ***
+7C18  STAB $24 / CLR $0023 / LDX $23   ; X = $0030 + n
+7C1F  ANDA #$0F         ;              low nibble selects the bit
+```
+
+Callers pass a lamp id and call once (`LDAA #$A2 / JSR $7C09`), i.e. **event-driven**, exactly as in
+§2.3. `ADDB #$30` also settles a second question in passing: the game addresses lamp RAM in **page 0**,
+not through the `0x1000` RAM mirror — which is the region AtariFA's `lamp_sniffer` watches.
+
+**Only two pieces of code ever walk all of `0x30–0x3F`**, and neither is periodic:
+
+| | |
+|---|---|
+| `$77CC` | `LDX #$0030 / CLR $00,X / INX / CPX #$0040 / BNE` — clear all lamps, once, during init |
+| `$7F0D` | `LDX #$0030 / LDAA #$FF / STAA $00,X / INX / CPX #$0040 / BNE` — all lamps **on** for the lamp self-test, afterwards stepped off again |
+
+There is no refresh table in the game code, hence no wrap-around to its first entry and no waiting for
+a next refresh cycle. Two of the five Gen1 games have now been read; both agree with §1.
+
 ---
 
 ## 3. Where the "keep-alive" claim comes from — and what it really describes
@@ -273,7 +322,18 @@ window**. Q6…Q9 (2N5883) are driven hard into saturation — the MC1413 pulls 
 i.e. ~0.2 A of base current — and are turned off by nothing but the 8.2 K base-emitter resistors
 (R42…R45). That is a storage time in the tens of microseconds. The original has this on top of its
 latch-reload overlap; **AtariFA had it even though it blanks**, because up to SW 0.1.5 it released the
-rows ~20 ns after switching the column (see §4). Two consequences: the mechanism of this section is
+rows ~20 ns after switching the column (see §4).
+
+**How much is "tens of microseconds"? Possibly a good deal more — and that changes how the field
+reports have to be read.** Charge goes into the base at ~0.2 A and has to come back out through
+8.2 K, i.e. at ~85 µA: roughly one two-thousandth of the rate it went in. The storage time can
+therefore reach hundreds of microseconds, in the worst case more than one strobe phase. And the
+lighter the column load, the deeper the saturation and the longer the tail — an LED-populated column
+is the worst case of all. The consequence for diagnosis is uncomfortable but unavoidable:
+**"more dead time changed nothing" does not acquit the column.** The SW 0.1.7 field feedback (DIP 6 =
+ON ⇒ ~110 µs, no visible difference — [`Lamp_Preglow_Experiment.md`](Lamp_Preglow_Experiment.md) §6)
+is not yet a verdict; deciding it takes one diagnostic build at ~400 µs
+(`SETTLE_LONG_CYCLES = 20000`, duty ~5 %). Two consequences: the mechanism of this section is
 now measured rather than argued, and the open question of §6.5 ("which of the two switches first")
 turns out not to matter — the slow column makes the window either way.
 

@@ -1,10 +1,13 @@
 # Vorglühen („pre-glow"): Beobachtung am Flipper und Gegenexperiment
 
-> **Stand 2026-08-10.** Schritt 1 ist gefahren — das **Ergebnis steht in §3**, und es hat die Sache
+> **Stand 2026-08-13.** Schritt 1 ist gefahren — das **Ergebnis steht in §3**, und es hat die Sache
 > entschieden: das Artefakt ist da, es ist reproduzierbar, und es entstand auf der AtariFA aus einer
 > Ursache, die in `Lamp_Refresh_Analysis.md` §3.3 nur als Möglichkeit benannt war. Was daraus gebaut
 > wurde, steht in §4; der ursprünglich geplante Kunstgriff `PREGLOW_CYCLES` ist damit überholt (§5).
-> Gehört zu [`Lamp_Refresh_Analysis.md`](Lamp_Refresh_Analysis.md) — dort steht die Analyse.
+> **Neu: §6** — die Feldrückmeldung zu SW 0.1.7 von zwei Maschinen. Der Fix wirkt, **eine** Lampe
+> bleibt offen (Lampe 21 / A20, auf Airborne *und* Middle Earth dieselbe Nummer); dort steht der
+> Messplan dazu. Gehört zu [`Lamp_Refresh_Analysis.md`](Lamp_Refresh_Analysis.md) — dort steht die
+> Analyse.
 
 ## 1. Worum es geht
 
@@ -19,6 +22,8 @@ Lampen im Aus-Zustand schwach pulsen, und verkauft das als absichtliche „keep-
 | Ursache = Zeilen/Spalten-Versatz bei lebender Spalte | **belegt** (2026-08-10 am Spielfeld, §3.3 hier) |
 | AtariFA zeigt das Artefakt | **ja** — an den FPGA-Pins blankt sie sauber, an der Lampenfassung nicht (§3.3) |
 | Glühlampen zeigen es | **nein** (§3.1) — es ist ein LED-Retrofit-Phänomen |
+| Fix aus §4 wirkt am Spielfeld | **ja**, zwei Maschinen, SW 0.1.7 (§6.1): DIP 5 = OFF sauber, DIP 5 = ON bringt es zurück |
+| Restfall Lampe 21 / A20 | **offen** — glimmt dauernd, auch bei „alles aus"; Messplan in §6.3/§6.4 |
 
 ## 2. Schritt 1 — Beobachten, ohne irgendetwas zu ändern
 
@@ -184,22 +189,31 @@ die Nullen werden geschoben, *während* die Lampe noch leuchtet; die Ausgänge �
 
 **(b) Der Spaltenwechsel wandert ins Austastfenster, umschaltbar über Options-DIP 5.**
 
-| | DIP 5 = OFF (Serienstand) | DIP 5 = ON |
-|---|---|---|
-| `strobe_sel` wechselt | beim **Clear**-Latch, Zeilen sind aus | beim **Daten**-Latch, gleichzeitig mit den Zeilen |
-| Totzeit Spalte → Zeilen scharf | `St_Settle` + Datendurchlauf ≈ **20 µs** | ~20 ns (Original-Zeitverhalten) |
-| Vorglühen bei LED-Retrofits | weg | da |
-| Phasendauer | 512,0 µs | 512,0 µs |
-| Duty | 24,0 % | 24,5 % |
+| | DIP 5 = OFF (Serienstand) | DIP 5 = ON | DIP 6 = ON (Reserve, seit 0.1.7) |
+|---|---|---|---|
+| `strobe_sel` wechselt | beim **Clear**-Latch, Zeilen sind aus | beim **Daten**-Latch, gleichzeitig mit den Zeilen | wie DIP 5 = OFF |
+| Totzeit Spalte → Zeilen scharf | `St_Settle` + Datendurchlauf ≈ **60 µs** (0.1.6: 20 µs) | ~20 ns (Original-Zeitverhalten) | ≈ **110 µs** |
+| Vorglühen bei LED-Retrofits | weg | da | weg |
+| Phasendauer | 512,0 µs | 512,0 µs | 512,0 µs |
+| Duty | 22,1 % | 24,5 % | 19,6 % |
 
-Die Phasendauer ist in beiden Modi gleich (im Original-Modus schlägt die übersprungene Settle-Zeit
-auf den Dwell auf) — sonst vergleicht man am Spielfeld zwei Variablen statt einer. Der
-Helligkeitsunterschied von 0,5 Prozentpunkten ist unsichtbar.
+**DIP 5 sticht DIP 6** (im Original-Modus gibt es keine Totzeit, die DIP 6 verlängern könnte).
 
-`SETTLE_CYCLES` (Default 497 ≈ 10 µs) ist der Feintuning-Hebel: glimmt die Nachbarlampe trotz
-DIP 5 = OFF weiter, ist die PNP-Speicherzeit länger als angenommen → 1250 (25 µs), dann 2500
-(50 µs), `DWELL_CYCLES` jeweils um denselben Betrag senken. Bleibt es auch bei 50 µs, ist die
-Spalten-Abschaltzeit nicht die Ursache und §3.3 muss zurück auf den Tisch.
+Die Phasendauer ist in allen Stellungen gleich (was die Totzeit nicht braucht, schlägt auf den Dwell
+auf) — sonst vergleicht man am Spielfeld zwei Variablen statt einer. Der Helligkeitsunterschied von
+2,4 Prozentpunkten zwischen Serienstand und DIP 5 = ON ist am Spielfeld nicht zu sehen; die
+0.1.7-Feldrückmeldung bestätigt das ausdrücklich („Wer es nicht weiss merkte nicht").
+
+`SETTLE_CYCLES` / `SETTLE_LONG_CYCLES` (0.1.7: 2500 ≈ 60 µs bzw. 5000 ≈ 110 µs; 0.1.6: 497 ≈ 10 µs)
+sind der Feintuning-Hebel. **Achtung bei der Auswertung** — die frühere Formulierung „bleibt es auch
+bei 50 µs, ist die Spalten-Abschaltzeit nicht die Ursache" war zu scharf: Einschalten zieht ~0,2 A in
+die Basis, Ausschalten räumt sie über 8,2 K mit ~85 µA aus, die Speicherzeit kann also Hunderte von
+Mikrosekunden erreichen (Rechnung in [`Lamp_Refresh_Analysis.md`](Lamp_Refresh_Analysis.md) §3.3).
+„110 µs ändern nichts" heißt daher **noch nicht** „die Spalte ist unschuldig". Entscheidbar ist es mit
+einem einzigen Diagnosebuild `SETTLE_LONG_CYCLES = 20000` (≈400 µs, Duty ~5 %, sichtbar dunkler — als
+Beweis, nicht als Serienstand); `SETTLE_LONG_CYCLES` fängt der Dwell selbst auf, solange es unter
+`DWELL_CYCLES + SETTLE_CYCLES` = 24597 bleibt. Erst wenn auch 400 µs nichts ändern, muss §3.3 zurück
+auf den Tisch.
 
 **Abnahme am Spielfeld:** DIP 5 = OFF, Lampe 22 setzen → LED 21 darf nicht mehr deutlich glimmen;
 DIP 5 = ON (im Spiel, ohne Neustart) → es muss zurückkommen. Das ist der A/B-Test, der die Diagnose
@@ -231,10 +245,160 @@ schiebt 24 Bit **seriell** durch die 595er. Ohne Blank liefen alle 24 Zwischenzu
 die Matrix — ein viel gröberes Artefakt als das Original. Deshalb blankt SW 0.1.6 weiter, nur eben
 aktiv statt hochohmig.
 
-## 6. Querverweise
+## 6. Feldrückmeldung SW 0.1.7 (08.2026) — Fix wirkt, Lampe 21 / A20 bleibt offen
 
-- [`Lamp_Refresh_Analysis.md`](Lamp_Refresh_Analysis.md) — §3.2/§3.3 (Mechanismus), §6.5 (offene
-  Punkte), §6.7 (Blanking-Messung), §6.3 (LA-Prozedur, `DBG_MODE 4/5`)
+### 6.1 Was gemeldet wurde
+
+Airborne Avenger, SW 0.1.7, Wortlaut des Testers:
+
+> Dip5 ON => Vorglühen/Flackern ist da · Dip5 OFF => bis auf Lampe 21 gelesen OK · Dip 6 ON => kein
+> Unterschied · Helligkeitsunterschied ist minimal. Wer es nicht weiss merkte nicht. · Bei mir glimmt
+> Lampe 21 (LED) immer noch. Egal ob Spiel oder Test oder wenn alle Lampen aus sind im Testmode…
+
+Ein **Middle Earth** meldet **dieselbe Gruppe**: dort war es (Rückmeldung 2026-08-12, die zu 0.1.7
+geführt hat) FA-Control-**Nummer 22** = A20 Ausgang Pin 14 = J1-D = „LAMP 32-B0-SC", also Gruppe 6,
+Strobe 2 — Nachbarnummer von 21, **gleiche 595-Gruppe, gleicher Treiber-IC**. Der ME-Nutzer hat
+zusätzlich am ULN-*Eingang* gemessen: **2,3 V aus / 3,4 V an** — das ist der Multiplex-Mittelwert der
+Gruppenleitung (2 bzw. 3 von 4 Phasen High), d. h. an dieser Gruppe brennen dauernd Lampen.
+*(Zu klären: der Airborne-Tester nennt 21, der ME-Bericht 22 — dieselbe Gruppe, aber nicht dieselbe
+Spalte. Für die Diagnose ist die Gruppe das Entscheidende, s. §6.2.)*
+
+Damit ist bestätigt: (a) der A/B-Schalter DIP 5
+arbeitet und reproduziert das Artefakt auf Kommando — die Diagnose aus §3.3 ist am zweiten Spielfeld
+bestanden; (b) das Grundglimmen aus §3.4 ist an den früher betroffenen Lampen 9, 15, 57 weg, Fix (a)
+wirkt; (c) der Duty-Verlust von 2,4 Prozentpunkten ist unsichtbar; (d) DIP 6 ändert nichts — was nach
+`Lamp_Refresh_Analysis.md` §3.3 **noch keine** Entlastung der Spalte ist, s. §4.
+
+### 6.2 Wo Lampe 21 sitzt — und was das ausschließt
+
+Lampe 21 (FA-Control, 0-basiert) → Gruppe `21 div 4 + 1` = **6**, Strobe `21 mod 4` = **1**.
+`GRP_OF` (`rtl/common/lamp_map_pkg.vhd`): Gruppe 6 = (Latch 0x1000, Bit 0) ⇒ `lamp_state`-Bit
+`(0*4+1)*8+0` = **Bit 8 = RAM 0x31 Bit 0**. Im Original-Schaltplan
+([`Lamp_Logic.png`](Lamp_Logic.png), Sheet 18D) ist das das Netz **„LAMP 31-B0-SB" = A20 Ausgang
+Pin 15, J1-C**. A20 Pin 1–4 hängen alle am *selben* Netz: Gruppe 6 = Lampen 20/21/22/23 =
+RAM 0x30…0x33 Bit 0 (Ausgänge 16/15/14/13). A20 Pin 5–7 = Gruppe 7 = Lampen 24/25/26, davon 24/25 in
+Airborne „NOT USED".
+
+Damit ist die naheliegende Vermutung „die Routine, die die Latch-Adressen scannt" als Erklärung für
+ein **dauerndes Glimmen bei Datenwort 0** ausgeschlossen, aus drei unabhängigen Gründen:
+
+1. Bei `lamp_state` = 0 latchen **beide** Durchläufe Nullen und `oe_n` liegt fest auf `'0'` — die
+   595-Ausgänge stehen 100 % der Zeit aktiv auf 0 V. Es gibt kein Hi-Z-Fenster mehr und keine
+   Schiebereihenfolge, die aus 24 Nullen Strom machen könnte.
+2. Ein Mapping-Fehler wäre **global**: `GRP_OF`, `STROBE_ENC` und die Zerlegung `offset[3:2]`=Latch /
+   `offset[1:0]`=Strobe gelten für alle 84 Lampen. Er würde Vierer- oder Gruppenblöcke verschieben und
+   sich als *falsche Lampe hell* zeigen — nie als Glimmen genau einer Lampe. 83 von 84 stimmen.
+3. Der Sniffer kann keine Phantom-Pulse erzeugen: `ram_wren` ist ein Ein-Takt-Puls auf der fallenden
+   `cpu_clk`-Flanke (`top/AtariFA.vhd`), Adresse und Daten sind dabei stabil, die Übernahme erfolgt
+   genau einmal je CPU-Write. Dazu die Messung in
+   [`Lamp_Refresh_Analysis.md`](Lamp_Refresh_Analysis.md) §6.6: **0 Lampen-RAM-Writes in 25,7 s im
+   Spiel**, und §2.4: beide gelesenen ROMs schalten Lampen als einzelnes Read-Modify-Write, nicht
+   periodisch.
+
+**Warum trotzdem beide Maschinen dieselbe Gruppe zeigen — und das ist die Leithypothese:** Gruppe 6
+ist die **Bonus-Gruppe**, dort brennen im Spiel wie im Attract dauernd Lampen (vom ME-Nutzer am
+ULN-Eingang gemessen, s. §6.1: 2 von 4 Phasen High). Genau das braucht das Artefakt aus §3.3: ein
+**dauerhaft leuchtender Gruppen-Nachbar**, dessen Zeilenmuster die gerade abgeschaltete, noch
+leitende Spalte sieht. Damit ist das Glimmen an Gruppe 6 nicht Streuung, sondern der einzige Ort im
+Spielfeld, an dem die Voraussetzung *permanent* erfüllt ist — auf jeder Maschine, in jedem Spiel, und
+je nach lit-Muster an Nummer 21 oder 22. A20 ist also nicht elektrisch besonders, sondern
+**statistisch**. Dass DIP 6 nichts ändert, heißt nach `Lamp_Refresh_Analysis.md` §3.3 dann nur:
+110 µs sind zu wenig.
+
+**Zu klären bleibt genau eine Lesart des Berichts**, und sie trennt die beiden Restursachen:
+
+- **(A)** Der Nachbar leuchtet weiter, wenn der Tester „alle Lampen aus" sagt — im **Spiel-Selbsttest**
+  ist das gut möglich, der garantiert nichts. Dann ist es §3.3, und der Hebel ist die Totzeit.
+- **(B)** Auch bei **FA-Control-Übernahme mit allen Lampen auf 0** (CPU angehalten, `lamp_state_mux`
+  beweisbar 0) glimmt 21 weiter. Dann kann es §3.3 nicht sein, und übrig bleibt der analoge Reststrom
+  (ULN-Kollektor-Restströmung, §4 „was bleiben darf") — der ist eine **Typeigenschaft, kein Defekt**,
+  also auf jeder Platine da und nur an LEDs sichtbar, aber softwareseitig nicht abstellbar.
+
+Deshalb ist der FA-Control-Nullzustand die erste Frage an den Tester (§6.4) und Fall 2 der
+Schreibtischmessung (§6.3) — „alles aus" muss *bewiesen* aus sein, nicht *geglaubt* aus.
+
+Nebenbei: „zwei Maschinen ⇒ kein Hardwareproblem" trägt als Schluss ohnehin nicht — der ICEX ist auf
+jeder Platine gleich. Nur erklärt er die *Gruppe* nicht, und die Bonus-Gruppe erklärt sie.
+
+### 6.3 Schreibtischmessung (LA + Oszi + µA-DMM, ohne Spielfeld)
+
+Diagnosebuild: `DBG_MODE := 5`, `DBG_WATCH_LAMP := 21` in `top/AtariFA.vhd`, dann
+`scripts\build.ps1 cyclone_10_pcb` (nur diese Variante routet alle 8 Debug-Pins,
+`Lamp_Refresh_Analysis.md` §6.1). **Wichtig: `DBG_MODE` vor dem Commit auf `0` zurück** und
+`scripts\check.ps1 -Fit` gegen `scripts/baseline.csv` fahren.
+
+Tastköpfe: `debug_signal` 0…6 = `ser`/`srck`/`rck`/`blank`/`strobe_sel(0)`/`strobe_sel(1)`/
+`watch_drive` (Pins in §6.1 dort); **zusätzlich extern A20 Pin 2** (= Gruppen-Netz) **und A20 Pin 15**
+(= Rückleitung), Trigger auf `rclk_595` (PIN_42).
+
+| Fall | Vorgehen | Erwartung / Bedeutung |
+|---|---|---|
+| 1 | FA-Control: **nur Lampe 21** setzen | Test-LED 21 hell, A20 Pin 2 genau im SB-Fenster high. Falsche Phase ⇒ `STROBE_ENC`/offset-Zerlegung (dann mit 20/22/23 gegenprüfen — es wären alle betroffen). LED bleibt dunkel/glimmt nur ⇒ Fall (B) |
+| 2 | FA-Control: **alle Lampen 0**, Oszi DC 50 mV/div über Minuten auf A20 Pin 2 | < 50 mV, keine Pulse. Jeder Puls ⇒ Datenpfad: dann `DBG_MODE := 4` mit `DBG_WATCH_LAMP := 21` und Kanal 3 (`watch_state`) / Kanal 2 (`lamp_wr_set`) nach §6.3/§6.4 dort auswerten |
+| 3 | alles aus: **Strom** durch Test-LED 21 messen (µA-DMM in Reihe, oder 1 kΩ einschleifen und Spannung messen) | Die Zahl entscheidet. µA ⇒ ICEX, kein SW-Fix, und der Messwert liefert direkt den Shunt. mA ⇒ echter Pfad. Vergleich mit 2–3 anderen A20-Kanälen und einem Kanal eines anderen ULN |
+| 4 | dunkler Raum, alles aus | Glimmt LED 21 am Schreibtisch überhaupt? Gegenprobe zu §3.1, dort war der Effekt „nicht nachstellbar" — aber nicht gezielt an Lampe 21 gesucht |
+
+Fall 2/3 laufen bewusst **unter FA-Control**: die CPU steht, `lamp_state_mux` kommt aus
+`fa_lamp_state` und ist beweisbar 0 — der saubere Nullzustand, den der Spiel-Selbsttest nicht
+garantiert.
+
+**Grenze des Aufbaus, sonst wird das Ergebnis falsch gelesen:** am Schreibtisch kommen die Spalten
+von den vier P-Kanal-MOSFETs der Box-Connectors (§3.5, ns-schnell, nA-Leckstrom), **nicht** von den
+2N5883 des Aux-Boards. Der Spalten-Nachlauf aus §3.3 ist hier also prinzipiell nicht reproduzierbar —
+„am Schreibtisch nichts gefunden" ist **kein Freispruch**, wohl aber ein vollständiger Test des
+Digitalpfads und des ULN-Reststroms.
+
+### 6.4 Fragen und Handgriffe für die Tester (DMM, löten/klemmen)
+
+In dieser Reihenfolge; jede Zeile hat einen eigenen Aussagewert:
+
+1. **Der Nullzustand — die wichtigste Frage:** in FA-Control die Kontrolle übernehmen (Options-DIP 4
+   = ON, Verbinden, `LISY_INIT`), **alle Lampen auf 0**, damit steht die CPU und keine Lampe kann
+   getrieben sein. Glimmt 21 **dann** noch? (entscheidet (A) gegen (B), s. §6.2 — im Spiel-Selbsttest
+   ist „alles aus" nicht garantiert)
+2. Im selben Zustand: **20 / 22 / 23 einzeln** setzen. Wird das Glimmen von 21 dabei deutlich stärker
+   (erwartet vor allem bei 22)? Und: leuchtet 21 selbst hell, wenn man sie einzeln setzt?
+   (Nachbar-Komponente aus §3.3; die vier Nummern einer Gruppe sind 20/21/22/23)
+3. **LED von 21 mit einer dunklen Fassung tauschen** (z. B. 13): wandert das Glimmen mit der LED oder
+   bleibt es an der Fassung? (Leuchtmittel gegen Treiberkanal — steht seit §3.6 offen)
+4. **Glühlampe** in Fassung 21 → Glimmen weg? (Erwartung ja, §3.1)
+5. **2,2 kΩ / ≥ ½ W parallel zur Fassung 21** → Glimmen weg? Dann ist der Feld-Fix gefunden: 100 µA
+   Reststrom erzeugen daran 0,22 V, weit unter der LED-Schwelle; bei eingeschalteter Lampe sind es
+   ~37 mW mittlere Verlustleistung (22 % Duty).
+6. **µA-DMM in Reihe** in die Rückleitung von 21, alles aus → Zahl; derselbe Messwert an einer
+   dunklen Fassung als Vergleich.
+7. Dieselben Punkte am **Middle Earth**, plus Bestätigung, dass die „21" dort ebenfalls aus der
+   FA-Control-Oberfläche kommt und nicht aus der Handbuch-Nummerierung.
+
+### 6.5 Fixpfade je Ergebnis
+
+- **Nachbar-abhängig / Fall (A)** — nach §6.2 der wahrscheinlichste Ausgang, weil Gruppe 6 die
+  Bonus-Gruppe ist: Diagnosebuild `SETTLE_LONG_CYCLES = 20000` (≈400 µs auf DIP 6, Duty ~5 %,
+  sichtbar dunkler) — s. §4. Das ist der **erste** Schritt, nicht der letzte Ausweg: 60/110 µs sind
+  nach der Abschaltzeit-Rechnung möglicherweise einfach zu kurz. Hilft es, wird der Wert (oder der
+  kleinste, der noch hilft) zum Serienstand für DIP 6, mit dem Helligkeitsverlust als bewusstem Preis.
+- **Reststrom / Fall (B)** (Glimmen auch im FA-Control-Nullzustand, 5/6 im µA-Bereich): kein RTL-Fix
+  möglich und keiner nötig — das ist der in §4 vorab benannte Rest, den auch die Original-MPU hat.
+  Empfehlung an den Nutzer: 2,2 kΩ parallel, Glühlampe oder „ghost-free"-LED; gehört dann in **beide**
+  Handbücher. Der Shunt hilft übrigens in **beiden** Fällen und ist damit der robusteste Feld-Fix.
+- **Digitaler Befund** (Fall 2 zeigt Pulse, oder Fall 1 falsche Phase): Reparatur in `STROBE_ENC` /
+  offset-Zerlegung / `GRP_OF` — und dann global, nicht für Lampe 21 allein.
+- **Platinenbefund:** vor dem Löten im Feld das Lampen-Blatt unter `N:\Projekte\FPGA Atari\doc\`
+  prüfen — (a) liegt **Pin 9 (COM)** der ULN2003A irgendwo an Spannung? Im Original ist COM offen
+  (Sheet 18D zeigt nur Pin 8 an Masse); läge COM z. B. auf +5 V, führt die interne Klemmdiode jedes
+  Ausgangs Strom von der Lampenspannung nach 5 V — ein Pfad ganz ohne FPGA, auf **jeder** Platine
+  gleich, und er passt zur Middle-Earth-Beschreibung „blieb halb an" besser als zu „glimmt".
+  (b) Hängen A20 Pin 1–4 wirklich am selben Netz, und ist an Gruppe 6 irgendetwas anders bestückt
+  als an den übrigen 20?
+
+## 7. Querverweise
+
+- [`Lamp_Refresh_Analysis.md`](Lamp_Refresh_Analysis.md) — §3.2/§3.3 (Mechanismus **und** die
+  Abschaltzeit-Abschätzung, auf die §4/§6 sich stützen), §2.4 (Middle-Earth-ROM), §6.5 (offene
+  Punkte), §6.6 (0 Lampen-Writes im Spiel), §6.7 (Blanking-Messung), §6.1/§6.3 (LA-Kanäle und
+  -Prozedur, `DBG_MODE 4/5`)
+- [`Lamp_Logic.png`](Lamp_Logic.png) — Sheet 18D: welcher Latch-Bit-Netz an welchem ULN2003A hängt
+  (Grundlage von §6.2: Gruppe 6 = A20 Pin 1–4)
 - [`Lamp_Strobes_Manual.png`](Lamp_Strobes_Manual.png) — die Handbuchstelle
 - `rtl/common/lamp_matrix.vhd` (Scan-FSM, `SETTLE_CYCLES`), `rtl/common/lamp_map_pkg.vhd`
   (`GRP_OF`, Nummerierung)

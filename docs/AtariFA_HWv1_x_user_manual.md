@@ -30,8 +30,9 @@ v1.0 06.08.2026
   - [4.2. The 6 switch bank: options](#42-the-6-switch-bank-options)
     - [4.2.1. Option 3 -> where the sound comes out](#421-option-3---where-the-sound-comes-out)
     - [4.2.2. Option 4 -> let FA-Control take over](#422-option-4---let-fa-control-take-over)
-    - [4.2.3. Options 1, 2, 6 -> reserved](#423-options-1-2-6---reserved)
+    - [4.2.3. Options 1 and 2 -> reserved](#423-options-1-and-2---reserved)
     - [4.2.4. Option 5 -> lamp timing like the original MPU](#424-option-5---lamp-timing-like-the-original-mpu)
+    - [4.2.5. Option 6 -> longer dead time for the lamp columns](#425-option-6---longer-dead-time-for-the-lamp-columns)
   - [4.3. Six of the ten DIPs are read once, at boot](#43-six-of-the-ten-dips-are-read-once-at-boot)
 - [5. Boot sequence](#5-boot-sequence)
   - [5.1. Phase 1: reading the DIP switches](#51-phase-1-reading-the-dip-switches)
@@ -164,7 +165,7 @@ Default setting is **all 'OFF'** - that is the right setting for a standard mach
 | Dip3 | **sound: OFF = Auxiliary Board, ON = on-board amplifier** | continuously |
 | Dip4 | **let FA-Control take over** - ON = allowed            | continuously |
 | Dip5 | **lamp timing: OFF = quiet, ON = like the original MPU** | continuously |
-| Dip6 | reserved                                              | continuously |
+| Dip6 | **lamp dead time: ON = longer** (only needed if LEDs still glow with Dip5 = OFF) | continuously |
 
 #### 4.2.1. Option 3 -> where the sound comes out
 
@@ -182,7 +183,7 @@ Default setting is **all 'OFF'** - that is the right setting for a standard mach
 
 This switch is read continuously as well: turning it 'OFF' while FA-Control is in charge takes control away **immediately** and restarts the game. That is the emergency stop for a test tool that has locked up.
 
-#### 4.2.3. Options 1, 2, 6 -> reserved
+#### 4.2.3. Options 1 and 2 -> reserved
 
 Not used, leave them 'OFF'. They are wired, they are shown on the info display, and they are there for later software versions.
 
@@ -194,11 +195,25 @@ Atari drives the lamps in a time multiplex: four columns are switched on in turn
 
 On an incandescent bulb you will never notice. **LED replacement lamps, however, glow visibly** even though they are switched off. This is the well-known effect that LEDs in an Atari "never go fully dark"; the Atari manual describes it as a supposed "keep-alive" circuit, but it is the same thing.
 
-- **'OFF'** - **quiet lamps. Default.** AtariFA switches the column while all lamps are blanked, and gives the old column about 20 microseconds to decay. Switched-off LEDs stay off. **This is the setting for a machine fitted with LED replacement lamps.**
+- **'OFF'** - **quiet lamps. Default.** AtariFA switches the column while all lamps are blanked, and gives the old column about 60 microseconds to decay. Switched-off LEDs stay off. **This is the setting for a machine fitted with LED replacement lamps.**
 
-- **'ON'** - **the timing of the original MPU**, glow included. Useful if you want to compare AtariFA against the original board, or if you prefer the original behaviour. Brightness is practically unaffected (24.0 % against 24.5 % duty cycle), and incandescent lamps do not care at all.
+- **'ON'** - **the timing of the original MPU**, glow included. Useful if you want to compare AtariFA against the original board, or if you prefer the original behaviour. Brightness is practically unaffected (22.1 % against 24.5 % duty cycle), and incandescent lamps do not care at all.
 
 This switch is read continuously, so it may be changed while the game is running — which makes the difference easy to compare on the spot.
+
+#### 4.2.5. Option 6 -> longer dead time for the lamp columns
+
+How long a column driver on the Auxiliary Board needs to turn off differs from machine to machine — it depends on the components and on how much current the lamps of that column draw. The less current, the longer it takes. A column fitted with LED replacement lamps is therefore the worst case, and there the 60 microseconds of option 5 = 'OFF' can be too short.
+
+- **'OFF'** - **default.** About 60 microseconds of dead time. That is enough in most machines.
+
+- **'ON'** - **about 110 microseconds of dead time.** Use this if single LED replacement lamps still glow with option 5 = 'OFF'. The lamps get marginally dimmer (19.6 % instead of 22.1 % duty cycle), which is not visible in the machine.
+
+**Option 5 overrides option 6:** with option 5 = 'ON' there is no dead time at all, so option 6 has no effect.
+
+This switch is read continuously as well.
+
+**If option 6 = 'ON' changes nothing either:** then the column turn-off time is not the cause, and turning it up further will not help. There is a second reason that no software can do anything about: the lamp drivers (ULN2003A) pass a residual current of a few microamperes while switched off, and because one column is always powered, that is enough to make a modern LED glow. An incandescent bulb never shows it. The original MPU has the same residual current. The remedy at the affected socket: **a resistor of about 2.2 kΩ (½ W) in parallel with the lamp** — it drains the residual current without affecting the lamp in operation. Equally effective: use an incandescent bulb in that position, or an LED replacement lamp with a built-in bleeder resistor ('ghost free').
 
 ### 4.3. Six of the ten DIPs are read once, at boot
 
@@ -435,7 +450,7 @@ bank of 4                          bank of 6
  3  game select bit 2  (+4)         3  sound path            live
  4  free play, ON = active          4  FA-Control allowed    live
                                     5  lamp timing           live
- all four read at boot only         6  reserved              live
+ all four read at boot only         6  lamp dead time        live
 ```
 
 **Sound path, option 3:** OFF = Auxiliary Board (standard) · ON = on-board amplifier
@@ -443,6 +458,8 @@ bank of 4                          bank of 6
 **FA-Control, option 4:** OFF = nobody interferes (standard) · ON = the ESP32 test tool may drive the machine (chapter 9)
 
 **Lamp timing, option 5:** OFF = quiet lamps, switched-off LEDs stay off (standard) · ON = timing of the original MPU, LED replacement lamps glow as on the original (chapter 4.2.4)
+
+**Lamp dead time, option 6:** OFF = about 60 µs (standard) · ON = about 110 µs, for machines where single LEDs still glow with option 5 = OFF; option 5 overrides option 6 (chapter 4.2.5)
 
 **After changing a switch that is read at boot: power off, power on.**
 
