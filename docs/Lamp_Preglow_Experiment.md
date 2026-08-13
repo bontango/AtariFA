@@ -23,7 +23,8 @@ Lampen im Aus-Zustand schwach pulsen, und verkauft das als absichtliche „keep-
 | AtariFA zeigt das Artefakt | **ja** — an den FPGA-Pins blankt sie sauber, an der Lampenfassung nicht (§3.3) |
 | Glühlampen zeigen es | **nein** (§3.1) — es ist ein LED-Retrofit-Phänomen |
 | Fix aus §4 wirkt am Spielfeld | **ja**, zwei Maschinen, SW 0.1.7 (§6.1): DIP 5 = OFF sauber, DIP 5 = ON bringt es zurück |
-| Restfall Lampe 21 / A20 | **offen**, aber eingekreist: Datenpfad am Bauteil **freigemessen** (§6.3.1), Spalten-Domäne bleibt ⇒ SW 0.1.8 entscheidet |
+| Längere Totzeit behebt das Glimmen | **ja** — Middle Earth mit 0.1.7 **behoben** (§6.1). Damit ist der Mechanismus aus §3.3 auch durch die Gegenmaßnahme bestätigt |
+| Restfall Airborne, Lampe 21 / A20 | **offen**, aber eingekreist: Datenpfad am Bauteil **freigemessen** (§6.3.1). **Vorher zu klären: lief dort wirklich 0.1.7?** (Kasten in §6.1) |
 
 ## 2. Schritt 1 — Beobachten, ohne irgendetwas zu ändern
 
@@ -246,7 +247,7 @@ schiebt 24 Bit **seriell** durch die 595er. Ohne Blank liefen alle 24 Zwischenzu
 die Matrix — ein viel gröberes Artefakt als das Original. Deshalb blankt SW 0.1.6 weiter, nur eben
 aktiv statt hochohmig.
 
-## 6. Feldrückmeldung SW 0.1.7 (08.2026) — Fix wirkt, Lampe 21 / A20 bleibt offen
+## 6. Feldrückmeldung SW 0.1.7 (08.2026) — Middle Earth behoben, Airborne noch offen
 
 ### 6.1 Was gemeldet wurde
 
@@ -256,13 +257,32 @@ Airborne Avenger, SW 0.1.7, Wortlaut des Testers:
 > Unterschied · Helligkeitsunterschied ist minimal. Wer es nicht weiss merkte nicht. · Bei mir glimmt
 > Lampe 21 (LED) immer noch. Egal ob Spiel oder Test oder wenn alle Lampen aus sind im Testmode…
 
-Ein **Middle Earth** meldet **dieselbe Gruppe**: dort war es (Rückmeldung 2026-08-12, die zu 0.1.7
-geführt hat) FA-Control-**Nummer 22** = A20 Ausgang Pin 14 = J1-D = „LAMP 32-B0-SC", also Gruppe 6,
-Strobe 2 — Nachbarnummer von 21, **gleiche 595-Gruppe, gleicher Treiber-IC**. Der ME-Nutzer hat
-zusätzlich am ULN-*Eingang* gemessen: **2,3 V aus / 3,4 V an** — das ist der Multiplex-Mittelwert der
-Gruppenleitung (2 bzw. 3 von 4 Phasen High), d. h. an dieser Gruppe brennen dauernd Lampen.
-*(Zu klären: der Airborne-Tester nennt 21, der ME-Bericht 22 — dieselbe Gruppe, aber nicht dieselbe
-Spalte. Für die Diagnose ist die Gruppe das Entscheidende, s. §6.2.)*
+Das **Middle Earth** hatte **dieselbe Gruppe** gemeldet — allerdings **auf dem Stand 0.1.6**
+(Rückmeldung 2026-08-12, die zu 0.1.7 geführt hat): FA-Control-**Nummer 22** = A20 Ausgang Pin 14 =
+J1-D = „LAMP 32-B0-SC", also Gruppe 6, Strobe 2 — Nachbarnummer von 21, **gleiche 595-Gruppe,
+gleicher Treiber-IC**. Der ME-Nutzer hat zusätzlich am ULN-*Eingang* gemessen: **2,3 V aus / 3,4 V
+an** — das ist der Multiplex-Mittelwert der Gruppenleitung (2 bzw. 3 von 4 Phasen High), d. h. an
+dieser Gruppe brennen dauernd Lampen.
+
+**Und mit 0.1.7 ist das Middle Earth behoben** (Rückmeldung 2026-08-13, Wortlaut):
+
+> I loaded 017 software and the lighting issue is fixed. The lights all work as they should, that
+> extra timing delay to make up for my original auxiliary board seems to have worked.
+
+Das ist der Beweis, auf den §3.3 gewartet hat: **die verlängerte Totzeit behebt das Glimmen an einer
+echten Maschine.** Der Mechanismus ist damit nicht mehr nur gemessen (§3.3), sondern durch die
+Gegenmaßnahme bestätigt — und der Hebel ist der richtige. *Offen dabei: stand DIP 6 auf ON oder OFF?*
+Davon hängt ab, ob die **60 µs** des Serienstands genügen oder erst die **110 µs** von DIP 6 — und
+damit, welcher Wert Serienstand wird. Nachfragen.
+
+> **⚠ Zu prüfen beim Airborne-Tester: lief dort wirklich 0.1.7?** Sein Bericht liest sich Zeile für
+> Zeile wie **0.1.6**-Verhalten, denn dort ist Options-DIP 6 **gar nicht implementiert** („reserviert")
+> — „Dip 6 ON => kein Unterschied" ist auf 0.1.6 also der *erwartete* Befund, während dieselbe Aussage
+> auf 0.1.7 bedeutet, dass 110 µs nicht reichen. Nichts in seinem Text ist 0.1.7-spezifisch, beide
+> Lesarten passen, und die Auswertung hängt genau daran. Prüfen kann er es in zehn Sekunden: die
+> **Info-Anzeige** beim Einschalten (Display 1, letzte Ziffer = `7`) und die **Versionsmeldung von
+> FA-Control** beim Verbinden. Bis das geklärt ist, ist die Aussage „110 µs ändern am Airborne nichts"
+> **nicht belastbar**, und damit auch nicht die Notwendigkeit von 0.1.8.
 
 Damit ist bestätigt: (a) der A/B-Schalter DIP 5 arbeitet und reproduziert das Artefakt auf Kommando —
 die Diagnose aus §3.3 ist am zweiten Spielfeld
@@ -296,15 +316,17 @@ ein **dauerndes Glimmen bei Datenwort 0** ausgeschlossen, aus drei unabhängigen
    Spiel**, und §2.4: beide gelesenen ROMs schalten Lampen als einzelnes Read-Modify-Write, nicht
    periodisch.
 
-**Warum trotzdem beide Maschinen dieselbe Gruppe zeigen — und das ist die Leithypothese:** Gruppe 6
+**Warum beide Maschinen dieselbe Gruppe gezeigt haben — und das ist die Leithypothese:** Gruppe 6
 ist die **Bonus-Gruppe**, dort brennen im Spiel wie im Attract dauernd Lampen (vom ME-Nutzer am
 ULN-Eingang gemessen, s. §6.1: 2 von 4 Phasen High). Genau das braucht das Artefakt aus §3.3: ein
 **dauerhaft leuchtender Gruppen-Nachbar**, dessen Zeilenmuster die gerade abgeschaltete, noch
 leitende Spalte sieht. Damit ist das Glimmen an Gruppe 6 nicht Streuung, sondern der einzige Ort im
 Spielfeld, an dem die Voraussetzung *permanent* erfüllt ist — auf jeder Maschine, in jedem Spiel, und
 je nach lit-Muster an Nummer 21 oder 22. A20 ist also nicht elektrisch besonders, sondern
-**statistisch**. Dass DIP 6 nichts ändert, heißt nach `Lamp_Refresh_Analysis.md` §3.3 dann nur:
-110 µs sind zu wenig.
+**statistisch**. Genau diese Gruppe ist am Middle Earth mit 0.1.7 verschwunden (§6.1) — die Erklärung
+trägt also. Bleibt sie am Airborne bestehen, heißt das nach `Lamp_Refresh_Analysis.md` §3.3 entweder
+„110 µs sind dort zu wenig" **oder** es lief nicht 0.1.7 (Kasten in §6.1) — und diese Reihenfolge
+ist einzuhalten: erst die Version klären, dann die Totzeit weiter hochdrehen.
 
 **Zu klären bleibt genau eine Lesart des Berichts**, und sie trennt die beiden Restursachen:
 
@@ -388,6 +410,11 @@ Digitalpfads und des ULN-Reststroms.
 
 In dieser Reihenfolge; jede Zeile hat einen eigenen Aussagewert:
 
+0. **Welche Version läuft wirklich?** Info-Anzeige beim Einschalten (Display 1, dritte Ziffer) und die
+   Versionsmeldung von FA-Control beim Verbinden. Das steht hier an erster Stelle, weil ein Bericht
+   über einen Schalter, den die geladene Version nicht hat, systematisch in die Irre führt — und weil
+   es zehn Sekunden kostet. Für das Middle Earth ist zusätzlich nachzufragen, ob **DIP 6 ON oder OFF**
+   war, als es behoben war (entscheidet 60 µs gegen 110 µs als künftigen Serienstand).
 1. **Der Nullzustand — die wichtigste Frage:** in FA-Control die Kontrolle übernehmen (Options-DIP 4
    = ON, Verbinden, `LISY_INIT`), **alle Lampen auf 0**, damit steht die CPU und keine Lampe kann
    getrieben sein. Glimmt 21 **dann** noch? (entscheidet (A) gegen (B), s. §6.2 — im Spiel-Selbsttest
@@ -408,8 +435,12 @@ In dieser Reihenfolge; jede Zeile hat einen eigenen Aussagewert:
 
 ### 6.5 Fixpfade je Ergebnis
 
+- **Schritt 0, vor allem anderen: Version des Airborne-Testers klären** (Kasten in §6.1). Lief dort
+  0.1.6, ist sein „DIP 6 ändert nichts" gegenstandslos, und der nächste Schritt ist schlicht
+  **0.1.7 mit DIP 6 = ON** — nicht 0.1.8.
 - **Nachbar-abhängig / Fall (A)** — nach §6.2 der wahrscheinlichste Ausgang, weil Gruppe 6 die
-  Bonus-Gruppe ist: **dafür ist SW 0.1.8 gebaut und ausgeliefert** (`SETTLE_LONG_CYCLES = 20000`,
+  Bonus-Gruppe ist, und am Middle Earth mit 0.1.7 bestätigt: **dafür ist SW 0.1.8 gebaut**
+  (`SETTLE_LONG_CYCLES = 20000`,
   ≈400 µs auf DIP 6, Duty ~5 %, sichtbar dunkler — s. §4). Das ist der **erste** Schritt, nicht der
   letzte Ausweg: 60/110 µs sind nach der Abschaltzeit-Rechnung möglicherweise einfach zu kurz.
   Abnahme im Feld: 0.1.8 programmieren, Info-Anzeige muss `018` zeigen, dann DIP 6 im laufenden Spiel
