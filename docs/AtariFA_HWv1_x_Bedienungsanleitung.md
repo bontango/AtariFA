@@ -206,7 +206,9 @@ Wie lange ein Spaltentreiber auf dem Auxiliary Board zum Abschalten braucht, ist
 
 - **„OFF"** — **Grundeinstellung.** Etwa 60 Mikrosekunden Totzeit. Das genügt in den meisten Automaten.
 
-- **„ON"** — **etwa 110 Mikrosekunden Totzeit.** Zu benutzen, wenn einzelne LED-Ersatzlampen trotz Option 5 = „OFF" noch glimmen. Die Lampen werden dadurch geringfügig dunkler (19,6 % statt 22,1 % Einschaltdauer), sichtbar ist das im Automaten nicht.
+- **„ON"** — **längere Totzeit**, zu benutzen, wenn einzelne LED-Ersatzlampen trotz Option 5 = „OFF" noch glimmen. In Software **0.1.7** sind das etwa 110 Mikrosekunden; die Lampen werden dadurch geringfügig dunkler (19,6 % statt 22,1 % Einschaltdauer), im Automaten ist das nicht zu sehen.
+
+> **Software 0.1.8 ist eine Messfassung.** Dort sind es auf Option 6 = „ON" etwa **400 Mikrosekunden**, und das kostet **drei Viertel der Helligkeit** (5,0 % statt 22,1 % Einschaltdauer) — die Lampen sind dann deutlich dunkler, und das ist Absicht, nicht ein Fehler. Diese Fassung ist dafür gedacht, **einmal** die Frage zu beantworten, ob ein hartnäckiges Glimmen überhaupt von der Abschaltzeit der Lampenspalte kommt: verschwindet es mit Option 6 = „ON", war es die Spalte; bleibt es unverändert, war es etwas anderes (siehe den letzten Absatz dieses Kapitels). **Zum Spielen bitte Option 6 auf „OFF" stellen** oder bei Version 0.1.7 bleiben. Welche Fassung läuft, zeigt die Info-Anzeige beim Einschalten (Kapitel 5.2).
 
 **Option 5 sticht Option 6:** steht Option 5 auf „ON", gibt es überhaupt keine Totzeit, und Option 6 bleibt ohne Wirkung.
 
@@ -458,7 +460,7 @@ Alle fünf laufen auch mit Freispiel (Kapitel 7).
 
 **Lampen-Timing, Option 5:** OFF = ruhige Lampen, ausgeschaltete LEDs bleiben aus (Standard) · ON = Zeitverhalten der Original-MPU, LED-Ersatzlampen glimmen wie am Original (Kapitel 4.2.4)
 
-**Lampen-Totzeit, Option 6:** OFF = etwa 60 µs (Standard) · ON = etwa 110 µs, für Automaten, in denen einzelne LEDs trotz Option 5 = OFF glimmen; Option 5 sticht Option 6 (Kapitel 4.2.5)
+**Lampen-Totzeit, Option 6:** OFF = etwa 60 µs (Standard) · ON = länger, für Automaten, in denen einzelne LEDs trotz Option 5 = OFF glimmen — 110 µs in Version 0.1.7, in der Messfassung 0.1.8 dagegen 400 µs und damit deutlich dunklere Lampen; Option 5 sticht Option 6 (Kapitel 4.2.5)
 
 **Nach dem Ändern eines Schalters, der beim Einschalten gelesen wird: aus- und wieder einschalten.**
 

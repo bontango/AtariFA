@@ -18,5 +18,5 @@ use ieee.std_logic_1164.all;
 
 package version_pkg is
 	constant SW_SUB1 : std_logic_vector(3 downto 0) := x"1";
-	constant SW_SUB2 : std_logic_vector(3 downto 0) := x"7";
+	constant SW_SUB2 : std_logic_vector(3 downto 0) := x"8";
 end package version_pkg;

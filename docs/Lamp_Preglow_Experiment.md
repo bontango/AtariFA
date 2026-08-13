@@ -192,10 +192,10 @@ die Nullen werden geschoben, *während* die Lampe noch leuchtet; die Ausgänge �
 | | DIP 5 = OFF (Serienstand) | DIP 5 = ON | DIP 6 = ON (Reserve, seit 0.1.7) |
 |---|---|---|---|
 | `strobe_sel` wechselt | beim **Clear**-Latch, Zeilen sind aus | beim **Daten**-Latch, gleichzeitig mit den Zeilen | wie DIP 5 = OFF |
-| Totzeit Spalte → Zeilen scharf | `St_Settle` + Datendurchlauf ≈ **60 µs** (0.1.6: 20 µs) | ~20 ns (Original-Zeitverhalten) | ≈ **110 µs** |
+| Totzeit Spalte → Zeilen scharf | `St_Settle` + Datendurchlauf ≈ **60 µs** (0.1.6: 20 µs) | ~20 ns (Original-Zeitverhalten) | ≈ **110 µs** in 0.1.7, ≈ **400 µs** in 0.1.8 |
 | Vorglühen bei LED-Retrofits | weg | da | weg |
 | Phasendauer | 512,0 µs | 512,0 µs | 512,0 µs |
-| Duty | 22,1 % | 24,5 % | 19,6 % |
+| Duty | 22,1 % | 24,5 % | 19,6 % (0.1.7) / **5,0 %** (0.1.8) |
 
 **DIP 5 sticht DIP 6** (im Original-Modus gibt es keine Totzeit, die DIP 6 verlängern könnte).
 
@@ -209,11 +209,12 @@ sind der Feintuning-Hebel. **Achtung bei der Auswertung** — die frühere Formu
 bei 50 µs, ist die Spalten-Abschaltzeit nicht die Ursache" war zu scharf: Einschalten zieht ~0,2 A in
 die Basis, Ausschalten räumt sie über 8,2 K mit ~85 µA aus, die Speicherzeit kann also Hunderte von
 Mikrosekunden erreichen (Rechnung in [`Lamp_Refresh_Analysis.md`](Lamp_Refresh_Analysis.md) §3.3).
-„110 µs ändern nichts" heißt daher **noch nicht** „die Spalte ist unschuldig". Entscheidbar ist es mit
-einem einzigen Diagnosebuild `SETTLE_LONG_CYCLES = 20000` (≈400 µs, Duty ~5 %, sichtbar dunkler — als
-Beweis, nicht als Serienstand); `SETTLE_LONG_CYCLES` fängt der Dwell selbst auf, solange es unter
-`DWELL_CYCLES + SETTLE_CYCLES` = 24597 bleibt. Erst wenn auch 400 µs nichts ändern, muss §3.3 zurück
-auf den Tisch.
+„110 µs ändern nichts" heißt daher **noch nicht** „die Spalte ist unschuldig". Genau darum ist
+**SW 0.1.8** gebaut: dort steht `SETTLE_LONG_CYCLES` auf **20000** (≈400 µs, Duty ~5 %, sichtbar
+dunkler — Messfassung, kein Serienstand), und DIP 6 = ON entscheidet die Frage am Spielfeld. Den
+Aufschlag fängt der Dwell selbst auf, solange `SETTLE_LONG_CYCLES` unter
+`DWELL_CYCLES + SETTLE_CYCLES` = 24597 bleibt (bei 20000 bleiben 4597 clk = 92 µs Dwell). Erst wenn
+auch 400 µs nichts ändern, muss §3.3 zurück auf den Tisch.
 
 **Abnahme am Spielfeld:** DIP 5 = OFF, Lampe 22 setzen → LED 21 darf nicht mehr deutlich glimmen;
 DIP 5 = ON (im Spiel, ohne Neustart) → es muss zurückkommen. Das ist der A/B-Test, der die Diagnose
@@ -263,8 +264,8 @@ Gruppenleitung (2 bzw. 3 von 4 Phasen High), d. h. an dieser Gruppe brennen daue
 *(Zu klären: der Airborne-Tester nennt 21, der ME-Bericht 22 — dieselbe Gruppe, aber nicht dieselbe
 Spalte. Für die Diagnose ist die Gruppe das Entscheidende, s. §6.2.)*
 
-Damit ist bestätigt: (a) der A/B-Schalter DIP 5
-arbeitet und reproduziert das Artefakt auf Kommando — die Diagnose aus §3.3 ist am zweiten Spielfeld
+Damit ist bestätigt: (a) der A/B-Schalter DIP 5 arbeitet und reproduziert das Artefakt auf Kommando —
+die Diagnose aus §3.3 ist am zweiten Spielfeld
 bestanden; (b) das Grundglimmen aus §3.4 ist an den früher betroffenen Lampen 9, 15, 57 weg, Fix (a)
 wirkt; (c) der Duty-Verlust von 2,4 Prozentpunkten ist unsichtbar; (d) DIP 6 ändert nichts — was nach
 `Lamp_Refresh_Analysis.md` §3.3 **noch keine** Entlastung der Spalte ist, s. §4.
@@ -373,10 +374,13 @@ In dieser Reihenfolge; jede Zeile hat einen eigenen Aussagewert:
 ### 6.5 Fixpfade je Ergebnis
 
 - **Nachbar-abhängig / Fall (A)** — nach §6.2 der wahrscheinlichste Ausgang, weil Gruppe 6 die
-  Bonus-Gruppe ist: Diagnosebuild `SETTLE_LONG_CYCLES = 20000` (≈400 µs auf DIP 6, Duty ~5 %,
-  sichtbar dunkler) — s. §4. Das ist der **erste** Schritt, nicht der letzte Ausweg: 60/110 µs sind
-  nach der Abschaltzeit-Rechnung möglicherweise einfach zu kurz. Hilft es, wird der Wert (oder der
-  kleinste, der noch hilft) zum Serienstand für DIP 6, mit dem Helligkeitsverlust als bewusstem Preis.
+  Bonus-Gruppe ist: **dafür ist SW 0.1.8 gebaut und ausgeliefert** (`SETTLE_LONG_CYCLES = 20000`,
+  ≈400 µs auf DIP 6, Duty ~5 %, sichtbar dunkler — s. §4). Das ist der **erste** Schritt, nicht der
+  letzte Ausweg: 60/110 µs sind nach der Abschaltzeit-Rechnung möglicherweise einfach zu kurz.
+  Abnahme im Feld: 0.1.8 programmieren, Info-Anzeige muss `018` zeigen, dann DIP 6 im laufenden Spiel
+  OFF↔ON schalten. Wird das Glimmen mit ON schwächer oder verschwindet es, war es die Spalte — dann
+  wird der **kleinste** noch wirksame Wert zum Serienstand für DIP 6 (mit dem Helligkeitsverlust als
+  bewusstem Preis), und 0.1.8 bleibt nicht, wie es ist. Ändert sich nichts, ist die Spalte erledigt.
 - **Reststrom / Fall (B)** (Glimmen auch im FA-Control-Nullzustand, 5/6 im µA-Bereich): kein RTL-Fix
   möglich und keiner nötig — das ist der in §4 vorab benannte Rest, den auch die Original-MPU hat.
   Empfehlung an den Nutzer: 2,2 kΩ parallel, Glühlampe oder „ghost-free"-LED; gehört dann in **beide**

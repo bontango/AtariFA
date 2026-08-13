@@ -50,7 +50,7 @@
 -- Wie lange die Spalte nachhaengt, ist Bauteil- und Lastsache und daher NICHT fuer alle Maschinen
 -- gleich: die 20 us aus SW 0.1.6 haben am Airborne gereicht, an einem Middle Earth blieb EINE LED
 -- halb an (Feldrueckmeldung 08.2026, s. docs/Lamp_Preglow_Experiment.md). Deshalb sind es seit
--- SW 0.1.7 ~60 us, und Options-DIP 6 legt ~110 us nach. Je weniger Strom die Spalte zieht, desto
+-- SW 0.1.7 ~60 us, und Options-DIP 6 legt nach (0.1.7: ~110 us, 0.1.8: ~400 us -- s.u.). Je weniger Strom die Spalte zieht, desto
 -- tiefer sitzt die PNP in der Saettigung und desto laenger die Speicherzeit -- eine mit LEDs
 -- bestueckte Spalte ist also genau der ungeguenstigste Fall.
 --
@@ -59,9 +59,10 @@
 -- Basis-Emitter, also mit ~85 uA. Bei diesem Verhaeltnis von Ausraeum- zu Einschaltstrom kann die
 -- Speicherzeit Hunderte von us erreichen, im Extremfall mehr als eine Phase. Fuer die Fehlersuche
 -- heisst das: "DIP 6 = ON aendert nichts" belegt NICHT, dass die Spalte unschuldig ist -- es kann
--- auch heissen, dass 110 us schlicht zu wenig sind. Wer das entscheiden will, baut EINMAL mit
--- SETTLE_LONG_CYCLES = 20000 (~400 us, Duty ~5 %, deutlich dunkler -- Diagnose, kein Serienstand)
--- und schaut, ob DIP 6 dann etwas aendert (docs/Lamp_Preglow_Experiment.md 4 und 6.5).
+-- auch heissen, dass 110 us schlicht zu wenig sind. Genau darum ist SW 0.1.8 gebaut: dort steht
+-- SETTLE_LONG_CYCLES auf 20000 (~400 us, Duty ~5 %, deutlich dunkler -- Diagnose, kein
+-- Serienstand), und DIP 6 = ON entscheidet die Frage am Spielfeld
+-- (docs/Lamp_Preglow_Experiment.md 4 und 6.5).
 --
 -- Blanken durch NULLEN-LATCHEN statt oe_n=Hi-Z: im Original haengen die ULN-Eingaenge an
 -- 9334-Latches, die permanent treiben -- eine Aus-Zeile ist dort 100 % der Zeit eine harte '0'.
@@ -111,16 +112,16 @@ entity lamp_matrix is
 		--     = 501 clk = 10 us  (am LA gemessen: 10,000 us seit St_ShiftLast,
 		--      docs/Lamp_Refresh_Analysis.md 6.7.1)
 		--   Phase = Dwell + Clear-Durchlauf 501 + Settle + Daten-Durchlauf 501 + Enable 1
-		--   Serienstand   : 22097 + 501 + 2500 + 501 + 1 = 25600 clk x 20 ns = 512,0 us
-		--   DIP 5 = ON    : 24597 + 501 +    0 + 501 + 1 = 25600 clk        = 512,0 us
-		--   DIP 6 = ON    : 19597 + 501 + 5000 + 501 + 1 = 25600 clk        = 512,0 us
+		--   Serienstand   : 22097 + 501 +  2500 + 501 + 1 = 25600 clk x 20 ns = 512,0 us
+		--   DIP 5 = ON    : 24597 + 501 +     0 + 501 + 1 = 25600 clk        = 512,0 us
+		--   DIP 6 = ON    :  4597 + 501 + 20000 + 501 + 1 = 25600 clk        = 512,0 us
 		--     (der Dwell faengt auf, was die Totzeit gerade nicht braucht -- die Phasendauer ist
 		--      in ALLEN DREI Stellungen gleich, sonst vergleicht man am Spielfeld zwei Variablen
 		--      statt einer; s. dwell_lim unten)
 		--   Phase = EIN Digit-Slot wie im Original, Frame = 4 Phasen = 2,048 ms = 488,3 Hz
 		--   Duty (sichtbar = Phase - Totzeit, Totzeit = Settle + Daten-Durchlauf 501 + Enable 1):
 		--     Serienstand 22598/(4x25600) = 22,1 % · DIP 5 = ON 25099/... = 24,5 %
-		--     · DIP 6 = ON 20098/... = 19,6 %
+		--     · DIP 6 = ON 5098/... = 5,0 %  (SW 0.1.8, Diagnosestand -- s. SETTLE_LONG_CYCLES)
 		-- Damit laeuft die Matrix im selben Raster wie die Original-DMA-Kette (Troubleshooting
 		-- Guide: 512 us je Spalte, "duty cycle of only 25 %"). Bis SW 0.1.4 stand hier 12500
 		-- (250 us, ~961 Hz) -- doppelt so schnell wie das Original bei gleicher Helligkeit.
@@ -128,21 +129,27 @@ entity lamp_matrix is
 		DWELL_CYCLES  : integer := 22097; -- clk_50-Zyklen Ruhezeit je Strobe-Phase -> 488Hz Frame
 		-- Totzeit zwischen Spaltenwechsel und Scharfwerden der Zeilen (nicht im Original-Modus).
 		-- SETTLE_CYCLES gilt im Serienstand, SETTLE_LONG_CYCLES bei Options-DIP 6 = ON. Zusammen
-		-- mit dem Daten-Durchlauf sind das ~60 us bzw. ~110 us, in denen die alte Spalte abklingen
+		-- mit dem Daten-Durchlauf sind das ~60 us bzw. ~400 us, in denen die alte Spalte abklingen
 		-- kann. Bis SW 0.1.6 stand hier 497 (~20 us) -- das genuegte am Airborne, an einem Middle
-		-- Earth blieb damit eine LED halb an (s. Kopf). HW-TUNBAR: glimmt die "gleiche Zeile,
-		-- vorhergehende Spalte"-Lampe auch mit DIP 6 = ON weiter, ist die Spalten-Abschaltzeit
-		-- damit NOCH NICHT freigesprochen -- die Basisladungs-Abschaetzung im Kopf laesst
-		-- Hunderte von us zu. Erst EIN Diagnosebuild mit SETTLE_LONG_CYCLES = 20000 (~400 us,
-		-- Duty ~5 %) entscheidet das; aendert auch der nichts, dann nicht weiter hochdrehen,
-		-- sondern docs/Lamp_Preglow_Experiment.md 3.3/6 neu aufrollen.
+		-- Earth blieb damit eine LED halb an (s. Kopf).
+		--
+		-- *** SW 0.1.8 = DIAGNOSESTAND: SETTLE_LONG_CYCLES 5000 -> 20000 (~110 -> ~400 us). ***
+		-- Die 110 us aus 0.1.7 haben an Gruppe 6 / A20 nichts geaendert, und nach der
+		-- Basisladungs-Abschaetzung im Kopf ist genau das noch kein Freispruch fuer die Spalte.
+		-- 400 us sind die Entscheidung: aendert sich das Glimmen damit, war es die
+		-- Spalten-Abschaltzeit und der Wert (bzw. der kleinste, der noch hilft) wird Serienstand;
+		-- aendert sich nichts, ist die Spalte erledigt -- dann NICHT weiter hochdrehen, sondern
+		-- docs/Lamp_Preglow_Experiment.md 3.3/6 neu aufrollen (dort auch der Feld-Fix 2,2 kOhm).
+		-- Der Preis steht im Duty-Block oben: DIP 6 = ON kostet in 0.1.8 gut drei Viertel der
+		-- Helligkeit (5,0 % statt 22,1 %) und ist deshalb NICHTS fuer den Dauerbetrieb.
 		-- Rechnerisch: eine Erhoehung von SETTLE_LONG_CYCLES faengt der Dwell selbst auf
 		-- (dwell_lim = DWELL + SETTLE - settle_lim), die Phase bleibt 25600 clk -- nur muss
 		-- SETTLE_LONG_CYCLES unter DWELL_CYCLES + SETTLE_CYCLES bleiben (= 24597, sonst wird
-		-- dwell_lim negativ). Wer dagegen SETTLE_CYCLES anhebt, senkt DWELL_CYCLES um denselben
-		-- Betrag, weil dort beide Summanden mitwachsen.
+		-- dwell_lim negativ; 20000 laesst also noch 4597 clk = 92 us Dwell uebrig). Wer dagegen
+		-- SETTLE_CYCLES anhebt, senkt DWELL_CYCLES um denselben Betrag, weil dort beide
+		-- Summanden mitwachsen.
 		SETTLE_CYCLES      : integer := 2500;
-		SETTLE_LONG_CYCLES : integer := 5000;
+		SETTLE_LONG_CYCLES : integer := 20000;
 		SHIFT_DIV     : integer := 10     -- clk_50 je SRCK-Halbperiode (SHIFT_DIV=10 -> ~2.5MHz Bit-Takt)
 	);
 	port (

@@ -207,7 +207,9 @@ How long a column driver on the Auxiliary Board needs to turn off differs from m
 
 - **'OFF'** - **default.** About 60 microseconds of dead time. That is enough in most machines.
 
-- **'ON'** - **about 110 microseconds of dead time.** Use this if single LED replacement lamps still glow with option 5 = 'OFF'. The lamps get marginally dimmer (19.6 % instead of 22.1 % duty cycle), which is not visible in the machine.
+- **'ON'** - **a longer dead time**, to be used if single LED replacement lamps still glow with option 5 = 'OFF'. In software **0.1.7** that is about 110 microseconds; the lamps get marginally dimmer (19.6 % instead of 22.1 % duty cycle), which is not visible in the machine.
+
+> **Software 0.1.8 is a measurement build.** There, option 6 = 'ON' gives about **400 microseconds**, and that costs **three quarters of the brightness** (5.0 % instead of 22.1 % duty cycle) - the lamps are clearly dimmer, and that is intended, not a fault. This build exists to answer **one** question once: whether a stubborn glow comes from the lamp column's turn-off time at all. If it disappears with option 6 = 'ON', it was the column; if it stays exactly as it was, it was something else (see the last paragraph of this chapter). **For playing, set option 6 to 'OFF'** or stay on version 0.1.7. Which build is running is shown on the info display at power on (chapter 5.2).
 
 **Option 5 overrides option 6:** with option 5 = 'ON' there is no dead time at all, so option 6 has no effect.
 
@@ -459,7 +461,7 @@ bank of 4                          bank of 6
 
 **Lamp timing, option 5:** OFF = quiet lamps, switched-off LEDs stay off (standard) · ON = timing of the original MPU, LED replacement lamps glow as on the original (chapter 4.2.4)
 
-**Lamp dead time, option 6:** OFF = about 60 µs (standard) · ON = about 110 µs, for machines where single LEDs still glow with option 5 = OFF; option 5 overrides option 6 (chapter 4.2.5)
+**Lamp dead time, option 6:** OFF = about 60 µs (standard) · ON = longer, for machines where single LEDs still glow with option 5 = OFF - 110 µs in version 0.1.7, but 400 µs and clearly dimmer lamps in the 0.1.8 measurement build; option 5 overrides option 6 (chapter 4.2.5)
 
 **After changing a switch that is read at boot: power off, power on.**
 
