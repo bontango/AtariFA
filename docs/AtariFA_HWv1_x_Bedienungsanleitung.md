@@ -185,7 +185,7 @@ Auch dieser Schalter wird fortlaufend gelesen: wer ihn im laufenden Betrieb auf 
 
 #### 4.2.3. Option 1 -> Hintergrundmusik, Option 2 reserviert
 
-- **Option 1, „ON"** — **während eines laufenden Spiels läuft Hintergrundmusik.** Der MP3-Spieler auf der Platine spielt den Ordner 02 seiner Speicherkarte in Schleife und pausiert wieder, sobald das Spiel vorbei ist. Alles Weitere in Kapitel 8.4.
+- **Option 1, „ON"** — **solange eine Kugel im Spiel ist, läuft Hintergrundmusik.** Der MP3-Spieler auf der Platine spielt den Ordner 02 seiner Speicherkarte in Schleife und pausiert wieder, sobald die Kugel unten liegt und das Spiel vorbei ist. Alles Weitere in Kapitel 8.4.
 
 - **Option 1, „OFF"** — keine Hintergrundmusik. Das ist die Vorgabe und die Einstellung für einen Automaten, der sich wie das Original verhalten soll.
 
@@ -350,11 +350,21 @@ Seit Software 0.3.0 kann der kleine MP3-Spieler auf der Platine (ein „MP3-Mini
 
 Der Spieler spielt diesen Ordner in Schleife, in seiner eigenen Reihenfolge. Es gibt keine Auswahl je Spiel und keinen Zufallsmodus. Wer auch eine GottFA1_PLuS-Platine betreibt, kann dieselbe Karte verwenden.
 
-**Was im Betrieb passiert.** Die Musik setzt mit dem Spielbeginn ein und pausiert, wenn das Spiel vorbei ist. Beim nächsten Spiel läuft sie dort weiter, wo sie aufgehört hat, statt von vorn zu beginnen. **Auch ein Tilt pausiert sie** — die Platine richtet sich nach dem Flipperrelais, und das fällt beim Tilt ab, genau wie am Originalautomaten. Mit dem nächsten Ball kommt die Musik zurück.
+**Was im Betrieb passiert.** Die Platine richtet sich nach dem **Outhole-Schalter**: die Musik läuft, solange keine Kugel im Outhole liegt. Sie setzt also ein, wenn die Kugel zum Spielbeginn ausgeworfen wird, und pausiert, wenn die letzte Kugel unten liegen bleibt. Beim nächsten Spiel läuft sie dort weiter, wo sie aufgehört hat, statt von vorn zu beginnen.
+
+Damit sie beim Ballwechsel nicht ständig aussetzt, reagiert die Platine erst nach **zwei Sekunden**. Wird die Kugel schneller wieder ausgeworfen, läuft die Musik durch; dauert die Bonuszählung länger, macht sie eine kurze Pause und kommt mit dem nächsten Ball zurück. Aus demselben Grund beginnt die Musik zwei Sekunden nach dem Spielstart und endet zwei Sekunden nach dem letzten Ball.
+
+**Ein Tilt pausiert die Musik nicht sofort** — sie läuft, bis die Kugel unten liegt. (Bis Software 0.3.0 richtete sich die Platine nach dem Flipperrelais und stoppte beim Tilt sofort. Dieses Relais gibt es aber nur bei Middle Earth und Space Riders, deshalb der Wechsel.)
+
+**Liegt beim Einschalten keine Kugel im Outhole** — etwa weil sie in der Schusslane oder auf dem Spielfeld liegt —, spielt die Musik auch im Attract-Modus. Kugel in den Outhole legen oder ein Spiel starten und beenden, dann ist wieder Ruhe.
 
 **Der Spielton bleibt unberührt.** Musik und Spielton sind zwei getrennte Analogwege, die erst am Verstärker zusammenlaufen. Die Töne aus Kapitel 8.1 spielen über der Musik; es wird nichts ausgeblendet und nichts stummgeschaltet. Das Verhältnis stellen Sie über die Lautstärke des Spielers und die Lautstärke Ihres Automaten ein.
 
-**Wenn Sie nichts hören:** der Schalter wird nur beim Einschalten gelesen — nach dem Umstellen von Option 1 also aus- und wieder einschalten. Prüfen Sie außerdem, ob der Ordner wirklich `02` heißt, ob die Karte im Spieler steckt, und ob die Info-Anzeige die Version **030** zeigt, Kapitel 5.2.
+**Wenn Sie nichts hören:** der Schalter wird nur beim Einschalten gelesen — nach dem Umstellen von Option 1 also aus- und wieder einschalten. Prüfen Sie außerdem, ob der Ordner wirklich `02` heißt, ob die Karte im Spieler steckt, und ob die Info-Anzeige die Version **032** zeigt, Kapitel 5.2.
+
+**Geben Sie ihr Zeit.** Die Platine lässt dem Spieler nach dem Einschalten fünf Sekunden zum Hochlaufen, meldet sich dann bei ihm an und wartet noch die Entprellung ab. Bis zum ersten Ton vergehen dadurch **rund 15 Sekunden**. Wer vorher aufgibt, hält ein funktionierendes Modul für defekt.
+
+Bleibt es danach still, obwohl eine Kugel im Spiel ist, prüfen Sie die Spielauswahl (Anhang A) noch einmal — die Platine liest je nach eingestelltem Spiel einen anderen Outhole-Schalter.
 
 ## 9. Die FA-Control-Schnittstelle (ESP32)
 
@@ -487,7 +497,7 @@ Alle fünf laufen auch mit Freispiel (Kapitel 7).
  alle vier nur beim Einschalten      6  Lampen-Totzeit  /  fortlaufend
 ```
 
-**Hintergrundmusik, Option 1:** OFF = aus (Standard) · ON = der MP3-Spieler spielt während des Spiels den Ordner `02` (Kapitel 8.4)
+**Hintergrundmusik, Option 1:** OFF = aus (Standard) · ON = der MP3-Spieler spielt den Ordner `02`, solange eine Kugel im Spiel ist (Kapitel 8.4)
 
 **Tonweg, Option 3:** OFF = Auxiliary Board (Standard) · ON = Verstärker auf der Platine
 

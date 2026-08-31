@@ -8,34 +8,59 @@
 -- Onboard-TDA7267. Es gibt KEINE Rueckleitung (kein BUSY, kein RX vom Player) --
 -- der Zustand wird hier mitgefuehrt (Signal 'running').
 --
--- Herkunft: portiert aus GottFA1_PLuS
---   N:\Projekte\FPGA System1\FPGA_source\rtl\common\DFPlayer_Mini_CMD.vhd (v0.5)
--- Unterschied: dort ein handgebautes 80-Bit-Schieberegister an einem 9600-Hz-Takt,
--- hier das im Baum vorhandene work.UART_TX (rtl/fa_control/uart_tx.vhd) in der
--- clk_50-Domaene -- kein zweiter Takt, nichts fuer die SDC zu tun.
+-- HERKUNFT -- wichtig, wenn hier je wieder etwas nachgezogen wird:
+--   Diese Datei folgt seit SW 0.3.2 dem Stand von RecelFA
+--   N:\Projekte\FPGA Recel\FPGA_source\rtl\common\DFPlayer_Mini_CMD.vhd (v0.6, 08.2026).
+--   DAS ist die gepflegte Linie. Die erste Portierung (SW 0.3.0) kam aus GottFA1_PLuS
+--   N:\Projekte\FPGA System1\FPGA_source\rtl\common\DFPlayer_Mini_CMD.vhd (v0.5, 09.2025),
+--   und das war ein aelterer Zweig -- ihm fehlten vier Haerten, die RecelFA im Feld
+--   gelernt hat und die genau die Faelle abdecken, in denen ein Modul stumm bleibt:
+--     * vollstaendige 10-Byte-Rahmen MIT Pruefsumme ("some clone chips insist on it")
+--     * 0x0D nach dem Repeat-Kommando ("some chips only set the mode with 0x11/0x17")
+--     * eine Pause zwischen zwei Kommandos
+--     * 5 s Startverzoegerung fuer langsame Module, dazu 0x16 statt eines Player-Resets
+--   Uebernommen ist der Ablauf, NICHT der Aufbau: RecelFA schiebt ein 100-Bit-Register
+--   an einem eigenen 9600-Hz-Takt, hier sendet das im Baum vorhandene work.UART_TX
+--   (rtl/fa_control/uart_tx.vhd) in der clk_50-Domaene -- kein zweiter Takt, nichts
+--   fuer die SDC. Alle Zeiten sind Generics.
 --
--- Rahmenformat (10 Byte laut Datenblatt, davon 2 Pruefsummenbytes):
---   7E FF 06 <cmd> 00 <par1> <par2> [csumH csumL] EF
--- Wir senden wie GottFA nur die 8 Byte OHNE Pruefsumme -- der Player akzeptiert das,
--- im Feld seit GottFA1_PLuS erprobt.
+-- Rahmenformat (10 Byte laut Datenblatt):
+--   7E FF 06 <cmd> 00 <par1> <par2> <csumH> <csumL> EF
+--   csum = 0 - ( FF + 06 + cmd + 00 + par1 + par2 ), 16 Bit
+-- Bis SW 0.3.1 wurden nur die 8 Byte ohne Pruefsumme gesendet (so macht es GottFA1_PLuS
+-- bis heute, dort im Feld erprobt). Ein Player, der ohne Pruefsumme arbeitet, kommt mit
+-- ihr ebenfalls zurecht -- der vollstaendige Rahmen ist also strikt die sicherere Wahl.
 --
 -- Verwendete Kommandos:
---   0x42  Status abfragen  -- einmal nach dem Boot, weckt den Player
---   0x06  Lautstaerke      -- par2 = 0..30, nur wenn SET_VOLUME
---   0x17  repeat folder    -- par2 = FOLDER, spielt den Ordner in Endlosschleife
---   0x0D  play/resume      -- weiter an der alten Stelle
+--   0x42  Status abfragen  -- erster Rahmen nach dem Boot. Manche Klone verwerfen den
+--                             allerersten Rahmen nach dem Einschalten; eine Abfrage hat
+--                             keinerlei Nebenwirkung (die Antwort geht ins Leere, der
+--                             Rueckkanal ist nicht angeschlossen).
+--   0x16  Stop             -- definierter Ausgangszustand OHNE Player-Reboot. RecelFA v0.6
+--                             hat dafuer bewusst den Reset 0x0C wieder ausgebaut: der
+--                             schickt den Player durch einen zweiten Boot mit SD-Scan,
+--                             und genau dabei geht ein Kommando verloren.
+--   0x06  Lautstaerke      -- einmal nach dem Boot, nur wenn SET_VOLUME
+--   0x17  repeat folder    -- Musik zum ersten Mal starten, par2 = FOLDER.
+--                             Rueckfallweg, falls ein Modul mit Ordnern nicht zurecht-
+--                             kommt: 0x11 mit par2 = 1 = alles wiederholen, so macht es
+--                             RecelFA. Hier steht 0x17, weil AtariFA und GottFA1_PLuS
+--                             sich die Karte mit dem Ordner 02 teilen.
+--   0x0D  play/resume      -- weiter an der alten Stelle, und als Nachschlag nach 0x17
 --   0x0E  pause
 --
--- Trigger in AtariFA.vhd: Q12 = Flipper Control Relay (Latch 0x1088 Bit 6) = "Spiel
--- laeuft". Beleg: Space-Riders-Handbuch Tab. 5-6 "FLIPPER CONTROL RELAY (A)1088 D6",
--- Selbsttest Nr. 12 "Flipper Relay", docs/solenoid_mapping.txt solenoids(12), und im
--- Middle-Earth-ROM 7F36 (Spielstart: ORAA #$40) / 77BC (Game Over: CLR $1088).
--- Details: docs/Background_Music.md.
+-- Trigger in AtariFA.vhd: der OUTHOLE-SCHALTER, invertiert -- "keine Kugel im Outhole
+-- = Spiel laeuft" (seit SW 0.3.1; bis 0.3.0 war es Q12, das Flipper Control Relay).
+-- Ein Flipper Control Relay haben nur Middle Earth und Space Riders; der Outhole
+-- funktioniert bei allen fuenf Spielen, nur seine Schalternummer ist spielabhaengig
+-- (Mux auf game_sel im Top-Level). Details: docs/Background_Music.md.
 --
 -- GLITCH_CYCLES ist die Entprellung des Triggers: der Wechsel wird erst nach der
--- Wartezeit erneut geprueft und nur dann uebernommen. Faengt kurze Relais-Aussetzer
--- ab und sorgt dafuer, dass ein einzelner Spulenpuls (FA-Control COILS, Kachel 12)
--- die Musik NICHT startet.
+-- Wartezeit erneut geprueft und nur dann uebernommen. Das ist hier nicht nur eine
+-- Entprellung, sondern die Unterscheidung "Ballwechsel" <-> "Spielende": beim
+-- Ballwechsel liegt die Kugel nur kurz im Outhole und wird wieder ausgeworfen, am
+-- Spielende bleibt sie liegen. Nebenbei sorgt sie weiter dafuer, dass ein einzelner
+-- Spulenpuls (FA-Control COILS, Kachel 12 = Trigger bei Uebernahme) nichts startet.
 -- ============================================================
 
 library ieee;
@@ -45,8 +70,10 @@ use ieee.numeric_std.all;
 entity dfplayer_cmd is
 	generic(
 		CLKS_PER_BIT  : integer := 5208;      -- clk_50 / 9600 Baud
-		START_DELAY   : integer := 100000000; -- 2 s @clk_50: Player-Boot abwarten
-		GLITCH_CYCLES : integer := 25000000;  -- 500 ms Trigger-Entprellung
+		START_DELAY   : integer := 250000000; -- 5 s @clk_50: Player-Boot abwarten
+		                                      -- (RecelFA v0.6, auch fuer langsame Module)
+		GAP_CYCLES    : integer := 25000000;  -- 500 ms Pause zwischen zwei Rahmen
+		GLITCH_CYCLES : integer := 100000000; -- 2 s Trigger-Entprellung (s. Kopf)
 		FOLDER        : integer := 2;         -- SD-Ordner "02" (wie GottFA1_PLuS)
 		SET_VOLUME    : boolean := true;      -- Lautstaerke einmalig setzen?
 		VOLUME        : integer := 20         -- 0..30
@@ -62,25 +89,30 @@ end dfplayer_cmd;
 
 architecture rtl of dfplayer_cmd is
 
-	type frame_t is array (0 to 7) of std_logic_vector(7 downto 0);
-	type state_t is (st_Boot, st_InitCmd, st_Idle, st_Delay, st_Decide,
-	                 st_Send, st_Wait);
+	type frame_t is array (0 to 9) of std_logic_vector(7 downto 0);
+	type state_t is (st_Boot, st_Init, st_Idle, st_Delay, st_Decide,
+	                 st_Send, st_Wait, st_Gap);
 
 	-- laengste Wartezeit bestimmt die Zaehlerbreite
 	function max_i(a, b : integer) return integer is
 	begin
 		if a > b then return a; else return b; end if;
 	end function;
-	constant WAIT_MAX : integer := max_i(START_DELAY, GLITCH_CYCLES);
+	constant WAIT_MAX : integer :=
+		max_i(max_i(START_DELAY, GLITCH_CYCLES), GAP_CYCLES);
 
 	signal state      : state_t := st_Boot;
-	signal after_send : state_t := st_Idle;   -- Ziel nach dem letzten Rahmenbyte
+	signal after_send : state_t := st_Idle;   -- Ziel nach Rahmen + Pause
 
 	signal frame      : frame_t := (others => (others => '0'));
-	signal byte_idx   : integer range 0 to 7 := 0;
+	signal byte_idx   : integer range 0 to 9 := 0;
 
 	signal wait_cnt   : integer range 0 to WAIT_MAX := 0;
-	signal init_step  : integer range 0 to 2 := 0;
+	signal init_step  : integer range 0 to 3 := 0;
+
+	-- Folgekommando: wird nach der Pause hinterhergeschickt (RecelFA v0.5)
+	signal pending     : std_logic := '0';
+	signal pending_cmd : std_logic_vector(7 downto 0) := (others => '0');
 
 	signal old_trigger : std_logic := '0';
 	signal running     : std_logic := '0';    -- laeuft schon einmal Musik?
@@ -109,20 +141,38 @@ port map(
 
 ------------------------------------------------------------------------------
 -- Kommando-FSM
+--
+--   st_Boot -> st_Init -> st_Idle -> st_Delay -> st_Decide -> st_Send -> st_Wait
+--                 ^                                              ^          |
+--                 +------------------- st_Gap <------------------+----------+
+--
+-- Nach JEDEM Rahmen liegt st_Gap, also immer eine definierte Pause -- ein Weg
+-- statt Sonderfaellen. Steht dabei ein Folgekommando an (pending), geht es
+-- direkt in den naechsten Rahmen statt nach after_send.
 ------------------------------------------------------------------------------
 process(clk_50)
-	-- baut den 8-Byte-Rahmen (ohne Pruefsumme, s. Kopf)
+	-- baut den vollstaendigen 10-Byte-Rahmen inklusive Pruefsumme (s. Kopf).
+	-- Die Addition faltet sich weg, wo cmd/par1/par2 Konstanten sind -- das ist
+	-- bei allen Aufrufen ausser dem ueber pending_cmd der Fall.
 	procedure build(signal f : out frame_t;
 	                cmd, par1, par2 : in std_logic_vector(7 downto 0)) is
+		variable chk : unsigned(15 downto 0);
 	begin
+		chk := to_unsigned(0, 16) - ( to_unsigned(16#FF#, 16)      -- Version
+		                            + to_unsigned(16#06#, 16)      -- Laenge
+		                            + resize(unsigned(cmd),  16)
+		                            + resize(unsigned(par1), 16)
+		                            + resize(unsigned(par2), 16) );
 		f(0) <= x"7E";   -- Startbyte
 		f(1) <= x"FF";   -- Version
 		f(2) <= x"06";   -- Laenge
 		f(3) <= cmd;
-		f(4) <= x"00";   -- kein Feedback
+		f(4) <= x"00";   -- kein Feedback (geht als 0 in die Pruefsumme ein)
 		f(5) <= par1;
 		f(6) <= par2;
-		f(7) <= x"EF";   -- Endbyte
+		f(7) <= std_logic_vector(chk(15 downto 8));
+		f(8) <= std_logic_vector(chk( 7 downto 0));
+		f(9) <= x"EF";   -- Endbyte
 	end procedure;
 begin
 	if rising_edge(clk_50) then
@@ -134,6 +184,7 @@ begin
 			byte_idx    <= 0;
 			wait_cnt    <= 0;
 			init_step   <= 0;
+			pending     <= '0';
 			old_trigger <= '0';
 			running     <= '0';
 		else
@@ -144,23 +195,28 @@ begin
 				if wait_cnt >= START_DELAY then
 					wait_cnt  <= 0;
 					init_step <= 0;
-					state     <= st_InitCmd;
+					state     <= st_Init;
 				else
 					wait_cnt <= wait_cnt + 1;
 				end if;
 
-			-- Init: Status abfragen, danach optional die Lautstaerke setzen
-			when st_InitCmd =>
+			-- Init: Status abfragen, stoppen, optional die Lautstaerke setzen.
+			-- Zwischen den Rahmen liegt jeweils st_Gap (after_send = st_Init).
+			when st_Init =>
 				byte_idx   <= 0;
-				after_send <= st_InitCmd;
+				after_send <= st_Init;
 				if init_step = 0 then
-					build(frame, x"42", x"00", x"00");
+					build(frame, x"42", x"00", x"00");        -- Status abfragen
 					init_step <= 1;
 					state     <= st_Send;
-				elsif init_step = 1 and SET_VOLUME then
+				elsif init_step = 1 then
+					build(frame, x"16", x"00", x"00");        -- Stop
+					init_step <= 2;
+					state     <= st_Send;
+				elsif init_step = 2 and SET_VOLUME then
 					build(frame, x"06", x"00",
 					      std_logic_vector(to_unsigned(VOLUME, 8)));
-					init_step <= 2;
+					init_step <= 3;
 					state     <= st_Send;
 				else
 					state <= st_Idle;
@@ -193,10 +249,14 @@ begin
 				after_send <= st_Idle;
 				if old_trigger = '1' then
 					if running = '0' or start_new = '1' then
-						-- Ordner in Endlosschleife starten
+						-- Ordner in Endlosschleife starten ...
 						build(frame, x"17", x"00",
 						      std_logic_vector(to_unsigned(FOLDER, 8)));
 						running <= '1';
+						-- ... und hinterher anstossen: manche Module setzen mit
+						-- 0x17 nur die Betriebsart, ohne zu spielen (RecelFA v0.5)
+						pending_cmd <= x"0D";
+						pending     <= '1';
 					else
 						build(frame, x"0D", x"00", x"00");  -- resume
 					end if;
@@ -219,13 +279,30 @@ begin
 			-- auf das Ende des Bytes warten, dann naechstes
 			when st_Wait =>
 				if tx_done = '1' then
-					if byte_idx = 7 then
+					if byte_idx = 9 then
 						byte_idx <= 0;
-						state    <= after_send;
+						wait_cnt <= 0;
+						state    <= st_Gap;
 					else
 						byte_idx <= byte_idx + 1;
 						state    <= st_Send;
 					end if;
+				end if;
+
+			-- Pause nach jedem Rahmen; danach das Folgekommando oder weiter
+			when st_Gap =>
+				if wait_cnt >= GAP_CYCLES then
+					wait_cnt <= 0;
+					if pending = '1' then
+						build(frame, pending_cmd, x"00", x"00");
+						pending  <= '0';
+						byte_idx <= 0;
+						state    <= st_Send;
+					else
+						state <= after_send;
+					end if;
+				else
+					wait_cnt <= wait_cnt + 1;
 				end if;
 
 			end case;

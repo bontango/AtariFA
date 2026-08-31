@@ -186,7 +186,7 @@ This switch is read continuously as well: turning it 'OFF' while FA-Control is i
 
 #### 4.2.3. Option 1 -> background music, option 2 reserved
 
-- **Option 1, 'ON'** - **background music plays while a game is running.** The MP3 player on the board plays folder 02 of its memory card in a loop, and pauses again when the game is over. Everything about it is in chapter 8.4.
+- **Option 1, 'ON'** - **background music plays while a ball is in play.** The MP3 player on the board plays folder 02 of its memory card in a loop, and pauses again once the ball rests in the outhole and the game is over. Everything about it is in chapter 8.4.
 
 - **Option 1, 'OFF'** - no background music. This is the default, and it is the setting for a machine that should behave like the original.
 
@@ -351,11 +351,21 @@ Since software 0.3.0 the small MP3 player on the board (an 'MP3 mini player' wit
 
 The player plays that folder in a loop, in its own order. There is no per-game selection and no random mode. If you also run a GottFA1_PLuS board, the same card works there.
 
-**What happens during play.** The music starts when a game starts, and pauses when the game is over. It resumes where it left off at the next game rather than starting from the beginning. **A tilt also pauses it** - the board takes its cue from the flipper relay, and that relay drops on tilt, exactly as on the original machine. The next ball brings the music back.
+**What happens during play.** The board takes its cue from the **outhole switch**: the music plays as long as no ball rests in the outhole. So it starts when the ball is kicked out at the beginning of a game, and it pauses when the last ball stays down. It resumes where it left off at the next game rather than starting from the beginning.
+
+So that it does not cut out at every ball change, the board only reacts after **two seconds**. If the ball is kicked out again sooner than that, the music plays straight through; if the bonus count takes longer, it pauses briefly and comes back with the next ball. For the same reason the music starts two seconds into a game and stops two seconds after the last ball.
+
+**A tilt does not pause the music right away** - it keeps playing until the ball is down. (Up to software 0.3.0 the board followed the flipper relay and stopped on tilt immediately. Only Middle Earth and Space Riders actually have that relay, which is why this changed.)
+
+**If no ball rests in the outhole at power-on** - because it sits in the shooter lane or on the playfield, say - the music also plays in attract mode. Put the ball in the outhole, or start and finish a game, and it goes quiet again.
 
 **The game sound is not affected.** Music and game sound are two separate analog paths that only meet at the amplifier. The game tones of chapter 8.1 play over the music; nothing is faded or muted. Set the balance between them with the volume control of the player and the volume of your machine.
 
-**If you hear nothing:** the switch is read at boot only, so power off and on after setting option 1. Check that the folder is really called `02`, that the card is in the player, and that the board reports version **030** on the info display, chapter 5.2.
+**If you hear nothing:** the switch is read at boot only, so power off and on after setting option 1. Check that the folder is really called `02`, that the card is in the player, and that the board reports version **032** on the info display, chapter 5.2.
+
+**Give it time.** After power-on the board allows the player five seconds to boot, then talks to it, then waits out the debounce. That adds up to **about 15 seconds** before the first note. Give up earlier and you will take a working module for a broken one.
+
+If it stays quiet after that while a ball is in play, check the game selection (appendix A) once more - the board reads a different outhole switch depending on the game you set.
 
 ## 9. The FA-Control interface (ESP32)
 
@@ -488,7 +498,7 @@ bank of 4                          bank of 6
  all four read at boot only         6  lamp dead time    /   live
 ```
 
-**Background music, option 1:** OFF = off (standard) · ON = the MP3 player plays folder `02` while a game runs (chapter 8.4)
+**Background music, option 1:** OFF = off (standard) · ON = the MP3 player plays folder `02` while a ball is in play (chapter 8.4)
 
 **Sound path, option 3:** OFF = Auxiliary Board (standard) · ON = on-board amplifier
 

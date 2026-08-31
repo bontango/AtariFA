@@ -20,5 +20,5 @@ package version_pkg is
 	-- Beide Stellen werden auf dem CD4511 angezeigt und koennen daher nur 0..9 sein --
 	-- nach 0.1.9 kommt 0.2.0, nicht 0.1.10.
 	constant SW_SUB1 : std_logic_vector(3 downto 0) := x"3";
-	constant SW_SUB2 : std_logic_vector(3 downto 0) := x"0";
+	constant SW_SUB2 : std_logic_vector(3 downto 0) := x"2";
 end package version_pkg;

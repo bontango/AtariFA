@@ -45,8 +45,15 @@ Gültig, wenn `Magic==0xA5` **und** `game_idx` == aktuelles Spiel (`restore_vali
 - **Player-Scores:** `$81–$8A` (BCD). Werden vom ROM (7CF5) in die Display-Region `$05/$06/$09/$0A/$0D/$0E`
   kopiert — **aber nur in bestimmten Zuständen**, nicht im Cold-Boot-Attract (s. „Atari-Verhalten").
 - **Outhole-Latch:** CPU-Adresse `0x2043` → `sw_state`-Offset **67** (= Spielende-Marke; Ball landet
-  am Ballende immer im Outhole). Outhole-Offsets der anderen Spiele: Atarians 19, Time2000 53,
-  Middle Earth 56, Space Riders 56.
+  am Ballende immer im Outhole). Outhole-Offsets der anderen Spiele: Atarians **50** (`0x2032`),
+  Time 2000 53, Middle Earth 56, Space Riders 56.
+  > **Korrigiert 2026-08-31:** hier stand für Atarians **19**. Das ist `0x2013` = **Slam Tilt** —
+  > bei allen fünf Spielen dieselbe Adresse. Richtig ist `0x2032` = 50
+  > (`Manuals\Atari Schalterzuordnungen und Kontakttestcodes.csv`, Zeile 36, Spalte Atarians
+  > „Outhole Kicker"; Gegenprobe im ROM: `0x2032` wird bei `76B4` und `76F0` in die
+  > Ball-Ende-Behandlung gepollt, `0x2013` nur bei `76BF` im Slam-Tilt-Zweig). Die Zahl war nie
+  > in Hardware ausgeübt — Stufe 1 lief nur mit Airborne. Verwendet wird sie jetzt vom
+  > Musik-Trigger, s. `Background_Music.md` §2.3.
 - **Boot:** `@7000` löscht RAM `0x00–0xD8`, Re-Init `0x40–0x7B` (Werte 1..60, **keine** Scores/Credits).
   Scores/Credits bleiben nach dem Clear auf 0, bis das Spiel/wir sie schreiben.
 - **NMI (7DBE)** = reiner Watchdog (RAM-Signatur `$D9=AA/$DA=55` + PC-High in `[0x70,0x80)`), **keine**
@@ -159,8 +166,9 @@ beschrieben wird:
 
 ### Verankerte Fakten für eine spätere Implementierung
 - **Airborne Credit-Master `$D5`** (HW-Restore bewiesen), Credit-**Limit** `$BC`, Credit-**Display** `$1D`.
-- **Outhole-Offsets** (Spielende-Marke, `sw_state`-Offset): Atarians 19, Time 53, ME 56, Space 56,
-  Airborne 67. Der Outhole-Trigger (`outhole_ofs`-Mux) war bereits generisch.
+- **Outhole-Offsets** (Spielende-Marke, `sw_state`-Offset): Atarians **50** (nicht 19, s.o.),
+  Time 53, ME 56, Space 56, Airborne 67. Der Outhole-Trigger (`outhole_ofs`-Mux) war bereits
+  generisch; er lebt seit SW 0.3.1 als Musik-Trigger in `AtariFA.vhd` weiter.
 - **FRAM-Slot-Idee je Spiel:** `mem_addr = game_idx * 16` (16-Byte-Record pro Spiel).
 
 ### Empfohlener Zukunftsweg = RE statt Probe

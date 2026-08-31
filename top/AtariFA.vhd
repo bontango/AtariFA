@@ -213,9 +213,11 @@ signal sol_wr		: std_logic := '0';
 signal sol_ah		: std_logic_vector(1 to 20);
 signal coin_cntr_ah	: std_logic;
 signal lockout_ah	: std_logic;
--- Hintergrundmusik (dfplayer_cmd.vhd): Trigger = Flipper Control Relay Q12 und
--- Freigabe-DIP; der Sender selbst haengt an SB_Audio. s. docs/Background_Music.md.
-signal flipper_relay	: std_logic;                     -- Q12 = Latch 0x1088 Bit6, aktiv-high
+-- Hintergrundmusik (dfplayer_cmd.vhd): Trigger = Outhole-Schalter ("keine Kugel im
+-- Outhole = Spiel laeuft") und Freigabe-DIP; der Sender selbst haengt an SB_Audio.
+-- s. docs/Background_Music.md.
+signal outhole		: std_logic;                     -- '1' = Kugel liegt im Outhole
+signal music_trig	: std_logic;                     -- '1' = Musik soll laufen
 signal music_enable	: std_logic;                     -- Options-DIP 1 (ON wird als '0' gelesen)
 -- Boot-Sprachausgabe ("Lisy", speech.vhd): eigener 1-Bit-Sigma-Delta-Strom + busy.
 -- Start an Vorderflanke boot_phase(1); Ausgabe ueber SB_Sound-Mux (Vorrang vor Sound).
@@ -730,14 +732,6 @@ disp_Anode_blank <= not i_disp_Anode_blank;
 gen_fa_sol: for i in 1 to 20 generate
 	solenoids(i) <= not fa_sol_ovr(i - 1) when fa_ctrl_active = '1' else not sol_ah(i);
 end generate;
--- Q12 = Flipper Control Relay (Latch 0x1088 Bit 6) = "Spiel laeuft". Beleg: Space-Riders-
--- Handbuch Tab. 5-6 "FLIPPER CONTROL RELAY (A)1088 D6", Selbsttest Nr. 12 "Flipper Relay",
--- docs/solenoid_mapping.txt solenoids(12) = 0x1088 bit6 = F_Q12; im ROM Middle Earth 7F36
--- (Spielstart, ORAA #$40) und 77BC (Game Over, CLR $1088), bei den anderen vier Spielen als
--- Tabelleneintrag 88 40. Quelle wie beim physischen Ausgang oben: im Spiel aus dem
--- solenoid_driver, bei Uebernahme aus FA-Control -- damit ist Q12 am Pruefstand ueber die
--- COILS-Ansicht schaltbar. Herleitung: docs/Background_Music.md.
-flipper_relay <= fa_sol_ovr(11) when fa_ctrl_active = '1' else sol_ah(12);
 -- Muenztuer-Spulen ueber Aux-Board (invertierender 74HCT540): aktiv-high coin_cntr/lockout -> invertiert.
 aux_sol_latch(0) <= not fa_sol_ovr(20) when fa_ctrl_active = '1' else not coin_cntr_ah;   -- COIN_CNTREN (0x1080 bit4)
 aux_sol_latch(1) <= not fa_sol_ovr(21) when fa_ctrl_active = '1' else not lockout_ah;     -- LOCKOUT_EN  (0x1080 bit5)
@@ -788,18 +782,58 @@ SB_Sound        <= speech_pwm                           when speech_busy = '1'
 -- SB_Audio: Steuerleitung zum DFPlayer Mini ("Audio1"), 9600 Baud UART an dessen RX.
 -- Eigener Analogpfad in den TDA7267 -- kein Mixer, kein Ducking: Spielsound und Musik
 -- laufen parallel, genau wie bei GottFA1_PLuS. Freigabe ueber Options-DIP 1 (Boot-Matrix,
--- wirkt erst nach Neustart); Trigger ist das Flipperrelais Q12 (s.o.).
+-- wirkt erst nach Neustart).
+--
+-- TRIGGER = OUTHOLE-SCHALTER (seit SW 0.3.1; bis 0.3.0 war es Q12, das Flipper Control
+-- Relay): die Musik laeuft, solange KEINE Kugel im Outhole liegt. Grund fuer den Wechsel --
+-- ein Flipper Control Relay haben nur Middle Earth und Space Riders. An demselben Bit haengt
+-- bei Atarians die Kickerspule "Hole Kicker Left" (Puls 6..10 Ticks) und bei Time 2000 /
+-- Airborne ein zeitbegrenztes Gate; die Musik wuerde dort also im Takt eines Kickers oder
+-- eines Gates an- und ausgehen. Den Unterschied "Ballwechsel" <-> "Spielende"
+-- macht die Maschine selbst: beim Ballwechsel wirft der Automat die Kugel wieder heraus, am
+-- Spielende bleibt sie liegen. Die kurze Schliesszeit dazwischen faengt GLITCH_CYCLES ab.
+-- Herleitung und die zwei Grenzen des Verfahrens (kein sofortiger Tilt-Stopp; Musik im
+-- Attract, wenn beim Einschalten keine Kugel im Outhole liegt): docs/Background_Music.md.
+--
+-- Outhole-Schalter je Spiel (sw_state-Offset = CPU-Adresse - 0x2000):
+--   Atarians 0x2032->50 | Time 2000 0x2035->53 | Airborne 0x2043->67 | ME/Space 0x2038->56.
+-- ACHTUNG: fuer Atarians stand in FRAM_Persistence.md und Background_Music.md 19 -- das ist
+-- 0x2013 = SLAM TILT (bei allen fuenf Spielen gleich), nicht der Outhole. Richtig ist 0x2032
+-- (Manuals/Atari Schalterzuordnungen und Kontakttestcodes.csv, Spalte Atarians: "Outhole
+-- Kicker"); das Atarians-ROM pollt 0x2032 bei 76B4 und 76F0 in die Ball-Ende-Behandlung.
+-- Airborne ist HW-verifiziert (FRAM-Save-Trigger 2026-07-09, docs/FRAM_Persistence.md).
+-- game_sel statt game_idx: die unbenutzten DIP-Codes 5..7 laufen mit dem Middle-Earth-ROM.
+-- Bewusst die vier Kandidatenbits gemuxt und NICHT sw_state(variabler Index) -- letzteres
+-- synthetisiert einen 80:1-Mux, das hier sind drei LUTs.
+outhole <= sw_state(50) when game_sel = 0 else
+           sw_state(53) when game_sel = 1 else
+           sw_state(67) when game_sel = 2 else
+           sw_state(56);
+-- Am Pruefstand ist keine Schaltermatrix angeschlossen, alle Schalter lesen "offen" -- der
+-- Outhole-Zweig laege dort dauerhaft auf '1'. Bei einer FA-Control-Uebernahme kommt der
+-- Trigger deshalb weiter aus der COILS-Kachel 12 (fa_sol_ovr(11)); damit bleibt die
+-- Bench-Prozedur ohne Maschine gueltig.
+music_trig   <= fa_sol_ovr(11) when fa_ctrl_active = '1' else not outhole;
 music_enable <= not options(1);          -- DIP ON wird als '0' gelesen
+-- Zeitplan nach dem Einschalten: erst laeuft das ~5 s lange Boot-Info-Fenster (io_live
+-- ist bis dahin low, das Modul im Reset), dann START_DELAY = 5 s Player-Boot, dann die
+-- drei Init-Rahmen 0x42 / 0x16 / 0x06 mit je 0,5 s Pause, dann greift GLITCH_CYCLES.
+-- Bis zum ersten Ton vergehen also rund 13..15 s -- wer frueher aufhoert zu warten,
+-- sucht den Fehler, wo keiner ist. Details und Byte-Erwartung: docs/Background_Music.md.
 MUSIC: entity work.dfplayer_cmd
 generic map(
-	CLKS_PER_BIT => 5208                 -- 50 MHz / 9600 Baud
+	CLKS_PER_BIT  => 5208,               -- 50 MHz / 9600 Baud
+	GLITCH_CYCLES => 100000000           -- 2 s Trigger-Entprellung: ueberbrueckt den
+	                                     -- Ballwechsel, damit die Musik zwischen zwei
+	                                     -- Baellen durchlaeuft (s.o.). START_DELAY und
+	                                     -- GAP_CYCLES bleiben auf den Vorgaben des Moduls.
 	)
 port map(
 	clk_50    => clk_50,
 	reset     => not io_live,            -- io_live, nicht reset_l_stable: bei einer
 	                                     -- FA-Control-Uebernahme muss das Modul noch
 	                                     -- das Pause-Kommando absetzen koennen.
-	trigger   => flipper_relay and music_enable,
+	trigger   => music_trig and music_enable,
 	start_new => '0',                    -- fortsetzen statt neu starten; options(2) Reserve
 	txd       => SB_Audio
 	);
