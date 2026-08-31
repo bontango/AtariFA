@@ -4,7 +4,7 @@
 
 **Hardware version v1.x**
 
-**Software Version 0.2.0**
+**Software Version 0.3.0**
 
 **user manual**
 
@@ -30,7 +30,7 @@ v1.0 06.08.2026
   - [4.2. The 6 switch bank: options](#42-the-6-switch-bank-options)
     - [4.2.1. Option 3 -> where the sound comes out](#421-option-3---where-the-sound-comes-out)
     - [4.2.2. Option 4 -> let FA-Control take over](#422-option-4---let-fa-control-take-over)
-    - [4.2.3. Options 1 and 2 -> reserved](#423-options-1-and-2---reserved)
+    - [4.2.3. Option 1 -> background music, option 2 reserved](#423-option-1---background-music-option-2-reserved)
     - [4.2.4. Options 5 and 6 -> dead time for the lamp columns](#424-options-5-and-6---dead-time-for-the-lamp-columns)
     - [4.2.5. If the glow stays](#425-if-the-glow-stays)
   - [4.3. Six of the ten DIPs are read once, at boot](#43-six-of-the-ten-dips-are-read-once-at-boot)
@@ -47,6 +47,7 @@ v1.0 06.08.2026
   - [8.1. What is rebuilt](#81-what-is-rebuilt)
   - [8.2. The two audio paths](#82-the-two-audio-paths)
   - [8.3. The boot announcement](#83-the-boot-announcement)
+  - [8.4. Background music from the MP3 player](#84-background-music-from-the-mp3-player)
 - [9. The FA-Control interface (ESP32)](#9-the-fa-control-interface-esp32)
   - [9.1. The permission: option 4](#91-the-permission-option-4)
   - [9.2. What happens while it has control](#92-what-happens-while-it-has-control)
@@ -160,7 +161,7 @@ Default setting is **all 'OFF'** - that is the right setting for a standard mach
 
 | DIP  | Function                                              | read        |
 |------|-------------------------------------------------------|-------------|
-| Dip1 | reserved                                              | at boot     |
+| Dip1 | **background music** - ON = active                    | at boot     |
 | Dip2 | reserved                                              | at boot     |
 | Dip3 | **sound: OFF = Auxiliary Board, ON = on-board amplifier** | continuously |
 | Dip4 | **let FA-Control take over** - ON = allowed            | continuously |
@@ -183,11 +184,17 @@ Default setting is **all 'OFF'** - that is the right setting for a standard mach
 
 This switch is read continuously as well: turning it 'OFF' while FA-Control is in charge takes control away **immediately** and restarts the game. That is the emergency stop for a test tool that has locked up.
 
-#### 4.2.3. Options 1 and 2 -> reserved
+#### 4.2.3. Option 1 -> background music, option 2 reserved
 
-Not used, leave them 'OFF'. They are wired, they are shown on the info display, and they are there for later software versions.
+- **Option 1, 'ON'** - **background music plays while a game is running.** The MP3 player on the board plays folder 02 of its memory card in a loop, and pauses again when the game is over. Everything about it is in chapter 8.4.
 
-Option 1 was used by an experimental credit/high score save feature that is currently on hold, see chapter 13. It has no effect in this software version.
+- **Option 1, 'OFF'** - no background music. This is the default, and it is the setting for a machine that should behave like the original.
+
+Option 1 used to belong to an experimental credit/high score save feature that is currently on hold, see chapter 13. From software 0.3.0 on it is the background music switch.
+
+**Option 2** is not used. Leave it 'OFF'. It is wired, it is shown on the info display, and it is there for later software versions.
+
+Both switches are read **at boot only** - see chapter 4.3.
 
 #### 4.2.4. Options 5 and 6 -> dead time for the lamp columns
 
@@ -330,6 +337,26 @@ It always comes out of the **on-board amplifier**, regardless of option 3 - it i
 
 If you hear nothing here, check the on-board amplifier and its speaker connection before you look anywhere else.
 
+### 8.4. Background music from the MP3 player
+
+Since software 0.3.0 the small MP3 player on the board (an 'MP3 mini player' with its own memory card) can play background music **while a game is running**. It is switched on with **option 1**, chapter 4.2.3, and it is off by default.
+
+**What you put on the memory card.** Create a folder named **`02`** and put your tracks in it, numbered:
+
+```
+/02/001.mp3
+/02/002.mp3
+...
+```
+
+The player plays that folder in a loop, in its own order. There is no per-game selection and no random mode. If you also run a GottFA1_PLuS board, the same card works there.
+
+**What happens during play.** The music starts when a game starts, and pauses when the game is over. It resumes where it left off at the next game rather than starting from the beginning. **A tilt also pauses it** - the board takes its cue from the flipper relay, and that relay drops on tilt, exactly as on the original machine. The next ball brings the music back.
+
+**The game sound is not affected.** Music and game sound are two separate analog paths that only meet at the amplifier. The game tones of chapter 8.1 play over the music; nothing is faded or muted. Set the balance between them with the volume control of the player and the volume of your machine.
+
+**If you hear nothing:** the switch is read at boot only, so power off and on after setting option 1. Check that the folder is really called `02`, that the card is in the player, and that the board reports version **030** on the info display, chapter 5.2.
+
 ## 9. The FA-Control interface (ESP32)
 
 The board has a socket prepared for an **ESP32-C3 Super Mini**. It runs **FA-Control** - a small firmware that opens a WLAN and serves a test interface in your browser: switch every lamp individually, pulse every solenoid, watch all switches live, write digits to the displays, play sounds.
@@ -368,7 +395,7 @@ On connecting, FA-Control asks the board what it is made of and configures itsel
 | | |
 |---|---|
 | Identification | `AtariFA` |
-| Software version | the same one the info display shows, e.g. `0.2.0` |
+| Software version | the same one the info display shows, e.g. `0.3.0` |
 | Lamps | 84 |
 | Solenoids | 22 (20 playfield + coin counter + lockout coil) |
 | Switches | 80 |
@@ -426,10 +453,9 @@ Apart from the pin assignment the two are identical, with two small differences 
 
 ## 13. Not implemented yet
 
-These are on the PCB, wired, and not used by this software version. They do nothing, and they do no harm - the FPGA holds all of them in a safe idle state.
+This is on the PCB, wired, and not used by this software version. It does nothing, and it does no harm - the FPGA holds it in a safe idle state.
 
-- **FRAM (credits and high scores over a power cycle).** The chip is fitted and the low level driver works, but making it reliable across all five games turned out to need more reverse engineering of the game roms than expected. The feature is switched off; option switch 1, which used to control it, has no effect. Chapter 6.3.
-- **The MP3 background player.** A second, independent audio path on the PCB. Not driven by this software version; it has nothing to do with the game sound of chapter 8.
+- **FRAM (credits and high scores over a power cycle).** The chip is fitted and the low level driver works, but making it reliable across all five games turned out to need more reverse engineering of the game roms than expected. The feature is switched off. Option switch 1, which used to control it, is the background music switch since software 0.3.0, chapter 4.2.3. See chapter 6.3.
 
 ## Appendix A 'game select'
 
@@ -454,13 +480,15 @@ All five run with free play as well (chapter 7).
 
 ```
 bank of 4                          bank of 6
- 1  game select bit 0  (+1)         1  reserved              read at boot
+ 1  game select bit 0  (+1)         1  background music      read at boot
  2  game select bit 1  (+2)         2  reserved              read at boot
  3  game select bit 2  (+4)         3  sound path            live
  4  free play, ON = active          4  FA-Control allowed    live
                                     5  lamp dead time    \   live
  all four read at boot only         6  lamp dead time    /   live
 ```
+
+**Background music, option 1:** OFF = off (standard) · ON = the MP3 player plays folder `02` while a game runs (chapter 8.4)
 
 **Sound path, option 3:** OFF = Auxiliary Board (standard) · ON = on-board amplifier
 

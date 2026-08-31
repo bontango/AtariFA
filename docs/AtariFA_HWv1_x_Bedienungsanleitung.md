@@ -4,7 +4,7 @@
 
 **Hardware-Version v1.x**
 
-**Software-Version 0.2.0**
+**Software-Version 0.3.0**
 
 **Bedienungsanleitung**
 
@@ -29,7 +29,7 @@ v1.0 06.08.2026
   - [4.2. Die 6er-Bank: Optionen](#42-die-6er-bank-optionen)
     - [4.2.1. Option 3 -> wo der Ton herauskommt](#421-option-3---wo-der-ton-herauskommt)
     - [4.2.2. Option 4 -> FA-Control darf übernehmen](#422-option-4---fa-control-darf-übernehmen)
-    - [4.2.3. Optionen 1 und 2 -> reserviert](#423-optionen-1-und-2---reserviert)
+    - [4.2.3. Option 1 -> Hintergrundmusik, Option 2 reserviert](#423-option-1---hintergrundmusik-option-2-reserviert)
     - [4.2.4. Optionen 5 und 6 -> Totzeit der Lampenspalten](#424-optionen-5-und-6---totzeit-der-lampenspalten)
     - [4.2.5. Wenn das Glimmen bleibt](#425-wenn-das-glimmen-bleibt)
   - [4.3. Sechs der zehn DIPs werden nur beim Einschalten gelesen](#43-sechs-der-zehn-dips-werden-nur-beim-einschalten-gelesen)
@@ -46,6 +46,7 @@ v1.0 06.08.2026
   - [8.1. Was nachgebildet wird](#81-was-nachgebildet-wird)
   - [8.2. Die zwei Tonwege](#82-die-zwei-tonwege)
   - [8.3. Die Ansage beim Einschalten](#83-die-ansage-beim-einschalten)
+  - [8.4. Hintergrundmusik vom MP3-Spieler](#84-hintergrundmusik-vom-mp3-spieler)
 - [9. Die FA-Control-Schnittstelle (ESP32)](#9-die-fa-control-schnittstelle-esp32)
   - [9.1. Die Freigabe: Option 4](#91-die-freigabe-option-4)
   - [9.2. Was während der Übernahme passiert](#92-was-während-der-übernahme-passiert)
@@ -159,7 +160,7 @@ Grundeinstellung ist **alle „OFF"** — das ist bei einem Standardautomaten ri
 
 | DIP  | Funktion                                                    | Wird gelesen      |
 |------|-------------------------------------------------------------|-------------------|
-| Dip1 | reserviert                                                  | beim Einschalten  |
+| Dip1 | **Hintergrundmusik** — ON = aktiv                            | beim Einschalten  |
 | Dip2 | reserviert                                                  | beim Einschalten  |
 | Dip3 | **Ton: OFF = Auxiliary Board, ON = Verstärker auf der Platine** | fortlaufend    |
 | Dip4 | **FA-Control darf übernehmen** — ON = erlaubt                | fortlaufend       |
@@ -182,11 +183,17 @@ Dieser Schalter **darf im laufenden Spiel umgestellt werden** — er wird fortla
 
 Auch dieser Schalter wird fortlaufend gelesen: wer ihn im laufenden Betrieb auf „OFF" stellt, nimmt FA-Control die Kontrolle **sofort** wieder weg, und das Spiel startet neu. Das ist der Not-Aus für den Fall, dass ein Testgerät sich aufhängt.
 
-#### 4.2.3. Optionen 1 und 2 -> reserviert
+#### 4.2.3. Option 1 -> Hintergrundmusik, Option 2 reserviert
 
-Nicht belegt, bitte auf „OFF" lassen. Sie sind verdrahtet, sie werden auf der Info-Anzeige dargestellt, und sie sind für spätere Software-Versionen vorgesehen.
+- **Option 1, „ON"** — **während eines laufenden Spiels läuft Hintergrundmusik.** Der MP3-Spieler auf der Platine spielt den Ordner 02 seiner Speicherkarte in Schleife und pausiert wieder, sobald das Spiel vorbei ist. Alles Weitere in Kapitel 8.4.
 
-Option 1 gehörte zu einer versuchsweisen Speicherung von Credits und Highscores, die derzeit zurückgestellt ist, siehe Kapitel 13. In dieser Software-Version hat sie keine Wirkung.
+- **Option 1, „OFF"** — keine Hintergrundmusik. Das ist die Vorgabe und die Einstellung für einen Automaten, der sich wie das Original verhalten soll.
+
+Option 1 gehörte früher zu einer versuchsweisen Speicherung von Credits und Highscores, die derzeit zurückgestellt ist, siehe Kapitel 13. Ab Software 0.3.0 ist sie der Schalter für die Hintergrundmusik.
+
+**Option 2** ist nicht belegt, bitte auf „OFF" lassen. Sie ist verdrahtet, sie wird auf der Info-Anzeige dargestellt, und sie ist für spätere Software-Versionen vorgesehen.
+
+Beide Schalter werden **nur beim Einschalten gelesen** — siehe Kapitel 4.3.
 
 #### 4.2.4. Optionen 5 und 6 -> Totzeit der Lampenspalten
 
@@ -329,6 +336,26 @@ Sie kommt **immer aus dem Verstärker auf der Platine**, unabhängig von Option 
 
 Hören Sie hier nichts, prüfen Sie zuerst den Verstärker auf der Platine und dessen Lautsprecheranschluss, bevor Sie woanders suchen.
 
+### 8.4. Hintergrundmusik vom MP3-Spieler
+
+Seit Software 0.3.0 kann der kleine MP3-Spieler auf der Platine (ein „MP3-Mini-Player" mit eigener Speicherkarte) **während eines laufenden Spiels** Hintergrundmusik abspielen. Eingeschaltet wird das mit **Option 1**, Kapitel 4.2.3; ab Werk ist es aus.
+
+**Was auf die Speicherkarte gehört.** Legen Sie einen Ordner **`02`** an und stellen Sie Ihre Titel durchnummeriert hinein:
+
+```
+/02/001.mp3
+/02/002.mp3
+...
+```
+
+Der Spieler spielt diesen Ordner in Schleife, in seiner eigenen Reihenfolge. Es gibt keine Auswahl je Spiel und keinen Zufallsmodus. Wer auch eine GottFA1_PLuS-Platine betreibt, kann dieselbe Karte verwenden.
+
+**Was im Betrieb passiert.** Die Musik setzt mit dem Spielbeginn ein und pausiert, wenn das Spiel vorbei ist. Beim nächsten Spiel läuft sie dort weiter, wo sie aufgehört hat, statt von vorn zu beginnen. **Auch ein Tilt pausiert sie** — die Platine richtet sich nach dem Flipperrelais, und das fällt beim Tilt ab, genau wie am Originalautomaten. Mit dem nächsten Ball kommt die Musik zurück.
+
+**Der Spielton bleibt unberührt.** Musik und Spielton sind zwei getrennte Analogwege, die erst am Verstärker zusammenlaufen. Die Töne aus Kapitel 8.1 spielen über der Musik; es wird nichts ausgeblendet und nichts stummgeschaltet. Das Verhältnis stellen Sie über die Lautstärke des Spielers und die Lautstärke Ihres Automaten ein.
+
+**Wenn Sie nichts hören:** der Schalter wird nur beim Einschalten gelesen — nach dem Umstellen von Option 1 also aus- und wieder einschalten. Prüfen Sie außerdem, ob der Ordner wirklich `02` heißt, ob die Karte im Spieler steckt, und ob die Info-Anzeige die Version **030** zeigt, Kapitel 5.2.
+
 ## 9. Die FA-Control-Schnittstelle (ESP32)
 
 Auf der Platine ist ein Steckplatz für ein **ESP32-C3 Super Mini** vorbereitet. Darauf läuft **FA-Control** — eine kleine Firmware, die ein WLAN aufmacht und im Browser eine Testoberfläche anbietet: jede Lampe einzeln schalten, jede Spule pulsen, alle Schalter live mitlesen, Ziffern auf die Displays schreiben, Töne abspielen.
@@ -367,7 +394,7 @@ Beim Verbinden fragt FA-Control die Ausstattung ab und stellt sich selbst darauf
 | | |
 |---|---|
 | Kennung | `AtariFA` |
-| Software-Version | dieselbe wie auf der Info-Anzeige, z. B. `0.2.0` |
+| Software-Version | dieselbe wie auf der Info-Anzeige, z. B. `0.3.0` |
 | Lampen | 84 |
 | Spulen | 22 (20 Spielfeld + Münzzähler + Sperrspule) |
 | Schalter | 80 |
@@ -425,10 +452,9 @@ Abgesehen von der Pinbelegung sind beide gleich, mit zwei kleinen Unterschieden 
 
 ## 13. Noch nicht implementiert
 
-Das Folgende ist auf der Platine vorhanden und verdrahtet, wird von dieser Software-Version aber nicht genutzt. Es tut nichts, und es schadet nichts — das FPGA hält alles davon in einem sicheren Ruhezustand.
+Das Folgende ist auf der Platine vorhanden und verdrahtet, wird von dieser Software-Version aber nicht genutzt. Es tut nichts, und es schadet nichts — das FPGA hält es in einem sicheren Ruhezustand.
 
-- **FRAM (Credits und Highscores über das Ausschalten hinweg).** Der Baustein ist bestückt und die Ansteuerung funktioniert, aber es zuverlässig für alle fünf Spiele hinzubekommen erfordert mehr Analyse der Spiel-ROMs als erwartet. Die Funktion ist abgeschaltet; Optionsschalter 1, der sie früher gesteuert hat, hat keine Wirkung. Kapitel 6.3.
-- **Der MP3-Hintergrundspieler.** Ein zweiter, unabhängiger Tonweg auf der Platine. Von dieser Software-Version nicht angesteuert; er hat nichts mit dem Spielton aus Kapitel 8 zu tun.
+- **FRAM (Credits und Highscores über das Ausschalten hinweg).** Der Baustein ist bestückt und die Ansteuerung funktioniert, aber es zuverlässig für alle fünf Spiele hinzubekommen erfordert mehr Analyse der Spiel-ROMs als erwartet. Die Funktion ist abgeschaltet. Optionsschalter 1, der sie früher gesteuert hat, ist seit Software 0.3.0 der Schalter für die Hintergrundmusik, Kapitel 4.2.3. Siehe Kapitel 6.3.
 
 ## Anhang A 'game select'
 
@@ -453,13 +479,15 @@ Alle fünf laufen auch mit Freispiel (Kapitel 7).
 
 ```
 4er-Bank                            6er-Bank
- 1  Spielauswahl Bit 0  (+1)         1  reserviert          beim Einschalten
+ 1  Spielauswahl Bit 0  (+1)         1  Hintergrundmusik    beim Einschalten
  2  Spielauswahl Bit 1  (+2)         2  reserviert          beim Einschalten
  3  Spielauswahl Bit 2  (+4)         3  Tonweg              fortlaufend
  4  Freispiel, ON = aktiv            4  FA-Control erlaubt  fortlaufend
                                      5  Lampen-Totzeit  \  fortlaufend
  alle vier nur beim Einschalten      6  Lampen-Totzeit  /  fortlaufend
 ```
+
+**Hintergrundmusik, Option 1:** OFF = aus (Standard) · ON = der MP3-Spieler spielt während des Spiels den Ordner `02` (Kapitel 8.4)
 
 **Tonweg, Option 3:** OFF = Auxiliary Board (Standard) · ON = Verstärker auf der Platine
 

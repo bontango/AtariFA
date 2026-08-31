@@ -188,7 +188,9 @@ hier vermieden (eigenständiges Modul).
 und `..._Solenoids_SCH.PDF`: `F_Audio0..3` und `F_L1084_B0..3` laufen über **74HCT540**
 (IC6/IC7 auf dem Main-Blatt, ein weiterer 540 auf dem Solenoid-Blatt für `F_Audio0`, `F_Audio2`,
 `F_L1084_B0`, `F_L1080_B5`); nur `F_Sol_Enable` geht über den nicht invertierenden 74HCT541 (IC14).
-`SB_Audio` = separater MP3/Background-Pfad, unangetastet.
+`SB_Audio` = separater MP3/Background-Pfad — seit SW 0.3.0 die UART-Steuerleitung zum DFPlayer Mini
+(Hintergrundmusik, s. [`Background_Music.md`](Background_Music.md)); mit der Ton-Emulation hier hat er
+nichts zu tun.
 
 > **`aux_audio_latch` ist 4 Bit**, nicht 6 — der frühere Hinweis auf `"00" & not snd_volume` und
 > „Bit 5/4 prüfen" war veraltet (Port `AtariFA.vhd`, QSF-Pins nur `[3:0]`).

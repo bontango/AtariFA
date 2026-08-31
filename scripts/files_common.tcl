@@ -26,6 +26,7 @@ set_global_assignment -name VHDL_FILE ../../rtl/common/slow_to_fast_clock.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/cpu68.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/game_rom.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/display_control.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/common/dfplayer_cmd.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/sound.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/speech.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/speech_rom.vhd

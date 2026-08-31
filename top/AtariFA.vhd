@@ -213,6 +213,10 @@ signal sol_wr		: std_logic := '0';
 signal sol_ah		: std_logic_vector(1 to 20);
 signal coin_cntr_ah	: std_logic;
 signal lockout_ah	: std_logic;
+-- Hintergrundmusik (dfplayer_cmd.vhd): Trigger = Flipper Control Relay Q12 und
+-- Freigabe-DIP; der Sender selbst haengt an SB_Audio. s. docs/Background_Music.md.
+signal flipper_relay	: std_logic;                     -- Q12 = Latch 0x1088 Bit6, aktiv-high
+signal music_enable	: std_logic;                     -- Options-DIP 1 (ON wird als '0' gelesen)
 -- Boot-Sprachausgabe ("Lisy", speech.vhd): eigener 1-Bit-Sigma-Delta-Strom + busy.
 -- Start an Vorderflanke boot_phase(1); Ausgabe ueber SB_Sound-Mux (Vorrang vor Sound).
 signal speech_pwm	: std_logic;                     -- 1-Bit Sigma-Delta der Sprachausgabe
@@ -726,6 +730,14 @@ disp_Anode_blank <= not i_disp_Anode_blank;
 gen_fa_sol: for i in 1 to 20 generate
 	solenoids(i) <= not fa_sol_ovr(i - 1) when fa_ctrl_active = '1' else not sol_ah(i);
 end generate;
+-- Q12 = Flipper Control Relay (Latch 0x1088 Bit 6) = "Spiel laeuft". Beleg: Space-Riders-
+-- Handbuch Tab. 5-6 "FLIPPER CONTROL RELAY (A)1088 D6", Selbsttest Nr. 12 "Flipper Relay",
+-- docs/solenoid_mapping.txt solenoids(12) = 0x1088 bit6 = F_Q12; im ROM Middle Earth 7F36
+-- (Spielstart, ORAA #$40) und 77BC (Game Over, CLR $1088), bei den anderen vier Spielen als
+-- Tabelleneintrag 88 40. Quelle wie beim physischen Ausgang oben: im Spiel aus dem
+-- solenoid_driver, bei Uebernahme aus FA-Control -- damit ist Q12 am Pruefstand ueber die
+-- COILS-Ansicht schaltbar. Herleitung: docs/Background_Music.md.
+flipper_relay <= fa_sol_ovr(11) when fa_ctrl_active = '1' else sol_ah(12);
 -- Muenztuer-Spulen ueber Aux-Board (invertierender 74HCT540): aktiv-high coin_cntr/lockout -> invertiert.
 aux_sol_latch(0) <= not fa_sol_ovr(20) when fa_ctrl_active = '1' else not coin_cntr_ah;   -- COIN_CNTREN (0x1080 bit4)
 aux_sol_latch(1) <= not fa_sol_ovr(21) when fa_ctrl_active = '1' else not lockout_ah;     -- LOCKOUT_EN  (0x1080 bit5)
@@ -773,8 +785,24 @@ aux_audio_latch <= not snd_volume_eff when options(3) = '1' else (others => '1')
 SB_Sound        <= speech_pwm                           when speech_busy = '1'
               else snd_pwm                              when options(3) = '0'
               else '0';
--- SB_Audio: separater MP3/Background-Pfad (ESP32/Mini-Player) -- nicht Teil der Emulation.
-SB_Audio <= '0';
+-- SB_Audio: Steuerleitung zum DFPlayer Mini ("Audio1"), 9600 Baud UART an dessen RX.
+-- Eigener Analogpfad in den TDA7267 -- kein Mixer, kein Ducking: Spielsound und Musik
+-- laufen parallel, genau wie bei GottFA1_PLuS. Freigabe ueber Options-DIP 1 (Boot-Matrix,
+-- wirkt erst nach Neustart); Trigger ist das Flipperrelais Q12 (s.o.).
+music_enable <= not options(1);          -- DIP ON wird als '0' gelesen
+MUSIC: entity work.dfplayer_cmd
+generic map(
+	CLKS_PER_BIT => 5208                 -- 50 MHz / 9600 Baud
+	)
+port map(
+	clk_50    => clk_50,
+	reset     => not io_live,            -- io_live, nicht reset_l_stable: bei einer
+	                                     -- FA-Control-Uebernahme muss das Modul noch
+	                                     -- das Pause-Kommando absetzen koennen.
+	trigger   => flipper_relay and music_enable,
+	start_new => '0',                    -- fortsetzen statt neu starten; options(2) Reserve
+	txd       => SB_Audio
+	);
 -- FRAM I2C: 2026-07-10 DEAKTIVIERT (NVRAM/Credit-Persistenz-Thematik zurueckgestellt, Aufwand<->Nutzen).
 -- Modul aus dem Build genommen (AtariFA.qsf: VHDL_FILE fram_i2c.vhd entfernt), Source `fram_i2c.vhd`
 -- als Quelle behalten. Pins auf sicherem Leerlauf: Open-Drain freigegeben (externer Pull-up zieht high),
