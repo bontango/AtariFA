@@ -89,35 +89,66 @@ dass die Musik 2 s verzögert einsetzt und 2 s verzögert pausiert.
 Das ist der einzige Punkt, an dem der Outhole dem Relais unterlegen ist — es braucht einen
 Mux über `game_sel`:
 
-| Spiel | `game_idx` | CPU-Adresse | `sw_state`-Offset |
-|---|---|---|---|
-| The Atarians | 0 | `0x2032` | **50** (s. Kasten) |
-| Time 2000 | 1 | `0x2035` | 53 |
-| Airborne Avenger | 2 | `0x2043` | **67** (HW-verifiziert) |
-| Middle Earth | 3 | `0x2038` | 56 |
-| Space Riders | 4 | `0x2038` | 56 |
+| Spiel | `game_idx` | Stecker/Zeile | CPU-Adresse | Handbuch-**SW-Nr** | `sw_state`-**Offset** |
+|---|---|---|---|---|---|
+| The Atarians | 0 | J7 / 13 | `0x2032` | 35 | **50** |
+| Time 2000 | 1 | J7 / N | `0x2035` | 38 | **53** |
+| Airborne Avenger | 2 | J7 / W | `0x2043` | 52 | **67** |
+| Middle Earth | 3 | J7 / 7 | `0x2038` | 41 | **56** |
+| Space Riders | 4 | J7 / 7 | `0x2038` | 41 | **56** |
 
-Quelle aller fünf Zeilen ist `Manuals\Atari Schalterzuordnungen und Kontakttestcodes.csv`
-(Zeilen 13/20/30/36, Spalte des jeweiligen Spiels). Airborne ist zusätzlich HW-verifiziert:
-auf genau diesem Offset lief am 2026-07-09 der FRAM-Save-Trigger an einer echten Maschine
-([`FRAM_Persistence.md`](FRAM_Persistence.md), Stufe 1). Die übrigen vier sind an der Maschine
-noch zu bestätigen — am schnellsten über die SWITCHES-Ansicht von FA-Control: Kugel in den
-Outhole legen und nachsehen, welche Kachel schließt.
-
-> **Korrektur: The Atarians ist 50, nicht 19.** In `FRAM_Persistence.md` und in der ersten
-> Fassung dieses Dokuments stand für Atarians der Offset **19**. Das ist `0x2013` und damit der
-> **Slam-Tilt** — bei allen fünf Spielen dieselbe Adresse, s. auch
-> [`FA_Control_Names_Files.md`](FA_Control_Names_Files.md). Der Outhole steht in der CSV
-> (Zeile 36) auf `0x2032` = 50. Gegenprobe im Atarians-ROM: `0x2032` wird zweimal gepollt
-> (`76B4` und `76F0`, beide `LDX #$2032 / JSR $78D2` = Entprellroutine, dann Sprung in die
-> Ball-Ende-Behandlung), `0x2013` dagegen nur einmal (`76BF`) im Slam-Tilt-Zweig. Vermutliche
-> Ursache des alten Werts: in CSV-Zeile 26 steht **19** als *Manual-Schalternummer*, nicht als
-> Offset.
+> **Derselbe Schalter hat vier Nummern — daran hat sich schon jemand gestoßen.** Im Handbuch
+> und in der Spalte „SW-Nr" der Übersicht steht **35/38/41/52**, im FPGA steht **50/53/56/67**.
+> Das ist kein Widerspruch, sondern dieselbe Information in zwei Zählungen:
+>
+> ```
+> sw_state-Offset = CPU-Adresse − 0x2000 = Handbuch-SW-Nr + 15
+> ```
+>
+> Die Regel steht auch in [`FA_Control_Names_Files.md`](FA_Control_Names_Files.md); die
+> FA-Control-Kachelnummer ist ebenfalls der Offset. Wer im Handbuch nachschlägt, muss 15
+> addieren, bevor er die Zahl mit dem Code vergleicht.
 
 Im Mux steht `game_sel` (geklemmt 0…4) und nicht `game_idx`, weil die unbenutzten DIP-Codes
 5…7 mit dem Middle-Earth-ROM laufen. Gemuxt werden bewusst die **vier Kandidatenbits** und
 nicht `sw_state(variabler Index)` — letzteres synthetisiert einen 80:1-Mux, so sind es drei
 LUTs.
+
+#### Beleglage — zwei Stufen, die man nicht verwechseln darf
+
+**Stufe 1, Papier:** `Manuals\Atari Schalterzuordnungen und Kontakttestcodes.pdf`
+(Zeilen 13/N/W/7). Daneben liegt eine CSV-Fassung — **die ist verkürzt**: das PDF hat für die
+Atarians zwei zusätzliche Spalten (eigene Adresse + Bezeichnung, `2013 Slam Tilt`,
+`2014 Tilt Cabinet`, `202C aTari`), die CSV nur eine. Für die Outhole-Frage folgenlos, aber
+beim nächsten Nachschlagen eine Falle. Im Zweifel das PDF nehmen.
+
+> **Genau diese Falle hat schon einmal zugeschlagen: The Atarians ist 50, nicht 19.** In
+> `FRAM_Persistence.md` und in der ersten Fassung dieses Dokuments stand für Atarians der
+> Offset **19**. Das ist `0x2013` und damit der **Slam-Tilt** — bei allen fünf Spielen dieselbe
+> Adresse. Vermutliche Ursache: in CSV-Zeile 26 steht **19** als *Manual-Schalternummer*, nicht
+> als Offset — also wieder die Verwechslung der beiden Zählungen von oben. Gegenprobe im ROM:
+> `0x2032` wird zweimal gepollt (`76B4`, `76F0`), `0x2013` dagegen nur einmal (`76BF`) im
+> Slam-Tilt-Zweig — was zugleich die Atarians-Spalte des PDF bestätigt (`2013 Slam Tilt`).
+
+**Stufe 2, ROM:** jedes der fünf Spiele greift nachweislich auf „seine" Adresse zu. Gescannt
+wurde über alle fünf Images nach den Adressbytes als Befehlsoperand:
+
+| Spiel | ROM-Stelle | Befehl | Rolle |
+|---|---|---|---|
+| The Atarians | `76B4`, `76F0` | `LDX #$2032 / JSR $78D2` | Entprellroutine, danach Sprung in die Ball-Ende-Behandlung |
+| Time 2000 | `732D`, `7457` | `LDX #$2035 / JSR $78AB` bzw. `JSR $77ED` | dasselbe Muster |
+| Airborne Avenger | `7298` | `LDAA $2043 / BPL $728F` | **Warteschleife** auf Bit 7, dann `JSR $7A94` |
+| Space Riders | `770E`, `78EA` | `LDAA $2038 / BPL` | **byteweise dasselbe Idiom wie Airborne**, dann `JSR $7844` |
+| Middle Earth | `771F` | `LDAA $2038 / BPL` | Verzweigung, wenn nicht geschlossen |
+
+Airborne ist der Anker: auf genau diesem Offset lief am 2026-07-09 der FRAM-Save-Trigger an
+einer **echten Maschine** ([`FRAM_Persistence.md`](FRAM_Persistence.md), Stufe 1). Space Riders
+benutzt auf `0x2038` dieselbe Warteschleife — „warte, bis die Kugel im Outhole liegt".
+
+**Was damit NICHT bewiesen ist.** Der ROM-Beleg zeigt, dass das *Spielprogramm* diese Adresse
+als Outhole benutzt. Er zeigt **nicht**, dass am konkreten Automaten der Schalter auch dort
+angeschlossen ist — das hängt weiter am Handbuch und an der Verdrahtung. An einer Maschine
+erprobt ist bis heute nur Airborne. Wie man den Rest **am Schreibtisch** prüft, steht in §6.5.
 
 ### 2.4 Was das Verfahren nicht kann
 
@@ -473,4 +504,35 @@ Das ist der eigentliche Test, denn hier hängt alles an der Schalternummer:
 **Je Spiel zu wiederholen**, weil die Schalternummer spielabhängig ist (50/53/67/56/56, §2.3)
 und außer Airborne keine davon an der Maschine bestätigt ist. Schnellprüfung ohne Spiel: in
 FA-Control die SWITCHES-Ansicht öffnen, Kugel in den Outhole legen und nachsehen, welche
-Kachel schließt — steht dort die Nummer aus §2.3, stimmt der Mux.
+Kachel schließt — steht dort die Nummer aus §2.3, stimmt der Mux. **Ganz ohne Automat geht das
+auch: §6.5.**
+
+### 6.5 Die Outhole-Nummer am Schreibtisch prüfen — ohne Automat
+
+§6.4 braucht eine Maschine. Der Triggerpfad lässt sich aber vollständig am Prüfstand prüfen,
+und die Schalternummer gleich mit:
+
+1. **FA-Control aktivieren** (Options-DIP 4 = ON, Opcode 100 `LISY_INIT`) und die
+   **SWITCHES**-Ansicht öffnen. Die Kachelnummer *ist* der `sw_state`-Offset — dieselbe Zahl
+   wie in der Tabelle von §2.3 (`FA_Control_Names_Files.md`: „FA-Control-Nummer = CPU-Offset =
+   Adresse − 0x2000").
+2. **Am Schaltermatrix-Stecker die beiden Pins des Outhole-Schalters brücken.** Welche das
+   sind, steht im Handbuch des Spiels bzw. in der Spalte „Stecker/Zeile" von §2.3 (J7, Zeile
+   13 / N / W / 7). Ein Draht genügt, es fließt nur der Matrix-Abfragestrom.
+3. **Erwartung:** es schließt die Kachel mit der Nummer aus §2.3. Damit ist die Kette
+   *Steckerpin → 74LS42/74LS145-Decode → `sw_state`-Index* geprüft, ganz ohne Spielfeld.
+   Schließt eine **andere** Kachel, liegt es an der Bit-Index-Zuordnung der Matrix und nicht am
+   Musik-Trigger — Tuning-Stelle dafür ist `switch_matrix.vhd`, s. CLAUDE.md
+   „Bekannte HW-Feintuning-Stellen".
+4. **Ende-zu-Ende, ebenfalls ohne Automat:** Options-DIP 1 = ON, Neustart. Am Prüfstand lesen
+   alle Schalter „offen", die Musik läuft also nach ~13…15 s von selbst (§6.1). Jetzt die
+   Brücke setzen → die Musik muss nach **~2 s pausieren**; Brücke lösen → nach ~2 s spielt sie
+   weiter. Das prüft den kompletten Pfad inklusive `GLITCH_CYCLES` und der Kommandos
+   `0x0E`/`0x0D`.
+5. **Je Spiel wiederholen**, mit den `game_select`-DIPs umgeschaltet — die Nummer ändert sich
+   mit dem Spiel, und genau der Mux ist hier der Prüfling.
+
+**Was das nicht prüft.** Ob der gebrückte Steckerpin am echten Spielfeld tatsächlich am
+Outhole-Schalter hängt. Diese letzte Zuordnung steht im Handbuch und lässt sich nur an einer
+Maschine bestätigen — bis dahin gilt die Abstufung aus §2.3: dokumentiert und ROM-verifiziert
+für alle fünf, an der Maschine erprobt nur Airborne.

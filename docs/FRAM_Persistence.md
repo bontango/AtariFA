@@ -168,7 +168,9 @@ beschrieben wird:
 - **Airborne Credit-Master `$D5`** (HW-Restore bewiesen), Credit-**Limit** `$BC`, Credit-**Display** `$1D`.
 - **Outhole-Offsets** (Spielende-Marke, `sw_state`-Offset): Atarians **50** (nicht 19, s.o.),
   Time 53, ME 56, Space 56, Airborne 67. Der Outhole-Trigger (`outhole_ofs`-Mux) war bereits
-  generisch; er lebt seit SW 0.3.1 als Musik-Trigger in `AtariFA.vhd` weiter.
+  generisch; er lebt seit SW 0.3.1 als Musik-Trigger in `AtariFA.vhd` weiter. **Alle fünf sind
+  inzwischen gegen die ROMs gegengeprüft** (Fundstellen: `docs/Background_Music.md` §2.3);
+  an einer Maschine erprobt bleibt nur Airborne.
 - **FRAM-Slot-Idee je Spiel:** `mem_addr = game_idx * 16` (16-Byte-Record pro Spiel).
 
 ### Empfohlener Zukunftsweg = RE statt Probe
