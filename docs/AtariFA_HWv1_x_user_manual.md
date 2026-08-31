@@ -4,7 +4,7 @@
 
 **Hardware version v1.x**
 
-**Software Version 0.1.5**
+**Software Version 0.2.0**
 
 **user manual**
 
@@ -368,14 +368,14 @@ On connecting, FA-Control asks the board what it is made of and configures itsel
 | | |
 |---|---|
 | Identification | `AtariFA` |
-| Software version | the same one the info display shows, e.g. `0.1.5` |
+| Software version | the same one the info display shows, e.g. `0.2.0` |
 | Lamps | 84 |
 | Solenoids | 22 (20 playfield + coin counter + lockout coil) |
 | Switches | 80 |
 | Sounds | 16 |
 | Displays | 5 (status with 4 digits, four players with 6 each) |
 
-The numbering follows the board: switches carry the same number as in the game's self test, and solenoids 0 to 19 are the twenty playfield outputs in schematic order.
+The numbering follows the board: switches carry the same number as in the game's self test, and **solenoids 1 to 20 are the drivers Q1 to Q20 of the schematic**, 21 is the coin counter and 22 the lockout coil. Solenoids are the only group starting at 1 - that is how the original counts them and how the LISY protocol counts them. Lamps (0 to 83) and switches (0 to 79) start at 0. *(Up to version 0.1.9 the solenoids started at 0 as well; an FA-Control firmware older than 1.16 will therefore fire the wrong coil.)*
 
 ### 9.5. Connecting it
 
@@ -388,8 +388,8 @@ The board has three status LEDs, wired in parallel to the LEDs of the piggy-back
 | LED    | Meaning                                                                  |
 |--------|--------------------------------------------------------------------------|
 | **D1** | watchdog: lights up and stays lit once the internal watchdog has timed out at least once. **Dark is the normal state.** |
-| **D2** | CPU is fetching instructions from rom - blinks at about 0.6 Hz. **Steady means the CPU is halted or stuck.** |
-| **D3** | the NMI timer runs - blinks at about 0.48 Hz. This is free running hardware and does not depend on the CPU. |
+| **D2** | CPU is fetching instructions from rom - blinks slowly, a few seconds per phase depending on the game. **Steady, lit or dark, means the CPU is halted or stuck.** |
+| **D3** | the NMI timer runs - blinks at 0.48 Hz, that is a good second lit and a good second dark. This is free running hardware and does not depend on the CPU. |
 
 Read them together:
 
@@ -489,6 +489,6 @@ Player 4        0     free play, 1 = active
 Credit     (dark)
 ```
 
-**LEDs:** D1 watchdog (dark = good) · D2 CPU running (blinks ~0.6 Hz) · D3 NMI timer (blinks ~0.48 Hz)
+**LEDs:** D1 watchdog (dark = good) · D2 CPU running (blinks slowly) · D3 NMI timer (blinks ~0.48 Hz)
 
 **No credits or scores are kept over a power cycle** - as on the original Atari MPU.

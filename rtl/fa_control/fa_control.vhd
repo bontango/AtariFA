@@ -50,6 +50,22 @@
 -- die Sollwerte.
 --
 -- ---------------------------------------------------------------------------
+-- NUMMERIERUNG -- Spulen ab 1, Lampen/Schalter/Sounds ab 0
+-- ---------------------------------------------------------------------------
+-- Das sieht nach einer Inkonsequenz aus, ist aber jeweils die Zaehlweise, die der
+-- Anwender vor sich hat:
+--   * SPULEN 1..N_SOL. So zaehlt LISY auf der Leitung (lisy_5_28/src/lisy/lisy_w.c,
+--     "sol number starts with 1"), und so heissen die Treiber im Atari-Schaltplan
+--     (Q1..Q20). Der Vektor sol_r bleibt intern 0-basiert, der Opcode-Handler zieht
+--     also 1 ab. Frueher war auch das Protokoll 0-basiert -- damit haette ein echter
+--     LISY-Host die falsche Spule getroffen und die letzte gar nicht erreicht.
+--   * LAMPEN 0..N_LAMPS-1, weil die AtariFA-Lampennummer aus (Gruppe-1)*4 + Strobe
+--     folgt und dort die 0 die erste Lampe ist.
+--   * SCHALTER 0..N_SW-1, weil die Nummer der CPU-Offset (addr - 0x2000) ist und sich
+--     damit mit dem deckt, was der Selbsttest des Spiels anzeigt.
+-- Beim Portieren in ein anderes Projekt also pruefen, was dort die Anwendersicht ist.
+--
+-- ---------------------------------------------------------------------------
 -- GRENZEN (bewusst, das hier ist ein Testwerkzeug und kein Spielbetrieb)
 -- ---------------------------------------------------------------------------
 --   * Nur EIN Spulenpuls (Opcode 23) gleichzeitig; ein neuer Puls loest den
@@ -559,8 +575,9 @@ begin
 								end if;
 								tx_b0 <= resp;  tx_len <= 1;
 							when OP_G_STAT_SOL =>
-								if par1 < N_SOL then
-									if sol_r(par1) = '1' then
+								-- Spulen zaehlen ab 1 (s. Kopf "NUMMERIERUNG"), sol_r ab 0.
+								if par1 >= 1 and par1 <= N_SOL then
+									if sol_r(par1 - 1) = '1' then
 										resp := x"01";
 									end if;
 								end if;
@@ -592,20 +609,21 @@ begin
 									lamp_r(par1) <= '0';
 								end if;
 							when OP_S_SOL_ON =>
-								if ctrl_r = '1' and par1 < N_SOL then
-									sol_r(par1) <= '1';
+								-- Spulen zaehlen ab 1 (s. Kopf "NUMMERIERUNG"), sol_r ab 0.
+								if ctrl_r = '1' and par1 >= 1 and par1 <= N_SOL then
+									sol_r(par1 - 1) <= '1';
 								end if;
 							when OP_S_SOL_OFF =>
-								if ctrl_r = '1' and par1 < N_SOL then
-									sol_r(par1)  <= '0';
-									if pulse_idx = par1 then
+								if ctrl_r = '1' and par1 >= 1 and par1 <= N_SOL then
+									sol_r(par1 - 1)  <= '0';
+									if pulse_idx = par1 - 1 then
 										pulse_run <= '0';
 									end if;
 								end if;
 							when OP_S_PULSE_SOL =>
-								if ctrl_r = '1' and par1 < N_SOL then
-									sol_r(par1) <= '1';
-									pulse_idx   <= par1;
+								if ctrl_r = '1' and par1 >= 1 and par1 <= N_SOL then
+									sol_r(par1 - 1) <= '1';
+									pulse_idx   <= par1 - 1;
 									pulse_left  <= pulse_ms;
 									pulse_run   <= '1';
 									-- Der Millisekunden-Takt laeuft frei weiter; die Pulszeit

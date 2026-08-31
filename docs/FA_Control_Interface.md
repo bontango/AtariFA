@@ -1,6 +1,6 @@
 # Die FA-Control-Schnittstelle
 
-Stand 2026-08-08, AtariFA SW 0.1.3, Modul `rtl/fa_control/`.
+Stand 2026-08-14, AtariFA SW 0.2.0, Modul `rtl/fa_control/`.
 
 **Am Prototyp getestet (2026-08-08), funktioniert.** Der Abschnitt „Inbetriebnahme" unten führt
 die Schritte auf, in der Reihenfolge, in der sie geprüft wurden.
@@ -118,15 +118,26 @@ Die Umrechnung auf das Bit im RAM-Shadow steht als `FA_LAMP_BIT` in
 Es gibt bewusst keine zweite, von Hand gepflegte Tabelle: `GRP_OF` bleibt die eine Stelle, an der
 die Lampenzuordnung am Prototyp getunt wird, und die Umkehrung fällt automatisch mit.
 
-**Spulen 0…21**
+**Spulen 1…22 — als einzige Gruppe 1-basiert** (seit SW 0.2.0 / FA_Control 1.16)
 
 | Nummer | Ausgang |
 |---|---|
-| 0…19 | `solenoids(1..20)` |
-| 20 | Münzzähler (`COIN_CNTREN`, Aux-Board) |
-| 21 | Sperrspule Münztür (`LOCKOUT_EN`, Aux-Board) |
+| 1…20 | `solenoids(1..20)` = Treiber **Q1…Q20** des Schaltplans |
+| 21 | Münzzähler (`COIN_CNTREN`, Aux-Board) |
+| 22 | Sperrspule Münztür (`LOCKOUT_EN`, Aux-Board) |
 
-Die Positionen **13 und 17** (= Q14 und Q18) sind auf der Platine **nicht bestückt** — je nach
+Die Kachelnummer ist damit die Q-Nummer, und zwar durchgängig: sie steht so auf der Kachel,
+geht so über die Leitung und wird erst in `fa_control.vhd` auf den 0-basierten Vektor `sol_r`
+heruntergerechnet (`par1 - 1`). Das Top-Level bleibt davon unberührt.
+
+**Warum ausgerechnet die Spulen ab 1 zählen und Lampen/Schalter nicht:** so zählt LISY sie auf
+der Leitung (`N:\Projekte\lisy_5_28\src\lisy\lisy_w.c`, „sol number starts with 1"), und so heißen
+sie im Original. Bis SW 0.1.9 war auch das Protokoll 0-basiert — ein echter LISY-Host hätte damit
+mit der 1 die zweite Spule getroffen und die 22. gar nicht erreicht (`par1 < N_SOL` scheiterte
+bei 22). Lampen folgen dagegen der Formel `(Gruppe−1)×4 + Strobe` und Schalter dem CPU-Offset,
+dort ist 0 die erste — das bleibt so.
+
+Die Positionen **14 und 18** (= Q14 und Q18) sind auf der Platine **nicht bestückt** — je nach
 Spiel gibt es diese Ausgänge auch im Original nicht. Der Befehl wird angenommen, es passiert nur
 nichts. Anders als der `solenoid_driver`, der sie fest auf AUS hält, lässt FA-Control sie zu;
 deshalb sind auch die früher erwarteten Quartus-Warnungen `solenoids[14]/[18] stuck at VCC`
@@ -150,7 +161,7 @@ Connect-Handshake:
 | Op | Name | Parameter | Antwort | AtariFA liefert |
 |---|---|---|---|---|
 | 0 | `G_HW` | – | String+NUL | `AtariFA` |
-| 1 | `G_LISY_VER` | – | String+NUL | `0.1.5` (aus `BOARD_ID`/`SW_SUB1`/`SW_SUB2`) |
+| 1 | `G_LISY_VER` | – | String+NUL | `0.2.0` (aus `BOARD_ID`/`SW_SUB1`/`SW_SUB2`) |
 | 2 | `G_API_VER` | – | String+NUL | `0.12` |
 | 3 | `G_NO_LAMPS` | – | 1 Byte | 84 |
 | 4 | `G_NO_SOL` | – | 1 Byte | 22 |
@@ -247,7 +258,7 @@ dass jeder Schritt den nächsten absichert:
 2. **ESP gesteckt, DIP 4 = OFF.** „VERBINDEN" in der Weboberfläche muss
    *„Kontrolle verweigert — Option-DIP 4 auf ON stellen"* melden, und das Spiel darf **nicht**
    stehenbleiben.
-3. **DIP 4 = ON.** Verbinden. Die Infozeile muss `AtariFA / 0.1.5 / 0.12` zeigen und
+3. **DIP 4 = ON.** Verbinden. Die Infozeile muss `AtariFA / 0.2.0 / 0.12` zeigen und
    **84 Lampen, 22 Spulen, 80 Schalter, 16 Sounds, 5 Displays (4,6,6,6,6)** — diese Zahlen kommen
    jetzt vom FPGA und stehen in der Oberfläche auf „nicht änderbar". Das Spiel bleibt stehen, die
    Anzeigen bleiben an.

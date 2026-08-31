@@ -376,15 +376,23 @@ constant DBG_WATCH_LAMP    : integer range 0 to LAMP_COUNT - 1 := 21;  -- Gruppe
                                                                        -- die Refresh-Messung 6.6.
 constant DBG_STRETCH_CYCLES : integer := 50000;   -- 1 ms @ clk_50 — Pulsdehnung fuer langsame LAs
 signal heartbeat_div  : std_logic_vector(24 downto 0) := (others => '0');
-   -- Bit 24 toggelt alle 2^24/50e6 ≈ 0.67s → ~0.75 Hz Heartbeat; nur als FPGA-Takt-Fallback genutzt
+   -- Freilaufteiler auf clk_50; Bit 24 wechselt alle 2^24/50e6 = 0.336 s (= 1.49 Hz Blinken).
+   -- AKTUELL VON NIEMANDEM GELESEN — nur als Reserve/FPGA-Takt-Nachweis stehen geblieben.
 signal cpu_fetch_cnt  : std_logic_vector(20 downto 0) := (others => '0');
-   -- Zählt ROM-CS-Steigeflanken in clk_50; Bit 20 → ~0.6 Hz auf LED_D2 wenn CPU fetcht
-   -- (1 MHz cpu_clk, ~1 Fetch/Zyklus → 2^20/50e6 ≈ 0.021s per Bit; Bit20=~21ms*2≈42ms Wait)
-   -- Steht LED_D2 dauerhaft: CPU macht keine ROM-Fetches (halted/hängt in RAM/Busy-Loop ohne ROM)
+   -- Zählt EREIGNISSE, keine Zeit: Steigflanken von (rom1_cs or rom2_cs), also ROM-Zugriffs-
+   -- BURSTS (aufeinanderfolgende Fetches halten rom_cs durchgehend '1' = eine Flanke).
+   -- LED_D2 = Bit 20 wechselt also je 2^20 Bursts. Daraus folgt KEINE feste Frequenz: die Rate
+   -- haengt am ROM-Code des gewaehlten Spiels. Gemessen ~350 k Bursts/s => ~3 s je Phase.
+   -- Obergrenze der Konstruktion: zwischen zwei Steigflanken muss ein Nicht-ROM-Zyklus liegen,
+   -- also hoechstens 500 kHz bei 1 MHz cpu_clk => nie schneller als 0.24 Hz. (Die frueher hier
+   -- und im Handbuch genannten "~0.6 Hz" waren geschaetzt und sind unerreichbar.)
+   -- Steht LED_D2 dauerhaft (hell ODER dunkel): CPU macht keine ROM-Fetches (halted/haengt in
+   -- RAM/Busy-Loop ohne ROM)
 signal rom_cs_d       : std_logic := '0';
    -- Edge-Detect für cpu_fetch_cnt
 signal nmi_blink_cnt  : std_logic_vector(11 downto 0) := (others => '0');
-   -- Zählt NMI-Generator-Flanken; Bit 11 ≈ 0.48 Hz auf LED_D3 (HW-NMI-Takt, unabhängig von CPU)
+   -- Zählt NMI-Generator-Flanken (244.14 Hz). LED_D3 = Bit 8 wechselt je 256 Flanken = 1.049 s,
+   -- volle Blinkperiode 2.097 s = 0.477 Hz. (Die oberen Bits sind ungenutzte Reserve.)
 signal wd_seen        : std_logic := '0';
    -- Sticky-Latch: '1' wenn Watchdog mind. einmal resettet hat (LED_D1)
 signal por_count      : integer range 0 to 50001 := 0;
@@ -653,8 +661,9 @@ reset_h <= (not reset_l_stable) or por_active;
 
 -- LEDs (Schnell-Diagnose ohne LA) — Board-LEDs aktiv-LOW (gegen VCC, Pin nach GND => leuchten bei '0')
 LED_D1   <= not wd_seen;           -- Watchdog-Sticky: leuchtet, wenn der WD mind. einmal resettet hat
-LED_D2   <= not cpu_fetch_cnt(20); -- CPU-Fetch-Blinker ~0.6 Hz: blinkt = cpu68 fetcht ROM-Befehle
-                                    -- (steht dauerhaft: CPU halted oder hängt ohne ROM-Zugriff)
+LED_D2   <= not cpu_fetch_cnt(20); -- CPU-Fetch-Blinker: blinkt = cpu68 fetcht ROM-Befehle. Rate ist
+                                    -- spielabhaengig (Ereigniszaehler, s. Deklaration), ~3 s je Phase
+                                    -- (steht dauerhaft hell oder dunkel: CPU halted oder haengt ohne ROM-Zugriff)
 LED_D3   <= not nmi_blink_cnt(8);  -- NMI-Generator-Blinker ~0.48 Hz: blinkt = HW-NMI-Takt läuft
                                     -- (unabhängig von CPU; Freilauf aus dma_counter; 244 NMI/s -> Bit8 ~0.48 Hz)
 LED_D4   <= not fa_ctrl_active;    -- leuchtet, solange FA-Control die Kontrolle hat (aktiv-LOW).
@@ -1468,7 +1477,8 @@ port map(
 -- Diagnose-Prozesse
 ------------------------------
 
--- Heartbeat-Teiler: 25-Bit-Freilaufzähler auf clk_50 (nur noch als Reserve / FPGA-Takt-Nachweis)
+-- Heartbeat-Teiler: 25-Bit-Freilaufzähler auf clk_50 (nur noch als Reserve / FPGA-Takt-Nachweis;
+-- der Ausgang wird derzeit nirgends gelesen, Bit 24 waere 0.336 s je Halbperiode = 1.49 Hz)
 process(clk_50)
 begin
 	if rising_edge(clk_50) then
@@ -1476,8 +1486,9 @@ begin
 	end if;
 end process;
 
--- CPU-Fetch-Zähler: zählt rising edges von (rom1_cs or rom2_cs) in clk_50
--- Bit 20 → ~0.6 Hz auf LED_D2 solange die CPU ROM-Bytes fetcht.
+-- CPU-Fetch-Zähler: zählt rising edges von (rom1_cs or rom2_cs) in clk_50, also ROM-Zugriffs-BURSTS.
+-- Bit 20 wechselt je 2^20 Bursts; das ergibt keine feste Frequenz, sondern ~3 s je Phase bei den
+-- vorhandenen Spielen (Rechnung und Obergrenze s. Deklaration von cpu_fetch_cnt).
 -- Steht LED_D2 dauerhaft (leuchtet oder dunkel): CPU macht keine ROM-Zugriffe →
 --   entweder halted, oder in RAM-Warteschleife ohne ROM-Fetch (dann DBG_MODE=1/2 für PC-Trace).
 process(clk_50)

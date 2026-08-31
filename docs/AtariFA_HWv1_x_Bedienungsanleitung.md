@@ -4,7 +4,7 @@
 
 **Hardware-Version v1.x**
 
-**Software-Version 0.1.5**
+**Software-Version 0.2.0**
 
 **Bedienungsanleitung**
 
@@ -367,14 +367,14 @@ Beim Verbinden fragt FA-Control die Ausstattung ab und stellt sich selbst darauf
 | | |
 |---|---|
 | Kennung | `AtariFA` |
-| Software-Version | dieselbe wie auf der Info-Anzeige, z. B. `0.1.5` |
+| Software-Version | dieselbe wie auf der Info-Anzeige, z. B. `0.2.0` |
 | Lampen | 84 |
 | Spulen | 22 (20 Spielfeld + Münzzähler + Sperrspule) |
 | Schalter | 80 |
 | Töne | 16 |
 | Displays | 5 (Status mit 4 Stellen, vier Spieler mit je 6) |
 
-Die Nummerierung folgt dabei der Platine: Schalter tragen dieselbe Nummer wie im Selbsttest des Spiels, Spule 0 bis 19 sind die zwanzig Spielfeld-Ausgänge in der Reihenfolge des Schaltplans.
+Die Nummerierung folgt dabei der Platine: Schalter tragen dieselbe Nummer wie im Selbsttest des Spiels, und **Spule 1 bis 20 sind die Treiber Q1 bis Q20 des Schaltplans**, 21 der Münzzähler und 22 die Sperrspule. Die Spulen sind die einzige Gruppe, die bei 1 anfängt — so zählt sie das Original, und so zählt sie das LISY-Protokoll. Lampen (0 bis 83) und Schalter (0 bis 79) beginnen bei 0. *(Bis Version 0.1.9 begannen auch die Spulen bei 0; wer eine ältere FA-Control-Firmware als 1.16 benutzt, löst damit die falsche Spule aus.)*
 
 ### 9.5. Anschluss
 
@@ -387,8 +387,8 @@ Die Platine hat drei Status-LEDs, parallel zu den LEDs der Huckepack-Platine ges
 | LED    | Bedeutung                                                                 |
 |--------|---------------------------------------------------------------------------|
 | **D1** | Watchdog: leuchtet und bleibt an, sobald der interne Watchdog mindestens einmal angesprochen hat. **Dunkel ist der Normalzustand.** |
-| **D2** | Der Prozessor holt Befehle aus dem ROM — blinkt mit etwa 0,6 Hz. **Dauerlicht heißt: der Prozessor steht.** |
-| **D3** | Der NMI-Zeitgeber läuft — blinkt mit etwa 0,48 Hz. Das ist freilaufende Hardware und hängt nicht vom Prozessor ab. |
+| **D2** | Der Prozessor holt Befehle aus dem ROM — blinkt langsam, je nach Spiel einige Sekunden je Phase. **Steht die LED, hell oder dunkel, dann steht der Prozessor.** |
+| **D3** | Der NMI-Zeitgeber läuft — blinkt mit 0,48 Hz, also gut eine Sekunde hell und gut eine Sekunde dunkel. Das ist freilaufende Hardware und hängt nicht vom Prozessor ab. |
 
 Lesen Sie die drei zusammen:
 
@@ -488,6 +488,6 @@ Spieler 4        0     Freispiel, 1 = aktiv
 Credit      (dunkel)
 ```
 
-**LEDs:** D1 Watchdog (dunkel = gut) · D2 Prozessor läuft (blinkt ~0,6 Hz) · D3 NMI-Zeitgeber (blinkt ~0,48 Hz)
+**LEDs:** D1 Watchdog (dunkel = gut) · D2 Prozessor läuft (blinkt langsam) · D3 NMI-Zeitgeber (blinkt ~0,48 Hz)
 
 **Credits und Spielstände überleben das Ausschalten nicht** — wie bei der originalen Atari-MPU.
