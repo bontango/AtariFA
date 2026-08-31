@@ -1073,9 +1073,18 @@ audio_clk <= dma_counter(2);  -- reserved for Phase C audio
 dma_int   <= not (dma_counter(10) and dma_counter(11));
 nmi_level <= dma_counter(10) and dma_counter(11);
 
--- DIP-Region 0x2000-0x200F: volles 1:1 aus der Matrix (SW1/SW2-Programmier-DIPs), zwei Ausnahmen:
---   0x2000: kein DIP-Read, sondern DMA-Sync -> Bit7=0 (BPL-Check @0x721C), Bit6=dma_toggle
---           (Display-Sync, ROM-Poll @0x78BE/0x78C9), Bit5..0=1.
+-- DIP-Region 0x2000-0x200F: volles 1:1 aus der Matrix (SW1/SW2-Programmier-DIPs), zwei Sonderfaelle:
+--   0x2000: ganz normale DIP-Position (Basis sw_state(0), geschlossen -> 0xFF), aber Bit6 wird
+--           vom dma_toggle UEBERSCHRIEBEN - genau wie PinMAME dipg1_r fuer offset 0:
+--             return toggle ? (dipram[0] | 0x40) : (dipram[0] & 0xbf);
+--           ROM-verifiziert (tools/listing.txt, Middle Earth 608/609): @0x7200-0x7229 sammelt das
+--           Spiel Bit7 von 0x2000..0x2007 per LDAB/BPL/INCA/ROLA zu einem DIP-Byte ein - 0x721C ist
+--           die 0x2000-Position dieser Schleife, Bit7 MUSS also der DIP sein. Bit6 dagegen ist der
+--           Display-Sync: @0x78BE/0x78C9 pollt das ROM mit ANDA #$40 auf den Wechsel.
+--           Frueher stand hier ein synthetisiertes Byte ("0" & dma_toggle & "111111"): Bit7 fest 0,
+--           Bit5..0 fest 1. Das stimmte in den beiden ausgewerteten Bits nur bei DIP OFF
+--           (Coin/Credit-Werkseinstellung) - eine geschlossene DIP 0 war fuer das Spiel unsichtbar,
+--           obwohl FA-Control sie auf Kachel 0 korrekt anzeigt (fa_sw_state kommt roh aus sw_state).
 --   0x200B: Testschalter-Leitung, NICHT invertiert (wie jede DIP-Position: gedrueckt/geschlossen
 --           -> 0xFF, Bit7=1). ROM-verifiziert (doc/Switch_Reading_Analysis.md): Middle Earth @7F9C
 --           und Airborne @7AB4 werten Bit7 aus und erwarten Bit7=1 = Test gedrueckt. Frueher faelschlich
@@ -1084,7 +1093,7 @@ nmi_level <= dma_counter(10) and dma_counter(11);
 --           Middle Earth (game_idx=3, PinMAME MACHINE_INIT ATARI1A): testSwBits=0x0F -> unteres Nibble
 --           invertiert (dipg1_r: 0x200B ^= 0x0F) auf der NICHT-invertierten Basis -> offen 0x0F, gedrueckt 0xF0.
 --   sonst : DIP aus Matrix (ON/geschlossen -> 0xFF, wie PinMAME dipg1_r).
-dip_value <= ("0" & dma_toggle & "111111")                              when cpu_addr = x"2000" else
+dip_value <= (6 => dma_toggle, others => sw_state(0))                   when cpu_addr = x"2000" else
              (7 downto 4 => sw_state(11), 3 downto 0 => not sw_state(11)) when (cpu_addr = x"200B" and game_idx = 3) else
              (others => sw_state(conv_integer(cpu_addr(6 downto 0))));
 

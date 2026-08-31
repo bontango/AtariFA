@@ -56,6 +56,68 @@ Matrix-Position 11 (0x200B) repräsentiert auf dem AtariFA-Board die kombinierte
 (Nutzer simuliert sie per einzelnem DIP; beim Boot offen = S1/1=0, Test nicht gedrückt). Falls DIP S1/1
 real auf 1 gesetzt wird, invertiert sich der Ruhepegel wie im Original — dann Test-Logik am Board prüfen.
 
+## Nachtrag SW 0.2.1: 0x2000 ist ein DIP, nicht nur der DMA-Sync
+
+Aufgefallen beim Editieren der FA-Control-Name-Files: **Kachel 0** (`0x2000`, im Name-File
+„SW2-4") zeigt den Schaltzustand richtig an — FA-Control bekommt `fa_sw_state` roh aus der
+Matrix —, **das Spiel sah den Schalter aber nie**. Der CPU-Lesepfad lieferte für genau diese
+eine Adresse ein synthetisiertes Byte:
+
+```vhdl
+dip_value <= ("0" & dma_toggle & "111111") when cpu_addr = x"2000" else …   -- bis 0.2.0
+```
+
+Bit 7 fest `'0'`, Bit 5..0 fest `'1'`, `sw_state(0)` unbenutzt.
+
+**PinMAME** (`src/wpc/atari.c`, `dipg1_r`) macht es anders: das ganze Byte kommt aus dem DIP
+(geschlossen → `0xFF`), und **nur Bit 6** wird vom Toggle überschrieben:
+
+```c
+if (offset) return dipram[offset];
+return toggle ? (dipram[offset] | 0x40) : (dipram[offset] & 0xbf);
+```
+
+**ROM-Gegenprobe** (`tools/listing.txt`, Middle Earth 608/609) — eindeutig:
+
+```
+  7215:  F6 20 07   LDAB   $2007
+  7218:  2A 01      BPL    $721B      ; Bit7 = DIP-Wert
+  721A:  4C         INCA
+  721B:  49         ROLA
+  721C:  F6 20 00   LDAB   $2000      ; <- 0x2000 ist Teil derselben Schleife
+  721F:  2A 01      BPL    $7222
+  7221:  4C         INCA
+  7222:  49         ROLA
+  7223:  F6 20 01   LDAB   $2001
+```
+
+Die Schleife `0x7200–0x7229` schiebt **Bit 7** von `0x2000…0x2007` zu einem DIP-Byte
+zusammen — `0x2000` ist dort eine ganz normale DIP-Position, Bit 7 **muss** der DIP sein.
+Bit 6 dagegen ist der Display-Sync:
+
+```
+  78BE:  B6 20 00   LDAA   $2000
+  78C1:  84 40      ANDA   #$40       ; nur Bit 6
+  78C3:  27 F9      BEQ    $78BE
+```
+
+Der frühere Kommentar im Top-Level deutete `0x721C` als „BPL-Check, der Bit7=0 erwartet" —
+das war die falsche Lesart derselben Fundstelle.
+
+**Fix (SW 0.2.1):**
+
+```vhdl
+dip_value <= (6 => dma_toggle, others => sw_state(0)) when cpu_addr = x"2000" else …
+```
+
+`sw_state(0)` ist derselbe Index, den der allgemeine Zweig gewählt hätte
+(`cpu_addr(6 downto 0) = 0`) — die Basis ist also exakt der DIP, Bit 6 liegt darüber.
+
+**Warum es bis 0.2.0 nicht auffiel:** die Spiele werten an `0x2000` nur Bit 7 und Bit 6 aus.
+Bei DIP **OFF** (Coin/Credit-Werkseinstellung) liefert das synthetisierte `0x3F`/`0x7F` in
+diesen zwei Bits dasselbe wie PinMAMEs `0x00`/`0x40`. Nur eine **geschlossene** DIP 0 hätte
+`0xFF`/`0xBF` ergeben müssen — die war für das Spiel unsichtbar.
+
 ## Noch offen (nach HW-Bestätigung des Fixes)
 - Middle Earth Switchtest „Schalter 1 geschlossen": nach sauberem Test-Eintritt erneut prüfen (evtl.
   Folge des vorher korrupten Eintritts, sonst Switch-Offset-Mapping / Replay-DIP-Injektion 0x204D-0x204F).
