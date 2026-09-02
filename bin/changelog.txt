@@ -43,3 +43,9 @@
   SW 0.3.2 - background music: outhole trigger (0.3.1) plus the RecelFA v0.6 command path. DFPlayer confirmed PLAYING on cyclone_10_dev_open on the bench; not yet tried on a machine, so the five outhole switch numbers stay unconfirmed except Airborne.
   cyclone_10_dev_open    1.3.2    AtariFA_v132.jic  sha256:8FF59EE180EB3284
   cyclone_10_pcb         0.3.2    AtariFA_v032.jic  sha256:8C0AD93A08F9F0AE
+
+2026-09-02 12:51  version .3.3
+  third board variant: cyclone_IV_dev_open (BOARD_ID 2, EP4CE6E22C8). No functional change to the logic - .3.3 exists so the new board gets an artefact without overwriting the shipped .3.2 files. NOT hardware tested on the Cyclone IV board.
+  cyclone_10_dev_open    1.3.3    AtariFA_v133.jic  sha256:B9F3FF033B220372
+  cyclone_10_pcb         0.3.3    AtariFA_v033.jic  sha256:53727C84E63B150C
+  cyclone_IV_dev_open    2.3.3    AtariFA_v233.jic  sha256:F3C64BFFA0CAEFCB
