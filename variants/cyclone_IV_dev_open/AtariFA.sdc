@@ -1,0 +1,58 @@
+    # 
+	# https://forums.intel.com/s/question/0D50P00003yyTEnSAM/getting-timing-requirements-not-met-as-critical-warning?language=de
+	#
+    #  Design Timing Constraints Definitions
+    # 
+    set_time_format -unit ns -decimal_places 3
+    # #############################################################################
+    #  Create Input reference clocks
+    create_clock -name {clk_50} -period 20.000 -waveform { 0.000 10.000 } [get_ports {clk_50}]	
+    # #############################################################################
+	#Here I create a clock called "clkin_50" (you can name it whatever you like), 
+	#specify that it is 50MHz (20ns period), specify it is 50% duty cycle
+	#(rising edge at 0ns, falling edge at 10ns), and instruct that the port 
+	#that the clock is located at (e.g. FPGA pin) is called "clkin_50" via the "[get_ports ]" command. 
+	#The clock name doesn't have to match the port name, but I find it useful to do so.
+	#
+	# generated clocks
+	#create_generated_clock -name clk_out -divide_by 100 -source clk_50 cpu_clk_gen:clock_gen|clk_out	
+	#create_generated_clock -name clk_out_1 -divide_by 125 -source clk_50 cpu_400KHz_gen:clock_gen_1|clk_out_1	
+	#create_generated_clock -name clk_out_2 -divide_by 100 -source clk_50 cpu_500KHz_gen:clock_gen_2|clk_out_2	
+	
+	
+	#create_clock -name {cpu_clk} -period 1118.880 -waveform { 0.000 559.440 } [get_registers {cpu_clk}]
+    #  Now that we have created the custom clocks which will be base clocks,
+    #  derive_pll_clock is used to calculate all remaining clocks for PLLs
+    
+	derive_pll_clocks -create_base_clocks
+   derive_clock_uncertainty
+
+	# cpu_clk (PLL clk[0]) wird in clk_50-Domain als Datensignal gesampled
+	# (Edge-Detect fuer RAM-Write-Strobe, AtariFA.vhd cpu_clk_d1/d2).
+	# cpu_clk ist aus clk_50 (/50) per PLL abgeleitet -> synchron, Hold-Check sinnlos.
+	set_false_path -from [get_clocks {clock_gen|altpll_component|auto_generated|pll1|clk[0]}] -to [get_registers {cpu_clk_d1}]
+
+	# Constrain IOs (don't care...)
+	set_input_delay -clock clk_50 0 [all_inputs]
+	set_output_delay -clock clk_50 0 [all_outputs]
+	# reset_sw goes only into a 2-flop synchronizer; exclude from timing analysis
+	set_false_path -from [get_ports reset_sw]
+	# sw_com_in is an asynchronous switch-matrix return; it only enters the 2-FF synchronizer
+	# in switch_matrix.vhd -> exclude from timing analysis (metastability handled there)
+	set_false_path -from [get_ports sw_com_in]
+	# ESP32 link (rtl/fa_control): both inputs are asynchronous to clk_50 and both are
+	# synchronized inside the module - ESP32_ser_tx by the 2-FF sampler in uart_rx.vhd,
+	# ESP32_ctrl_req by the req_meta/req_sync pair in fa_control.vhd.
+	set_false_path -from [get_ports ESP32_ser_tx]
+	set_false_path -from [get_ports ESP32_ctrl_req]
+
+	#
+	# example second clock
+	#create_clock -name {clk} -period 400.000 -waveform { 0.000 200.000 } [get_registers {clk}]
+	#
+	# if output clock pins exist
+	#
+	# Create a generated clock: -name = name of new clock, -divide_by = output frequency is input divided by this, 
+	# -source = original clock, then end of line is the target signal where output clock is.
+	#
+	

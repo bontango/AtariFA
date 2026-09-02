@@ -47,9 +47,10 @@ desktop.ini
 # Local audio sources (speech ROM is regenerated from these; see CLAUDE.md)
 *.wav
 
-# NOTE: rtl/cyclone_10/*.cmp and cpu_clock.ppf are tracked. They belong to the
-#       megafunctions (the .qip lists them as MISC_FILE), so a fresh clone needs
-#       them - they used to be ignored as build artefacts, which they are not.
+# NOTE: rtl/cyclone_10/*.cmp, rtl/cyclone_IV/*.cmp and the two cpu_clock.ppf are
+#       tracked. They belong to the megafunctions (the .qip lists them as MISC_FILE),
+#       so a fresh clone needs them - they used to be ignored as build artefacts,
+#       which they are not.
 # NOTE: rom/*.hex and rom/lisy.mif are source files, not build output.
 # NOTE: the two scripts in tools/ are tracked (dis6800.py = 6800 disassembler,
 #       make_speech_mif.py = speech ROM encoder). Binaries and the disassembly

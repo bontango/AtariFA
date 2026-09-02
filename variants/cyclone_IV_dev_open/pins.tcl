@@ -1,0 +1,99 @@
+# pins.tcl - pin locations for THIS board (AtariFA PCB v1.0 carrying the 'dev_open'
+# Cyclone IV board). Merged into AtariFA.qsf by scripts\gen_qsf.ps1. This is the
+# truth about the board, not the comments in the VHDL port list. Hand maintained.
+#
+# Same piggy back board as cyclone_10_dev_open, so this list is that one's list with
+# exactly TWO lines moved - because PIN_22 is a user I/O on the Cyclone 10 LP but not
+# on the EP4CE6E22C8 (E144). Cross checked against the pin list of
+# N:\Projekte\FPGA Stern\FPGA_source\SternFA_HW2.0_Cyclone_dev_open, which runs on that
+# chip: PIN_22 appears nowhere there, every other pin used here does, and PIN_104 is
+# in use there (SB_out_D[7]).
+#
+#   dip_opt[1]   PIN_22  -> PIN_103
+#   dip_opt[3]   PIN_103 -> PIN_104
+#
+# Not here on purpose: debug_signal[3..7]. This board only routes three debug lines
+# to the 10 pin logic analyser header; the remaining five get VIRTUAL_PIN from
+# variant.psd1 so Quartus does not place them on a real pin.
+set_location_assignment PIN_1 -to solenoids[13]
+set_location_assignment PIN_100 -to LED_D4
+set_location_assignment PIN_101 -to LED_D1
+set_location_assignment PIN_103 -to dip_opt[1]
+set_location_assignment PIN_104 -to dip_opt[3]
+set_location_assignment PIN_105 -to dip_opt[4]
+set_location_assignment PIN_106 -to SB_Sound
+set_location_assignment PIN_111 -to SB_Audio
+set_location_assignment PIN_112 -to solenoids[6]
+set_location_assignment PIN_113 -to solenoids[7]
+set_location_assignment PIN_114 -to solenoids[8]
+set_location_assignment PIN_115 -to solenoids[9]
+set_location_assignment PIN_119 -to solenoids[10]
+set_location_assignment PIN_120 -to aux_lamp_strobe[1]
+set_location_assignment PIN_121 -to aux_lamp_strobe[0]
+set_location_assignment PIN_124 -to aux_audio_latch[1]
+set_location_assignment PIN_125 -to aux_audio_latch[3]
+set_location_assignment PIN_126 -to aux_sol_latch[0]
+set_location_assignment PIN_127 -to aux_audio_latch[2]
+set_location_assignment PIN_128 -to aux_audio[3]
+set_location_assignment PIN_129 -to aux_audio[1]
+set_location_assignment PIN_132 -to aux_audio[0]
+set_location_assignment PIN_133 -to aux_audio_latch[0]
+set_location_assignment PIN_135 -to aux_sol_latch[1]
+set_location_assignment PIN_136 -to aux_audio[2]
+set_location_assignment PIN_137 -to solenoids[19]
+set_location_assignment PIN_138 -to solenoids[20]
+set_location_assignment PIN_141 -to solenoids[17]
+set_location_assignment PIN_142 -to solenoids[18]
+set_location_assignment PIN_143 -to solenoids[15]
+set_location_assignment PIN_144 -to solenoids[16]
+set_location_assignment PIN_2 -to solenoids[14]
+set_location_assignment PIN_23 -to dip_opt[2]
+set_location_assignment PIN_24 -to dip_ret[0]
+set_location_assignment PIN_25 -to dip_ret[1]
+set_location_assignment PIN_28 -to disp_Load
+set_location_assignment PIN_3 -to solenoids[11]
+set_location_assignment PIN_31 -to disp_Adr[4]
+set_location_assignment PIN_32 -to disp_Adr[5]
+set_location_assignment PIN_33 -to disp_Adr[0]
+set_location_assignment PIN_34 -to disp_Adr[6]
+set_location_assignment PIN_38 -to debug_signal[1]
+set_location_assignment PIN_39 -to disp_Anode_blank
+set_location_assignment PIN_42 -to debug_signal[2]
+set_location_assignment PIN_43 -to debug_signal[0]
+set_location_assignment PIN_44 -to sw_com_in
+set_location_assignment PIN_46 -to sw_strobe[3]
+set_location_assignment PIN_49 -to sw_strobe[2]
+set_location_assignment PIN_50 -to sw_strobe[1]
+set_location_assignment PIN_51 -to sw_strobe[0]
+set_location_assignment PIN_52 -to disp_Adr[2]
+set_location_assignment PIN_53 -to sw_com[2]
+set_location_assignment PIN_54 -to disp_Adr[1]
+set_location_assignment PIN_55 -to sw_com[1]
+set_location_assignment PIN_58 -to disp_Adr[3]
+set_location_assignment PIN_59 -to sw_com[0]
+set_location_assignment PIN_60 -to disp_Data[1]
+set_location_assignment PIN_65 -to disp_Data[2]
+set_location_assignment PIN_66 -to solenoids[1]
+set_location_assignment PIN_67 -to disp_Data[0]
+set_location_assignment PIN_68 -to solenoids[2]
+set_location_assignment PIN_69 -to disp_Data[3]
+set_location_assignment PIN_7 -to solenoids[12]
+set_location_assignment PIN_70 -to solenoids[3]
+set_location_assignment PIN_71 -to disp_Cathode_blank
+set_location_assignment PIN_72 -to solenoids[4]
+set_location_assignment PIN_73 -to ESP32_ser_rx
+set_location_assignment PIN_74 -to solenoids[5]
+set_location_assignment PIN_75 -to solenoids_enable
+set_location_assignment PIN_76 -to fram_i2c_sda
+set_location_assignment PIN_77 -to clk_595
+set_location_assignment PIN_80 -to fram_i2c_scl
+set_location_assignment PIN_83 -to rclk_595
+set_location_assignment PIN_84 -to ESP32_ctrl_req
+set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to ESP32_ctrl_req
+set_location_assignment PIN_85 -to oe_595
+set_location_assignment PIN_86 -to ESP32_ser_tx
+set_location_assignment PIN_87 -to serin_595
+set_location_assignment PIN_89 -to reset_sw
+set_location_assignment PIN_91 -to clk_50
+set_location_assignment PIN_98 -to LED_D3
+set_location_assignment PIN_99 -to LED_D2

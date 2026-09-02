@@ -1,6 +1,6 @@
 # AtariFA — Arbeitsablauf
 
-Wie man in diesem Baum etwas ändert, ohne die zweite Variante zu vergessen — und wie die
+Wie man in diesem Baum etwas ändert, ohne die anderen Varianten zu vergessen — und wie die
 Quartus-IDE neben den Skripten koexistiert.
 
 ---
@@ -18,7 +18,7 @@ Sie wird aus sechs Bausteinen zusammengesetzt (`scripts/gen_qsf.ps1`):
 | `variants/<n>/pins.tcl` | die `set_location_assignment`-Zeilen | Hand |
 | `variants/<n>/variant.psd1` | Board-ID, Familie, VirtualPins, Release-Ziel | Hand |
 | `scripts/files_common.tcl` | die gemeinsamen Quellen inkl. Top-Level | Hand |
-| `scripts/files_cyclone_10.tcl` | die Megafunctions der Familie | Hand |
+| `scripts/files_<family>.tcl` | die Megafunctions der Familie (`cyclone_10`, `cyclone_IV`) | Hand |
 
 Quartus schreibt aus der IDE heraus selbst in die `.qsf` zurück. Deshalb rufen `check.ps1`
 und `build.ps1` als Erstes `gen_qsf.ps1 -Quiet` auf und melden es gelb, wenn dabei etwas
@@ -38,11 +38,12 @@ zurückgesetzt werden musste. `gen_qsf.ps1 -Check` zeigt den Unterschied, ohne z
 | Timing-Constraint | `variants/<n>/AtariFA.sdc` |
 | `.sof` → `.jic` | `variants/<n>/AtariFA.cof`, Pfade **relativ** halten |
 | neue Variante | Ordner unter `variants/` mit den sieben Dateien anlegen, `gen_qsf.ps1` |
+| neue **Chipfamilie** | `rtl/<family>/` + `scripts/files_<family>.tcl`, dann `RtlFamily` in `variant.psd1` |
 
 ## Ablauf einer Änderung
 
 1. Ändern in `rtl/common/` bzw. `top/AtariFA.vhd`.
-2. `scripts\check.ps1` — schnelle Synthese beider Varianten. Fängt Syntax- und
+2. `scripts\check.ps1` — schnelle Synthese aller Varianten. Fängt Syntax- und
    Elaborationsfehler und vergleicht schon hier Comb/Reg/Memory gegen die Baseline.
 3. `scripts\check.ps1 -Fit` — Fitter und Timing dazu. **Comb/Register/Memory müssen exakt
    stimmen**, sonst ist etwas anderes passiert als beabsichtigt; die LE-Zahl des Fitters
@@ -52,7 +53,7 @@ zurückgesetzt werden musste. `gen_qsf.ps1 -Check` zeigt den Unterschied, ohne z
 5. Version in `rtl/common/version_pkg.vhd` hochziehen.
 6. `scripts\release.ps1 -Note "..."` → alle Varianten bauen, nach `bin/` kopieren,
    Changelog schreiben.
-7. Ein Commit, ein Tag — beide Varianten konsistent.
+7. Ein Commit, ein Tag — alle Varianten konsistent.
 
 Absichtliche Ressourcenänderung? Dann `scripts/baseline.csv` mit der neuen Zahl **und einer
 Begründung in der Note-Spalte** nachziehen. Die Notiz ist der Teil, der später zählt.
