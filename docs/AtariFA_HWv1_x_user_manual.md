@@ -4,13 +4,13 @@
 
 **Hardware version v1.x**
 
-**Software Version 0.3.0**
+**Software Version 0.3.3**
 
 **user manual**
 
 ralf@lisy.dev
 
-v1.0 06.08.2026
+v1.1 04.09.2026
 
 > Eine deutsche Fassung gibt es unter `AtariFA_HWv1_x_Bedienungsanleitung.md`.
 > A German version is available as `AtariFA_HWv1_x_Bedienungsanleitung.md`. The chapter
@@ -261,7 +261,7 @@ When the DIP read is done the displays come on and show the configuration for **
 
 Everything stands right aligned, the unused digits stay dark.
 
-Example: player 1 showing `012`, player 2 showing `02`, player 3 showing `000000`, player 4 showing `0` is software 0.1.2 on the standard board, running Airborne Avenger, no options set, no free play.
+Example: player 1 showing `033`, player 2 showing `02`, player 3 showing `000000`, player 4 showing `0` is software 0.3.3 on the standard board, running Airborne Avenger, no options set, no free play.
 
 **The leading digit of the version tells you which board variant you have**, see chapter 12. `0` is the standard AtariFA board.
 
@@ -361,7 +361,7 @@ So that it does not cut out at every ball change, the board only reacts after **
 
 **The game sound is not affected.** Music and game sound are two separate analog paths that only meet at the amplifier. The game tones of chapter 8.1 play over the music; nothing is faded or muted. Set the balance between them with the volume control of the player and the volume of your machine.
 
-**If you hear nothing:** the switch is read at boot only, so power off and on after setting option 1. Check that the folder is really called `02`, that the card is in the player, and that the board reports version **032** on the info display, chapter 5.2.
+**If you hear nothing:** the switch is read at boot only, so power off and on after setting option 1. Check that the folder is really called `02`, that the card is in the player, and that the board reports version **033** on the info display - **133** or **233** on the two 'dev_open' boards, chapter 5.2.
 
 **Give it time.** After power-on the board allows the player five seconds to boot, then talks to it, then waits out the debounce. That adds up to **about 15 seconds** before the first note. Give up earlier and you will take a working module for a broken one.
 
@@ -405,7 +405,7 @@ On connecting, FA-Control asks the board what it is made of and configures itsel
 | | |
 |---|---|
 | Identification | `AtariFA` |
-| Software version | the same one the info display shows, e.g. `0.3.0` |
+| Software version | the same one the info display shows, e.g. `0.3.3` |
 | Lamps | 84 |
 | Solenoids | 22 (20 playfield + coin counter + lockout coil) |
 | Switches | 80 |
@@ -448,18 +448,19 @@ There is no SD card image for AtariFA. The game roms are part of the FPGA progra
 
 ## 12. Board variants
 
-The same design runs on two piggy-back boards. The FPGA program is **not** interchangeable between them - the pin assignment differs.
+The same design runs on three piggy-back boards. The FPGA program is **not** interchangeable between them - the pin assignment differs, and the third one carries an FPGA from a different family.
 
-| Variant | Board | Version starts with |
-|---|---|---|
-| `cyclone_10_pcb` | AtariFA PCB v1.x with the lisy.dev Cyclone 10 piggy-back board | **0** |
-| `cyclone_10_dev_open` | AtariFA PCB v1.x with the 'dev_open' Cyclone 10 board | **1** |
+| Variant | Board | FPGA | Version starts with |
+|---|---|---|---|
+| `cyclone_10_pcb` | AtariFA PCB v1.x with the lisy.dev Cyclone 10 piggy-back board | Cyclone 10 LP | **0** |
+| `cyclone_10_dev_open` | AtariFA PCB v1.x with the 'dev_open' Cyclone 10 board | Cyclone 10 LP | **1** |
+| `cyclone_IV_dev_open` | the same 'dev_open' board, but populated with a Cyclone IV | Cyclone IV E | **2** |
 
 **The info display tells you which program is running:** the first of the three version digits on player display 1 is the board number. If you loaded the wrong one, the displays will most likely stay dark or show nonsense - check that digit first.
 
-Apart from the pin assignment the two are identical, with two small differences on the piggy-back board itself: the `dev_open` board has its reset switch and all four of its status LEDs on the piggy-back board (the fourth is a spare and stays dark), and it brings 3 instead of 8 debug lines to the logic analyser header.
+Apart from the pin assignment all three are identical, with two small differences on the piggy-back board itself: the `dev_open` board has its reset switch and all four of its status LEDs on the piggy-back board (the fourth is a spare and stays dark), and it brings 3 instead of 8 debug lines to the logic analyser header. The two 'dev_open' versions differ only in the FPGA fitted and in two pins that sit elsewhere on the Cyclone IV.
 
-**The `dev_open` variant has not been tested on a machine.**
+**Test status.** Only `cyclone_10_pcb` has been played on a machine so far. `cyclone_10_dev_open` has been running on the bench since software 0.3.0 - boot, info display and the MP3 player are confirmed there, everything else depends on the wiring to the machine and is untested. `cyclone_IV_dev_open` has been built but has never run on hardware.
 
 ## 13. Not implemented yet
 
@@ -520,7 +521,7 @@ If it still glows at 400 µs, it is not the software - chapter 4.2.5.
 **The info display, first 5 seconds after power on**
 
 ```
-Player 1   0 1 2      version, first digit = board variant
+Player 1   0 3 3      version, first digit = board variant
 Player 2      0 2     game select  (Appendix A)
 Player 3   000000     options 1..6, left to right, 1 = ON
 Player 4        0     free play, 1 = active

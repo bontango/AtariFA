@@ -4,13 +4,13 @@
 
 **Hardware-Version v1.x**
 
-**Software-Version 0.3.0**
+**Software-Version 0.3.3**
 
 **Bedienungsanleitung**
 
 ralf@lisy.dev
 
-v1.0 06.08.2026
+v1.1 04.09.2026
 
 > Deutsche Fassung von `AtariFA_HWv1_x_user_manual.md`. Die Kapitelnummern sind in beiden
 > Fassungen gleich.
@@ -260,7 +260,7 @@ Ist der DIP-Einlesevorgang fertig, gehen die Anzeigen an und zeigen für **etwa 
 
 Alles steht rechtsbündig, die nicht benutzten Stellen bleiben dunkel.
 
-Beispiel: Spieler 1 zeigt `012`, Spieler 2 zeigt `02`, Spieler 3 zeigt `000000`, Spieler 4 zeigt `0` — das ist Software 0.1.2 auf der Standardplatine, Airborne Avenger, keine Optionen gesetzt, kein Freispiel.
+Beispiel: Spieler 1 zeigt `033`, Spieler 2 zeigt `02`, Spieler 3 zeigt `000000`, Spieler 4 zeigt `0` — das ist Software 0.3.3 auf der Standardplatine, Airborne Avenger, keine Optionen gesetzt, kein Freispiel.
 
 **Die erste Ziffer der Version sagt Ihnen, welche Platinen-Variante Sie haben**, siehe Kapitel 12. `0` ist die Standard-AtariFA-Platine.
 
@@ -360,7 +360,7 @@ Damit sie beim Ballwechsel nicht ständig aussetzt, reagiert die Platine erst na
 
 **Der Spielton bleibt unberührt.** Musik und Spielton sind zwei getrennte Analogwege, die erst am Verstärker zusammenlaufen. Die Töne aus Kapitel 8.1 spielen über der Musik; es wird nichts ausgeblendet und nichts stummgeschaltet. Das Verhältnis stellen Sie über die Lautstärke des Spielers und die Lautstärke Ihres Automaten ein.
 
-**Wenn Sie nichts hören:** der Schalter wird nur beim Einschalten gelesen — nach dem Umstellen von Option 1 also aus- und wieder einschalten. Prüfen Sie außerdem, ob der Ordner wirklich `02` heißt, ob die Karte im Spieler steckt, und ob die Info-Anzeige die Version **032** zeigt, Kapitel 5.2.
+**Wenn Sie nichts hören:** der Schalter wird nur beim Einschalten gelesen — nach dem Umstellen von Option 1 also aus- und wieder einschalten. Prüfen Sie außerdem, ob der Ordner wirklich `02` heißt, ob die Karte im Spieler steckt, und ob die Info-Anzeige die Version **033** zeigt — auf den beiden „dev_open"-Platinen entsprechend **133** oder **233**, Kapitel 5.2.
 
 **Geben Sie ihr Zeit.** Die Platine lässt dem Spieler nach dem Einschalten fünf Sekunden zum Hochlaufen, meldet sich dann bei ihm an und wartet noch die Entprellung ab. Bis zum ersten Ton vergehen dadurch **rund 15 Sekunden**. Wer vorher aufgibt, hält ein funktionierendes Modul für defekt.
 
@@ -404,7 +404,7 @@ Beim Verbinden fragt FA-Control die Ausstattung ab und stellt sich selbst darauf
 | | |
 |---|---|
 | Kennung | `AtariFA` |
-| Software-Version | dieselbe wie auf der Info-Anzeige, z. B. `0.3.0` |
+| Software-Version | dieselbe wie auf der Info-Anzeige, z. B. `0.3.3` |
 | Lampen | 84 |
 | Spulen | 22 (20 Spielfeld + Münzzähler + Sperrspule) |
 | Schalter | 80 |
@@ -447,18 +447,19 @@ Für AtariFA gibt es kein SD-Karten-Abbild. Die Spiel-ROMs sind Teil des FPGA-Pr
 
 ## 12. Platinen-Varianten
 
-Dasselbe Design läuft auf zwei Huckepack-Platinen. Das FPGA-Programm ist zwischen ihnen **nicht** austauschbar — die Pinbelegung unterscheidet sich.
+Dasselbe Design läuft auf drei Huckepack-Platinen. Das FPGA-Programm ist zwischen ihnen **nicht** austauschbar — die Pinbelegung unterscheidet sich, und bei der dritten sitzt ein FPGA aus einer anderen Familie.
 
-| Variante | Platine | Version beginnt mit |
-|---|---|---|
-| `cyclone_10_pcb` | AtariFA-Platine v1.x mit der lisy.dev-Cyclone-10-Huckepackplatine | **0** |
-| `cyclone_10_dev_open` | AtariFA-Platine v1.x mit der „dev_open"-Cyclone-10-Platine | **1** |
+| Variante | Platine | FPGA | Version beginnt mit |
+|---|---|---|---|
+| `cyclone_10_pcb` | AtariFA-Platine v1.x mit der lisy.dev-Cyclone-10-Huckepackplatine | Cyclone 10 LP | **0** |
+| `cyclone_10_dev_open` | AtariFA-Platine v1.x mit der „dev_open"-Cyclone-10-Platine | Cyclone 10 LP | **1** |
+| `cyclone_IV_dev_open` | dieselbe „dev_open"-Platine, aber mit Cyclone IV bestückt | Cyclone IV E | **2** |
 
 **Die Info-Anzeige sagt Ihnen, welches Programm läuft:** Die erste der drei Versionsziffern auf der Anzeige von Spieler 1 ist die Platinennummer. Haben Sie das falsche Programm geladen, bleiben die Anzeigen höchstwahrscheinlich dunkel oder zeigen Unsinn — prüfen Sie dann zuerst diese Ziffer.
 
-Abgesehen von der Pinbelegung sind beide gleich, mit zwei kleinen Unterschieden auf der Huckepackplatine selbst: Bei der „dev_open"-Platine sitzen der Reset-Taster und alle vier Status-LEDs auf der Huckepackplatine (die vierte ist Reserve und bleibt dunkel), und sie führt 3 statt 8 Debug-Leitungen auf den Stecker für den Logikanalysator.
+Abgesehen von der Pinbelegung sind alle drei gleich, mit zwei kleinen Unterschieden auf der Huckepackplatine selbst: Bei den beiden „dev_open"-Platinen sitzen der Reset-Taster und alle vier Status-LEDs auf der Huckepackplatine (die vierte ist Reserve und bleibt dunkel), und sie führen 3 statt 8 Debug-Leitungen auf den Stecker für den Logikanalysator. Die beiden „dev_open"-Fassungen unterscheiden sich nur im bestückten FPGA und in zwei Pins, die auf dem Cyclone IV anders liegen.
 
-**Die Variante `cyclone_10_dev_open` ist noch nicht am Automaten erprobt.**
+**Erprobungsstand.** Am Automaten gespielt ist bisher nur `cyclone_10_pcb`. `cyclone_10_dev_open` läuft seit Software 0.3.0 auf dem Prüfstand — Start, Info-Anzeige und der MP3-Spieler sind dort bestätigt, alles übrige hängt an der Verdrahtung zum Automaten und ist ungeprüft. `cyclone_IV_dev_open` ist gebaut, aber noch nie auf Hardware gelaufen.
 
 ## 13. Noch nicht implementiert
 
@@ -519,7 +520,7 @@ Glimmt es auch bei 400 µs weiter, liegt es nicht an der Software — Kapitel 4.
 **Die Info-Anzeige, die ersten 5 Sekunden nach dem Einschalten**
 
 ```
-Spieler 1   0 1 2      Version, erste Ziffer = Platinen-Variante
+Spieler 1   0 3 3      Version, erste Ziffer = Platinen-Variante
 Spieler 2      0 2     Spielauswahl  (Anhang A)
 Spieler 3   000000     Optionen 1..6, von links nach rechts, 1 = ON
 Spieler 4        0     Freispiel, 1 = aktiv
