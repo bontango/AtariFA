@@ -4,9 +4,9 @@ Wie man eine `names/AtariFA/<spiel>.cfg` für FA_Control erstellt: woher die Num
 kommen, welche Umrechnung je Gewerk gilt, und was davon **spielunabhängig** ist und
 deshalb nur einmal hergeleitet werden musste.
 
-Entstanden beim Bau von `AtariFA/002.cfg` (Airborne Avenger, 08.2026). Die vier
+Entstanden beim Bau von `AtariFA/002.cfg` (Airborne Avenger, 08.2026); die vier
 übrigen Spiele — Atarians (000), Time 2000 (001), Middle Earth (003), Space Riders
-(004) — sind damit im Wesentlichen Fleißarbeit; die Rechenregeln stehen alle hier.
+(004) — kamen 09.2026 dazu, die Lampen zuletzt. **Alle fünf Dateien sind vollständig.**
 
 Schwesterdokument: **`FA_Control_Interface.md`** (Protokoll, Übernahmemodell,
 Nummerierung aus Sicht des FPGAs). Dieses Dokument ist die Anwendung davon auf die
@@ -22,11 +22,14 @@ dreistellig. Auf AtariFA ist das die Game-Select-DIP-Bank:
 
 | Nr | Spiel | Datei |
 |---|---|---|
-| 000 | The Atarians | `AtariFA/000.cfg` |
-| 001 | Time 2000 | `AtariFA/001.cfg` |
-| 002 | Airborne Avenger | `AtariFA/002.cfg` ✅ fertig |
-| 003 | Middle Earth | `AtariFA/003.cfg` |
-| 004 | Space Riders | `AtariFA/004.cfg` |
+| 000 | The Atarians | `AtariFA/000.cfg` ✅ 54 Lampen |
+| 001 | Time 2000 | `AtariFA/001.cfg` ✅ 47 Lampen |
+| 002 | Airborne Avenger | `AtariFA/002.cfg` ✅ 62 Lampen |
+| 003 | Middle Earth | `AtariFA/003.cfg` ✅ 49 Lampen |
+| 004 | Space Riders | `AtariFA/004.cfg` ✅ 52 Lampen |
+
+Game-Select 5…7 spielt zwar Middle Earth, FA_Control sucht dann aber `005.cfg`…`007.cfg`
+und findet nichts. Kopien von `003.cfg` wären die Lösung; bisher nicht angelegt.
 
 Hochladen im Menü **07 NAMES** oder ablegen unter
 `https://lisy.dev/swrep/misc/FA_Control/names/AtariFA/`.
@@ -65,13 +68,29 @@ Diese Übersetzung ist **je Spiel neu nachzuschlagen** — sie ergibt sich aus d
 Verdrahtung des jeweiligen Spielfelds, nicht aus der MPU.
 
 **Q14 und Q18 sind auf der AtariFA-Platine nicht bestückt.** FA-Control nimmt die
-Befehle an, es passiert nur nichts. Nummern, die ein Spiel nicht benutzt, lässt man
-in der Datei einfach weg.
+Befehle an, es passiert nur nichts. Sie tauchen folgerichtig auch in keiner der fünf
+Spalten der Spulen-PDF auf.
 
-Mögliche Abkürzung für die übrigen vier Spiele:
-`Manuals\Atari Spulentreiberbelegung Gen1.pdf` sieht nach genau dieser Tabelle für alle
-Gen1-Spiele aus (beim nächsten Spiel prüfen — der Text ließ sich nicht extrahieren, das
-PDF muss man ansehen).
+### Die Abkürzung: `Atari Spulentreiberbelegung Gen1.pdf` ist genau diese Tabelle
+
+**Bestätigt 09.2026** — das PDF listet Q1…Q20 für alle fünf Spiele im Klartext, mit
+`**********` für die unbenutzten Treiber. Damit entfällt Tabelle 5 des Manuals völlig.
+Der Text **lässt sich extrahieren**, nur nicht mit dem eingebauten PDF-Reader (kein
+`pdftoppm`); `pdftotext -layout` aus dem Git-Bash-`mingw64` reicht:
+
+```bash
+pdftotext -layout "N:/Projekte/FPGA Atari/Manuals/Atari Spulentreiberbelegung Gen1.pdf" -
+```
+
+Zwei Befunde, die der 002.cfg widersprachen und dort korrigiert wurden: **Q3 = Extra
+Ball Meter** und **Q20 = Total Plays** bei Airborne — beides Zählwerke, die in Tabelle 5
+(nur Spielfeldspulen) gar nicht vorkommen und deshalb fälschlich als unbenutzt geführt
+waren. Q20 ist bei Middle Earth und Space Riders ebenfalls das Zählwerk; nur bei den
+Atarians liegt dort der linke Flipper.
+
+Seit 09.2026 führen alle fünf Dateien **alle 22 Nummern** auf, die unbenutzten mit dem
+Namen `NOT USED` — sonst sieht man in der Weboberfläche nicht, ob eine Kachel ungeprüft
+oder wirklich unbelegt ist.
 
 ---
 
@@ -106,6 +125,22 @@ Die Spalte `Zeile` ist der Steckerpin auf J7 bzw. J10 — und genau das steht au
 Spalte „AtariFA Switch Test" der `Airborne Avenger Assignments.xlsx`. Die beiden Quellen
 decken sich vollständig.
 
+> **Für die Atarians ist die CSV unvollständig — dort gilt das PDF.** Das Spiel hat einen
+> **dritten Stecker J6 mit eigenen Adressen** (`$2013–$201F` und `$2028–$202F`: Tilt-Gruppe,
+> `SW #1…#8`, Center Bumper, beide Slingshots, der ATARI-Spellout). Diese zwei Spalten
+> stehen nur in `…Kontakttestcodes.pdf`, nicht in der CSV. `pdftotext` verschiebt dort die
+> Zeilen; die Spalte ist nur **im Bild** zuverlässig zu lesen — `pdftoppm` fehlt, `pymupdf`
+> ist aber installiert:
+>
+> ```python
+> import fitz; d = fitz.open(PDF)
+> d[0].get_pixmap(matrix=fitz.Matrix(4,4), clip=(505,0,842,595)).save("sw_right.png")
+> ```
+>
+> Offen geblieben: `$2014` und `$2016` sind im Blatt **beide** mit „Tilt Cabinet"
+> beschriftet. So steht es in der Quelle, in `000.cfg` entsprechend als
+> `20=Tilt Cabinet` und `22=Tilt Cabinet (2)`.
+
 ### Nicht vergessen: die Schalter außerhalb des Spielfelds
 
 | FA-Nr | Adresse | Bedeutung |
@@ -137,6 +172,57 @@ also wirklich unbelegt und nicht nur unbeschriftet.
 **Reihenfolge der ROM-Argumente beachten:** `dis6800.py <rom@0x7000> <rom@0x7800>`.
 Bei falscher Reihenfolge kommen unsinnige Vektoren heraus (`RESET=$8E39`); richtig ist
 für Airborne `airborne.e00.hex` zuerst.
+
+### Die Programmier-DIPs (Schalter 0–15)
+
+Die 16 Adressen `$2000–$200F` sind keine Spielfeldschalter, sondern die beiden
+8er-DIP-Bänke **PROG SW1** und **PROG SW2** auf der Prozessorplatine. Sie hängen an
+derselben SWITCH-COMMON-Leitung und kommen deshalb über dieselbe Matrix herein.
+Die Zuordnung ist **hardwarefest, für alle fünf Spiele gleich** (Space-Riders-Handbuch
+Table 5-2, `Space_Riders_Manual_full.md` Zeile 2983–2998; Gegenprobe PinMAME `dipg1_r`):
+
+```
+0-3   $2000-$2003 = PROG SW2 Toggle 4, 3, 2, 1
+4-7   $2004-$2007 = PROG SW2 Toggle 8, 7, 6, 5
+8-11  $2008-$200B = PROG SW1 Toggle 4, 3, 2, 1
+12-15 $200C-$200F = PROG SW1 Toggle 8, 7, 6, 5
+```
+
+Nur die **Funktion** je Toggle ist Spielsache. Wo sie steht:
+
+| Spiel | Quelle |
+|---|---|
+| Airborne | `Manuals/Airborne Avenger/…Switch_Settings.txt` (Tabellen 1–9) |
+| Middle Earth | `Manuals/Middle Earth/…Switch_Settings.txt` |
+| Space Riders | `Manuals/Space Riders/Space_Riders_Manual_full.md`, Adjustments-Kapitel |
+| Time 2000 | **`doc/Time2000_Operator_Options.jpg`** — Handbuch Kap. 1C, Table 2 |
+| Atarians | **`doc/Atarian_Operator_Options.jpg`** — Table 1-2, **ohne Toggle-Angaben** |
+
+> **Falle: manche Tabellen nennen den Bauteilort statt der Bank.** Die Time-2000-Tabelle
+> schreibt „Location F2" und „Location F4". Es gilt **F2 = PROG SW1, F4 = PROG SW2** —
+> aufgelöst über vier Anker, die alle in dieselbe Richtung zeigen: F2-1 = Self Test
+> (= SW1-1, `$200B`), F2-5/6 = Max Credits (= SW1-5/6), F4-1 = Balls per Game (= SW2-1),
+> F4-2 = Match (= SW2-2). Bei einer neuen Quelle immer an diesen vier gegenprüfen,
+> bevor man 16 Zeilen spiegelverkehrt einträgt.
+
+Das **Grundgerüst ist bei vier der fünf Spiele identisch**: SW2-1 Balls, SW2-2 Match,
+SW2-7/8 Special, SW1-1 Test, SW1-5/6 Max Credits, der Rest von SW2 Coin/Credit.
+Zwei Abweichungen sind belegt:
+
+* **Time 2000** stellt die beiden Münzschächte getrennt ein (links SW1-2/3/4, rechts
+  SW2-4/5/6) und hat auf SW2-3 ein „Slam/Tilt Warning Sound".
+* **Die Atarians** haben auf SW2-3 „Replays Allowed" und auf SW2-4 „Playfield
+  Restoration" — also gerade **nicht** Coin/Credit. Das steht nicht im Handbuch
+  (Table 1-2 nennt die Optionen ohne Toggles), sondern kommt aus dem Schaltplan:
+  `$2003` Balls, `$2002` Match, `$2001` Replays, `$2000` Memory Reset/Restore.
+  Die drei restlichen Optionen der Tabelle (Game Cost, Special, Max Credits) haben je
+  vier Choices, und es bleiben genau drei Toggle-Paare übrig (SW2-5/6, SW2-7/8,
+  SW1-5/6) — in `000.cfg` so eingetragen und dort als **übernommen, nicht belegt**
+  gekennzeichnet. SW1-2/3/4 und SW1-7/8 bleiben bei den Atarians ohne Funktion.
+
+**Nicht vergessen:** `$2000` ist auf dem AtariFA ein Sonderfall — der FPGA
+überschreibt **Bit 6** mit dem synthetisierten DMA-Sync. Der DIP wird von der Matrix
+richtig gelesen, das Spiel sieht ihn nur eingeschränkt.
 
 ---
 
@@ -240,8 +326,74 @@ die Nummer hier nach:
 ### Wo die Lampennamen herkommen
 
 Das Spielfeld-Lampenblatt des jeweiligen Spiels (Steckerpin → Funktion → DS-Nummer).
-Im Repo liegen bisher `doc/Lamp_Strobes_Airborne.png` und `doc/Lamp_Strobes_Atarians.png`;
-für die übrigen drei steht das Blatt in den Manuals unter `Manuals\<Spiel>\`.
+**Seit 09.2026 liegen alle fünf vor:**
+
+| Spiel | Blatt | Hochauflösendes Original (wenn der Ausschnitt nicht reicht) |
+|---|---|---|
+| Airborne | `doc/Lamp_Strobes_Airborne.png` | — |
+| Atarians | `doc/Lamp_Strobes_Atarians.png` | Zeichnung A006023-01 |
+| Time 2000 | `doc/Lamp_Strobes_Time2000.png` | `Manuals/Time 2000/Time_2000_TM-099_1st_Printing.pdf` **Seitenindex 63/64** (Figure 31, linkes/rechtes Blatt) |
+| Middle Earth | `doc/Lamp_Strobes_Middle_Earth_1.png` (J1) + `_2.png` (J2) | `Manuals/Middle Earth/Middle_Earth_TM-108_1st_Printing_Sheet_1_of_2.pdf` — **eine Seite mit 13600×8809 px**, die beste Quelle im ganzen Bestand |
+| Space Riders | — (kein Blatt im Repo) | `Manuals/Space Riders/Atari Space Riders manual.pdf` **Seitenindex 57** (Figure 5-7, Sheet 2 of 2) |
+
+Die kleinen `doc/*.png` sind Ausschnitte in Originalauflösung — Hineinzoomen bringt dort
+nichts mehr. Wo eine Zeile unklar bleibt oder der Ausschnitt unten abgeschnitten ist,
+rendert man dieselbe Seite aus dem Handbuch neu (`pdftoppm` fehlt auf dieser Maschine,
+`pymupdf` ist da):
+
+```python
+import fitz
+d = fitz.open(PDF)
+d[idx].get_pixmap(matrix=fitz.Matrix(5.5, 5.5), clip=fitz.Rect(x0, y0, x1, y1)).save(out)
+```
+Sinnvoller Zoom = `Bildbreite / Seitenbreite` (`d[i].get_images(full=True)` nennt die
+Pixelmaße des eingebetteten Scans); mehr ist Interpolation.
+
+### Die vier Fallen beim Abtippen — und die drei Tests, die sie fangen
+
+1. **Der Pin steht UNTER seiner Zeile**, nicht daneben. Auf allen Blättern sitzt die
+   Beschriftung auf der Trennlinie, die die Zeile nach unten abschließt. Wer sie der
+   Zeile darunter zuordnet, verschiebt das ganze Blatt um eins.
+2. **Unbelegte Pins werden mal als Leerzeile gezeichnet, mal gar nicht.** Middle Earth
+   überspringt auf J1 den Pin **B** ohne Lücke (A, C, D, …), Time 2000 lässt auf J2 die
+   Pins F und H ersatzlos weg (…, D, E, **J**), die Atarians zeichnen für die unbelegten
+   J2-Pins 6 und 7 dagegen leere Zeilen. Man muss die Buchstaben also wirklich lesen.
+3. **B/C und F/J verwechselt man leicht** in der Handschrift. Hilft: dieselbe Zeichnung
+   nach einem *bekannten* Vorkommen desselben Buchstabens absuchen und beide Glyphen
+   nebeneinander vergrößern.
+4. **Zeilenumbrüche im Namen** erzeugen scheinbare Leerzeilen (Space Riders J2: „SAME
+   PLAYER / SHOOTS AGAIN" braucht zwei Textzeilen, dazwischen steht der unbelegte Pin B).
+
+Dagegen helfen drei Tests, alle billig und alle unabhängig von der eigenen Lesart:
+
+* **DS-Reihenfolge.** Bei Atarians und Time 2000 laufen die DS-Nummern lückenlos in
+  Steckerpin-Reihenfolge (Atarians DS10 an J1-2 … DS79 an J2-J). Jeder Sprung muss sich
+  als Beleuchtungsgruppe erklären lassen, sonst ist eine Zeile verrutscht. Bei Middle
+  Earth und Space Riders sind die DS-Nummern **nicht** sortiert — dort greift der Test nicht.
+* **Strobe-Familien.** Lampen, die am Spielfeld eine Leiter oder ein Wort bilden, hängen
+  fast immer an *einer* Spalte, d. h. sie haben alle dasselbe `Nummer mod 4`. Belegt:
+  Airborne Bonus 1K–20K → alle SD · Middle Earth Bonus → alle SD, Spieler → alle SC ·
+  Space Riders Bonus → alle SD, BIKE → SC, CITY → SA · Atarians Punkte 1.000–10.000 →
+  alle SB, ATARI → alle SD, EXTRA BALL → alle SC · Time 2000 **alle zwölf AM-Lampen → SA,
+  alle zwölf PM-Lampen → SB**, Spieler → SD. Genau dieser Test hat bei Middle Earth die
+  Frage „ist Pin B belegt?" entschieden: mit B fällt jede einzelne Familie auseinander.
+* **Zweite Quelle**, wo es sie gibt (Space Riders, s. u.).
+
+### Sonderfall Space Riders: Latch-Tabelle als Gegenprobe
+
+`doc/Lamp_Latches_Space_Rider.png` (Handbuch Table 5-6, „LATCH TEST (LAMPS)") nennt je
+Lampe **Latch-Adresse und Datenbit**, also `L` und `b` — und damit die Gruppe
+`GRP_OF(L*6+b)`. **Den Strobe liefert sie nicht:** in nur teilweise belegten Gruppen ist
+nicht entscheidbar, welcher der vier Plätze leer ist. Als *alleinige* Quelle taugt sie
+deshalb nicht, als Gegenprobe ist sie ausgezeichnet — die Namen stehen in aufsteigender
+Strobe-Reihenfolge, unbelegte Plätze fehlen einfach.
+
+Ergebnis der Gegenprobe 09.2026: in **allen 14 Gruppen** liegen die Latch-Namen genau auf
+den Plätzen, die das Steckerblatt belegt. Genau eine Lampe steht nur in der Tabelle —
+`$1004 D3` = Gruppe 18, und da Blatt und Tabelle sich auf SA/SB/SD einig sind, bleibt für
+„BALL" nur SC = **Lampe 70**. Umgekehrt kennt die Tabelle den BIKE-/CITY-Spellout nicht.
+Bei abweichendem Wortlaut gilt das Steckerblatt (die Tabelle nennt die vier Center-
+Rollover „Upper Left/Right Rollover", das Blatt „Lt./Rt. Upper/Lower Center Rollover").
 
 **Die Strobe-Spalte solcher Blätter ist ein guter Selbsttest.** Sie muss zum Strobe des
 Sheet-18D-Labels passen (sonst könnte die Lampe gar nicht leuchten). Beim Airborne
@@ -258,9 +410,19 @@ Gegenprobe. Im Konfliktfall gilt der Schaltplan.
 
 ### Wie viele Lampen ein Spiel benutzt
 
-Airborne belegt J1 komplett (bis auf F, L, W) und J2 nur bis Pin 13 / R → **62 der 84**.
-Unbelegt bleiben 0-3, 7, 24, 32-35, 39-47, 51, 78, 82. Andere Spiele werden andere
-Teilmengen benutzen; unbenutzte Nummern lässt man in der Datei weg.
+Jedes Spiel belegt eine andere Teilmenge; unbenutzte Nummern lässt man weg.
+
+| Spiel | Lampen | unbelegt |
+|---|---|---|
+| Airborne | 62 | 0-3, 7, 24, 32-35, 39-47, 51, 78, 82 |
+| Atarians | 54 | 0-3, 32-47, 69-70, 76-83 |
+| Time 2000 | 47 | 0-3, 32-47, 65-71, 74-83 |
+| Middle Earth | 49 | 0-3, 20, 32-47, 64, 66, 68-71, 76-83 |
+| Space Riders | 52 | 0-3, 32-47, 54, 58, 62, 74, 76-83 |
+
+**0-3 und 32-47 sind bei allen fünf frei** — das sind die Gruppen 1, 9, 10, 11, 12 und
+teilweise 20/21, also die ULN-Positionen, die das Original an J3 weiterführt und die
+AtariFA gar nicht bestückt. Wer dort eine Lampe zu sehen glaubt, hat sich verzählt.
 
 ---
 
@@ -293,9 +455,12 @@ LISY-Beispieltext und trifft auf Atari Gen1 nicht zu). S. `Sound_Emulation.md`.
 
 1. **Schalter:** `Manuals\Atari Schalterzuordnungen und Kontakttestcodes.csv` öffnen,
    Spalte des Spiels nehmen, `Adresse − 0x2000` = FA-Nummer. Die fünf spielunabhängigen
-   Blöcke aus Abschnitt 3 dazu.
-2. **Spulen:** Tabelle 5 des Spiel-Manuals (Credit-Display-Nr → Qn); Qn ist die
-   FA-Nummer. Ggf. `Atari Spulentreiberbelegung Gen1.pdf` als Sammelquelle prüfen.
+   Blöcke aus Abschnitt 3 dazu. Bei den **Atarians** stattdessen das PDF nehmen
+   (Stecker J6 fehlt in der CSV, s. Kasten in Abschnitt 3).
+2. **Spulen:** `Manuals\Atari Spulentreiberbelegung Gen1.pdf` per `pdftotext -layout`
+   auslesen — dort steht `Qn` direkt. Tabelle 5 des Spiel-Manuals (Credit-Display-Nr
+   → Qn) braucht man nur noch als Gegenprobe. Alle 22 Nummern eintragen, unbenutzte
+   als `NOT USED`.
 3. **Lampen:** Spielfeld-Lampenblatt (Pin → Funktion) und die Tabelle aus Abschnitt 4
    (Pin → Nummer). Strobe-Spalte als Gegenprobe.
 4. **Sounds/Displays** aus `002.cfg` kopieren.
@@ -347,8 +512,10 @@ for i in range(84):
 | `rtl/common/lamp_map_pkg.vhd` | `GRP_OF` — die eine Quelle der Lampenzuordnung |
 | `docs/Lamp_Logic.png` | Sheet 18D, Airborne Processor PCB — Ausgang → Steckerpin |
 | `docs/solenoid_mapping.txt` | Latch-Bit → `F_Qn` (Bestückung der AtariFA) |
-| `../doc/Lamp_Strobes_Airborne.png`, `../doc/Lamp_Strobes_Atarians.png` | Spielfeld-Lampen je Steckerpin |
-| `../Manuals/Atari Schalterzuordnungen und Kontakttestcodes.csv` | **Schalter aller 5 Spiele mit CPU-Adresse** |
-| `../Manuals/Atari Spulentreiberbelegung Gen1.pdf` | vermutlich Spulen aller 5 Spiele (noch prüfen) |
+| `../doc/Lamp_Strobes_*.png`, `../doc/Lamp_Latches_Space_Rider.png` | Spielfeld-Lampen je Steckerpin (alle 5 Spiele, s. Abschnitt 4) |
+| `../Manuals/Atari Schalterzuordnungen und Kontakttestcodes.csv` | **Schalter aller 5 Spiele mit CPU-Adresse** (für Atarians unvollständig) |
+| `../Manuals/Atari Schalterzuordnungen und Kontakttestcodes.pdf` | dasselbe **plus Stecker J6 der Atarians** |
+| `../Manuals/Middle Earth/…Switch_Settings.txt`, `../Manuals/Space Riders/Space_Riders_Manual_full.md` | Funktion der PROG-DIPs (für Time 2000 und Atarians nur Scans → dort generische DIP-Namen) |
+| `../Manuals/Atari Spulentreiberbelegung Gen1.pdf` | **Spulen aller 5 Spiele** — bestätigt, `pdftotext -layout` |
 | `../Manuals/<Spiel>/` | Spiel-Manuals mit Tabelle 5 und Lampenblatt |
 | `N:\Projekte\FA_Control\names\example.cfg` | Formatbeschreibung |
