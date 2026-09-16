@@ -232,6 +232,19 @@ WillFA/GottFA Cyclone-II-Varianten haben, die noch mit Quartus 13.0sp1 gebaut we
 `numeric_std` wird nur modulintern benutzt und kollidiert deshalb nicht mit der
 `std_logic_unsigned`-Konvention der Top-Levels.
 
+**Boot-Lader für Spiel-ROMs** (`rtl/fa_control/esp_rom_loader.vhd`, zuerst in SternFA): das
+Spiel-ROM kommt vom ESP statt von der SD-Karte. Das ist bewusst **kein** LISY-Opcode, sondern
+ein eigenes kleines Protokoll vor jeder LISY-Sitzung auf derselben UART. Das Modul ist
+allgemein gehalten (Generics `HW_NAME`, `ROM_SECTORS`) und lässt sich mit dem Ordner
+übernehmen. FA-Control legt die ROMs unter `<HW>/<nnn>` ab. Beschreibung:
+`N:\Projekte\FA_Control\docs\TECHNICAL_REFERENCE.md`, Abschnitt 6.3. Für AtariFA ist es bisher
+nicht eingebaut.
+
+**`GAME_DIGITS`** (SternFA-Stand von `fa_control.vhd`): wie viele Ziffern Opcode 8 meldet.
+Namensdateien und ROMs liegen unter `<HW>/<nnn>`; eine einzelne Ziffer lässt Spiele
+zusammenfallen. Beim Übernehmen des SternFA-Stands hierher `game_info` entsprechend breit
+anschließen (Default 1 = 4 Bit wie bisher).
+
 ## 8. Ressourcen (AtariFA, Quartus 22.1std.2)
 
 | | vor SW 0.1.3 | mit FA-Control |
