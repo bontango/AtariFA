@@ -10,6 +10,13 @@ option overlaid on top.
 
 Ralf Thelen ('bontango') · <https://lisy.dev>
 
+## User manuals
+
+**Read online:** <https://bontango.github.io/AtariFA/>
+
+- [User manual HW 1.x (English)](https://bontango.github.io/AtariFA/AtariFA_HWv1_x_user_manual.html)
+- [Bedienungsanleitung HW 1.x (Deutsch)](https://bontango.github.io/AtariFA/AtariFA_HWv1_x_Bedienungsanleitung.html)
+
 ---
 
 ## Boards
@@ -59,9 +66,11 @@ archive/        historic modules, in no build
 
 ## Documentation
 
-**User manual: [`docs/AtariFA_HWv1_x_user_manual.md`](docs/AtariFA_HWv1_x_user_manual.md)** — for
+**User manual: [online](https://bontango.github.io/AtariFA/AtariFA_HWv1_x_user_manual.html)**
+(source `docs/AtariFA_HWv1_x_user_manual.html`) — for
 whoever puts the board into a machine: DIP switches, boot sequence, sound paths, LEDs, free play.
-In German: [`docs/AtariFA_HWv1_x_Bedienungsanleitung.md`](docs/AtariFA_HWv1_x_Bedienungsanleitung.md).
+In German: [online](https://bontango.github.io/AtariFA/AtariFA_HWv1_x_Bedienungsanleitung.html)
+(`docs/AtariFA_HWv1_x_Bedienungsanleitung.html`).
 Same chapter numbering, so a hint like "see chapter 4.3" fits both.
 
 Everything else in `docs/` is development material: measurements, schematic extracts and the

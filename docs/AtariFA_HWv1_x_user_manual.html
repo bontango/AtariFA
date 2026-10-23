@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>AtariFA user manual (HW 1.x)</title>
+  <style>
+
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+</style>
+  <style type="text/css">:root {
+--bg: #fbfaf7;
+--fg: #1d1f21;
+--muted: #5a5f66;
+--accent: #0b5cad;
+--rule: #d9d6cf;
+--code-bg: #f0eee8;
+--th-bg: #ece9e1;
+--row-alt: #f5f3ee;
+--note-bg: #eef4fb;
+--note-rule: #0b5cad;
+}
+@media (prefers-color-scheme: dark) {
+:root:not([data-theme="light"]) {
+--bg: #17191c;
+--fg: #e4e2dd;
+--muted: #a3a7ad;
+--accent: #6fb1f2;
+--rule: #3a3d42;
+--code-bg: #24272b;
+--th-bg: #2a2d32;
+--row-alt: #1d2024;
+--note-bg: #1c2633;
+--note-rule: #6fb1f2;
+}
+}
+:root[data-theme="dark"] {
+--bg: #17191c;
+--fg: #e4e2dd;
+--muted: #a3a7ad;
+--accent: #6fb1f2;
+--rule: #3a3d42;
+--code-bg: #24272b;
+--th-bg: #2a2d32;
+--row-alt: #1d2024;
+--note-bg: #1c2633;
+--note-rule: #6fb1f2;
+}
+html { -webkit-text-size-adjust: 100%; }
+body {
+background: var(--bg);
+color: var(--fg);
+font: 16px/1.6 "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+max-width: 58rem;
+margin: 0 auto;
+padding: 2rem 1rem 4rem;
+}
+h1, h2, h3, h4 { line-height: 1.25; margin: 2.2em 0 0.6em; }
+h1 { font-size: 2.2rem; margin-top: 0.5em; border-bottom: 3px solid var(--accent); padding-bottom: 0.2em; }
+h2 { font-size: 1.5rem; border-bottom: 1px solid var(--rule); padding-bottom: 0.2em; }
+h3 { font-size: 1.2rem; }
+h4 { font-size: 1.05rem; color: var(--muted); }
+a { color: var(--accent); }
+a:not(:hover) { text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+p, ul, ol, table, pre, blockquote { margin: 0 0 1em; }
+li { margin: 0.15em 0; }
+li > p { margin: 0.2em 0; }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 2.5em 0; }
+img { max-width: 100%; height: auto; display: block; margin: 1em auto; border-radius: 4px; }
+code {
+font-family: Consolas, "Cascadia Mono", "SFMono-Regular", Menlo, monospace;
+font-size: 0.9em;
+background: var(--code-bg);
+padding: 0.1em 0.3em;
+border-radius: 3px;
+}
+pre {
+background: var(--code-bg);
+padding: 0.8em 1em;
+border-radius: 4px;
+overflow-x: auto;
+line-height: 1.4;
+}
+pre code { background: none; padding: 0; font-size: 0.85em; }
+blockquote {
+background: var(--note-bg);
+border-left: 4px solid var(--note-rule);
+margin-left: 0;
+padding: 0.6em 1em;
+}
+blockquote > :last-child { margin-bottom: 0; }
+table {
+border-collapse: collapse;
+display: block;
+overflow-x: auto;
+max-width: 100%;
+font-size: 0.95em;
+}
+th, td { border: 1px solid var(--rule); padding: 0.3em 0.6em; vertical-align: top; text-align: left; }
+th { background: var(--th-bg); }
+tbody tr:nth-child(even) { background: var(--row-alt); }
+table.gamelist td, table.gamelist th { padding: 0.15em 0.45em; white-space: nowrap; }
+
+.titlepage { margin-bottom: 2.5em; }
+.titlepage p { margin: 0.2em 0; }
+@media (max-width: 600px) {
+body { font-size: 15px; padding: 1rem 1rem 3rem; }
+h1 { font-size: 1.8rem; }
+}
+@media print {
+body { background: #fff; color: #000; max-width: none; font-size: 10.5pt; padding: 0; }
+a { color: #000; text-decoration: none; }
+h2, h3 { break-after: avoid; }
+pre, table, img, blockquote { break-inside: avoid; }
+tbody tr:nth-child(even) { background: #f3f3f3; }
+}
+</style>
+</head>
+<body>
+<h1 id="atarifa">AtariFA</h1>
+<p><strong>Atari Generation 1 MPU, based on FPGA</strong></p>
+<p><strong>Hardware version v1.x</strong></p>
+<p><strong>Software Version 0.3.3</strong></p>
+<p><strong>user manual</strong></p>
+<p><a href="mailto:ralf@lisy.dev">ralf@lisy.dev</a></p>
+<p>v1.1 04.09.2026</p>
+<blockquote>
+<p>Eine deutsche Fassung gibt es unter <a href="AtariFA_HWv1_x_Bedienungsanleitung.html">AtariFA_HWv1_x_Bedienungsanleitung.html</a>.
+A German version is available as <a href="AtariFA_HWv1_x_Bedienungsanleitung.html">AtariFA_HWv1_x_Bedienungsanleitung.html</a>.
+The chapter numbering is the same in both.</p>
+</blockquote>
+<h2 id="table-of-contents">Table of contents</h2>
+<ul>
+<li><a href="#important-remark">Important remark</a></li>
+<li><a href="#1-introduction">1. Introduction</a></li>
+<li><a href="#2-quickstart">2. Quickstart</a></li>
+<li><a href="#3-installation">3. Installation</a>
+<ul>
+<li><a href="#31-what-atarifa-replaces-and-what-it-does-not">3.1. What
+AtariFA replaces and what it does not</a></li>
+<li><a href="#32-the-box-connectors">3.2. The box connectors</a></li>
+<li><a href="#33-fuses">3.3. Fuses</a></li>
+</ul></li>
+<li><a href="#4-dip-switch-settings">4. Dip Switch Settings</a>
+<ul>
+<li><a href="#41-the-4-switch-bank-game-select-and-free-play">4.1. The 4
+switch bank: game select and free play</a></li>
+<li><a href="#42-the-6-switch-bank-options">4.2. The 6 switch bank:
+options</a>
+<ul>
+<li><a href="#421-option-3---where-the-sound-comes-out">4.2.1. Option 3
+-&gt; where the sound comes out</a></li>
+<li><a href="#422-option-4---let-fa-control-take-over">4.2.2. Option 4
+-&gt; let FA-Control take over</a></li>
+<li><a href="#423-option-1---background-music-option-2-reserved">4.2.3.
+Option 1 -&gt; background music, option 2 reserved</a></li>
+<li><a href="#424-options-5-and-6---dead-time-for-the-lamp-columns">4.2.4.
+Options 5 and 6 -&gt; dead time for the lamp columns</a></li>
+<li><a href="#425-if-the-glow-stays">4.2.5. If the glow stays</a></li>
+</ul></li>
+<li><a href="#43-six-of-the-ten-dips-are-read-once-at-boot">4.3. Six of
+the ten DIPs are read once, at boot</a></li>
+</ul></li>
+<li><a href="#5-boot-sequence">5. Boot sequence</a>
+<ul>
+<li><a href="#51-phase-1-reading-the-dip-switches">5.1. Phase 1: reading
+the DIP switches</a></li>
+<li><a href="#52-phase-2-the-info-display">5.2. Phase 2: the info
+display</a></li>
+<li><a href="#53-phase-3-program-execution">5.3. Phase 3: program
+execution</a></li>
+</ul></li>
+<li><a href="#6-game-settings-and-self-test">6. Game settings and self
+test</a>
+<ul>
+<li><a href="#61-the-programming-dip-banks-and-the-replay-switch">6.1.
+The programming DIP banks and the replay switch</a></li>
+<li><a href="#62-the-self-test">6.2. The self test</a></li>
+<li><a href="#63-credits-and-high-scores-are-not-kept">6.3. Credits and
+high scores are not kept</a></li>
+</ul></li>
+<li><a href="#7-free-play">7. Free play</a></li>
+<li><a href="#8-sound">8. Sound</a>
+<ul>
+<li><a href="#81-what-is-rebuilt">8.1. What is rebuilt</a></li>
+<li><a href="#82-the-two-audio-paths">8.2. The two audio paths</a></li>
+<li><a href="#83-the-boot-announcement">8.3. The boot
+announcement</a></li>
+<li><a href="#84-background-music-from-the-mp3-player">8.4. Background
+music from the MP3 player</a></li>
+</ul></li>
+<li><a href="#9-the-fa-control-interface-esp32">9. The FA-Control
+interface (ESP32)</a>
+<ul>
+<li><a href="#91-the-permission-option-4">9.1. The permission: option
+4</a></li>
+<li><a href="#92-what-happens-while-it-has-control">9.2. What happens
+while it has control</a></li>
+<li><a href="#93-how-control-is-handed-back">9.3. How control is handed
+back</a></li>
+<li><a href="#94-what-the-web-interface-learns-from-the-board">9.4. What
+the web interface learns from the board</a></li>
+<li><a href="#95-connecting-it">9.5. Connecting it</a></li>
+</ul></li>
+<li><a href="#10-the-status-leds">10. The status LEDs</a></li>
+<li><a href="#11-programming-the-fpga">11. Programming the FPGA</a></li>
+<li><a href="#12-board-variants">12. Board variants</a></li>
+<li><a href="#13-not-implemented-yet">13. Not implemented yet</a></li>
+<li><a href="#appendix-a-game-select">Appendix A &#39;game select&#39;</a></li>
+<li><a href="#appendix-b-quick-reference">Appendix B Quick
+reference</a></li>
+</ul>
+<h2 id="important-remark">Important remark</h2>
+<p>By using AtariFA it is possible to damage your pinball machine. As
+this is a private project with NO commercial interest the author accepts
+no liability for any damage that may arise by using AtariFA!</p>
+<h2 id="1-introduction">1. Introduction</h2>
+<p>AtariFA replaces the MPU of an Atari Generation 1 pinball machine
+with an FPGA board. It emulates the MC6800 processor, provides the ram
+and the game roms, and rebuilds the TTL logic around them - the address
+latches, the display multiplexer, the switch matrix decoders, the lamp
+drivers and the solenoid drivers.</p>
+<p>The FPGA is a Cyclone 10 LP (10CL006) on a piggy-back board that sits
+on the AtariFA PCB. The PCB carries the original Atari edge connectors,
+so the board goes in where the Atari MPU came out.</p>
+<p><strong>Five games are supported and all five are in the FPGA at the
+same time:</strong></p>
+<p>The Atarians, Time 2000, Airborne Avenger, Middle Earth and Space
+Riders. Which one runs is set with three DIP switches - there is no SD
+card and nothing to download per game. Free play is a fourth DIP switch,
+not a different rom set.</p>
+<p><strong>What do you need?</strong></p>
+<ul>
+<li>A PC with a USB port and a USB Blaster in order to be able to
+program the FPGA</li>
+</ul>
+<p>That is all. No SD card, no card reader, no battery.</p>
+<p><strong>Two things are worth knowing before you begin:</strong></p>
+<ul>
+<li><p><strong>Six of the ten DIP switches are read once, during
+boot.</strong> Changing them while the game runs has no effect. See
+chapter 4.3.</p></li>
+<li><p><strong>Credits and high scores are lost when you switch the
+machine off.</strong> That is not a limitation of AtariFA - the original
+Atari Generation 1 MPU has no battery backup either. See chapter
+6.3.</p></li>
+</ul>
+<h2 id="2-quickstart">2. Quickstart</h2>
+<ol type="1">
+<li><p>Download the latest FPGA program for <strong>AtariFA</strong>
+from lisy.dev</p></li>
+<li><p>Program the FPGA (chapter 11)</p></li>
+<li><p>Set &#39;game select&#39; according to your pinball (Appendix A)</p></li>
+<li><p>Decide where the sound should come out - option 3, see chapter
+4.2.1. For an unmodified machine with its Auxiliary Board in place,
+leave it <strong>OFF</strong></p></li>
+<li><p>Replace your original Atari MPU with AtariFA</p></li>
+<li><p>Switch the game ON</p></li>
+<li><p>Watch the info display for about 5 seconds and check that game
+select and version are what you expect (chapter 5.2)</p></li>
+<li><p>Enjoy</p></li>
+</ol>
+<p>There is no &#39;first boot&#39; procedure and nothing to initialise - the
+board has no non volatile memory that would need it.</p>
+<h2 id="3-installation">3. Installation</h2>
+<p>AtariFA has the same edge connectors as the original Atari Generation
+1 MPU and goes in at its place. Switch the machine off, pull the
+original MPU, put AtariFA in, done.</p>
+<h3 id="31-what-atarifa-replaces-and-what-it-does-not">3.1. What AtariFA
+replaces and what it does not</h3>
+<p><strong>Replaced:</strong> the MPU board, including the display
+driver logic, the switch matrix decoders, the lamp drivers and the
+solenoid drivers. Those all live on the AtariFA PCB now - 12 ULN2003A
+for the lamp matrix, 20 IRL540 MOSFETs for the solenoids.</p>
+<p><strong>Still needed: the Atari Auxiliary Board.</strong> Two things
+come from there and are not rebuilt on AtariFA:</p>
+<ul>
+<li><strong>the four lamp strobes.</strong> The lamp matrix is 21 x 4;
+AtariFA drives the 21 rows, the Auxiliary Board makes the four column
+strobes at +20 V out of the two select lines AtariFA sends it.</li>
+<li><strong>the audio output path</strong>, unless you switch the sound
+to the on-board amplifier - see chapter 8.2.</li>
+</ul>
+<p>The coin door counter and lockout coils are driven through the
+Auxiliary Board as well.</p>
+<p>So: leave the Auxiliary Board in the machine.</p>
+<h3 id="32-the-box-connectors">3.2. The box connectors</h3>
+<p>Next to the original Atari edge connectors the PCB carries two 25 pin
+&#39;box connectors&#39;. They bring the same signals out on a connector that is
+easier to probe, for testing on the bench without a playfield
+attached.</p>
+<p>The box connectors also carry the four lamp strobes, made on the
+board by four P-channel MOSFETs. <strong>Those are for test LEDs
+only</strong> - they are not built to drive the 20 V lamp matrix of a
+real playfield. On a machine the strobes come from the Auxiliary
+Board.</p>
+<h3 id="33-fuses">3.3. Fuses</h3>
+<p>The board has its own fuse holders for the solenoid supply. Use
+<strong>2 A slow blow</strong>.</p>
+<p>Two of the twenty solenoid drivers, Q14 and Q18, are not fitted -
+depending on the game those outputs do not exist on the original either.
+There is simply no MOSFET there, and the game cannot drive them
+anyway.</p>
+<h2 id="4-dip-switch-settings">4. Dip Switch Settings</h2>
+<p>AtariFA has <strong>ten DIP switches</strong> in two banks: a bank of
+four and a bank of six.</p>
+<p>Throughout this manual, and on the info display, a switch that is
+<strong>&#39;ON&#39; counts</strong>, and switch 1 of a bank is always the one
+that counts 1.</p>
+<h3 id="41-the-4-switch-bank-game-select-and-free-play">4.1. The 4
+switch bank: game select and free play</h3>
+<table>
+<thead>
+<tr>
+<th>DIP</th>
+<th>Function</th>
+<th>Weight</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dip1</td>
+<td>game select, bit 0</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Dip2</td>
+<td>game select, bit 1</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Dip3</td>
+<td>game select, bit 2</td>
+<td>4</td>
+</tr>
+<tr>
+<td>Dip4</td>
+<td><strong>free play</strong> - ON = active</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<p>The three game select switches give a number from 0 to 7. Numbers 0
+to 4 are the five games, see Appendix A. <strong>Numbers 5, 6 and 7 are
+not used and fall back to Middle Earth</strong> - so a wrongly set
+switch never leaves the board without a game.</p>
+<p>Free play is described in chapter 7.</p>
+<h3 id="42-the-6-switch-bank-options">4.2. The 6 switch bank:
+options</h3>
+<p>Default setting is <strong>all &#39;OFF&#39;</strong> - that is the right
+setting for a standard machine.</p>
+<table>
+<thead>
+<tr>
+<th>DIP</th>
+<th>Function</th>
+<th>read</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dip1</td>
+<td><strong>background music</strong> - ON = active</td>
+<td>at boot</td>
+</tr>
+<tr>
+<td>Dip2</td>
+<td>reserved</td>
+<td>at boot</td>
+</tr>
+<tr>
+<td>Dip3</td>
+<td><strong>sound: OFF = Auxiliary Board, ON = on-board
+amplifier</strong></td>
+<td>continuously</td>
+</tr>
+<tr>
+<td>Dip4</td>
+<td><strong>let FA-Control take over</strong> - ON = allowed</td>
+<td>continuously</td>
+</tr>
+<tr>
+<td>Dip5</td>
+<td><strong>lamp dead time, high bit</strong> - on its own = timing of
+the original MPU</td>
+<td>continuously</td>
+</tr>
+<tr>
+<td>Dip6</td>
+<td><strong>lamp dead time, low bit</strong> - four steps together with
+Dip5, only needed if LEDs glow</td>
+<td>continuously</td>
+</tr>
+</tbody>
+</table>
+<h4 id="421-option-3---where-the-sound-comes-out">4.2.1. Option 3 -&gt;
+where the sound comes out</h4>
+<ul>
+<li><p><strong>&#39;OFF&#39;</strong> - <strong>the original path.</strong>
+AtariFA feeds the Atari Auxiliary Board exactly as the original MPU
+does: the four audio lines and the four volume latch lines. The sound is
+then made by the Auxiliary Board and goes to the amplifier of your
+machine. <strong>This is the setting for an unmodified
+pinball.</strong></p></li>
+<li><p><strong>&#39;ON&#39;</strong> - <strong>the on-board path.</strong> The
+sound is generated inside the FPGA, filtered and sent to the small
+amplifier (TDA7267) on the AtariFA PCB. Use this on the bench, or in a
+machine whose Auxiliary Board audio section is defective. The Auxiliary
+Board outputs are held in their idle state while this is
+selected.</p></li>
+</ul>
+<p><strong>This switch may be changed while the game is running</strong>
+- it is read continuously. The sound moves over immediately.</p>
+<h4 id="422-option-4---let-fa-control-take-over">4.2.2. Option 4 -&gt;
+let FA-Control take over</h4>
+<ul>
+<li><p><strong>&#39;OFF&#39;</strong> - <strong>nobody interferes.</strong> A
+plugged in FA-Control module can watch the displays and switches, but it
+cannot switch anything. This is the setting for normal play, and it is
+the default.</p></li>
+<li><p><strong>&#39;ON&#39;</strong> - <strong>FA-Control may drive the
+machine.</strong> Only then does AtariFA hand over control when asked,
+and the game is stopped while it does. Everything else is in chapter
+9.</p></li>
+</ul>
+<p>This switch is read continuously as well: turning it &#39;OFF&#39; while
+FA-Control is in charge takes control away <strong>immediately</strong>
+and restarts the game. That is the emergency stop for a test tool that
+has locked up.</p>
+<h4 id="423-option-1---background-music-option-2-reserved">4.2.3. Option
+1 -&gt; background music, option 2 reserved</h4>
+<ul>
+<li><p><strong>Option 1, &#39;ON&#39;</strong> - <strong>background music plays
+while a ball is in play.</strong> The MP3 player on the board plays
+folder 02 of its memory card in a loop, and pauses again once the ball
+rests in the outhole and the game is over. Everything about it is in
+chapter 8.4.</p></li>
+<li><p><strong>Option 1, &#39;OFF&#39;</strong> - no background music. This is
+the default, and it is the setting for a machine that should behave like
+the original.</p></li>
+</ul>
+<p>Option 1 used to belong to an experimental credit/high score save
+feature that is currently on hold, see chapter 13. From software 0.3.0
+on it is the background music switch.</p>
+<p><strong>Option 2</strong> is not used. Leave it &#39;OFF&#39;. It is wired,
+it is shown on the info display, and it is there for later software
+versions.</p>
+<p>Both switches are read <strong>at boot only</strong> - see chapter
+4.3.</p>
+<h4 id="424-options-5-and-6---dead-time-for-the-lamp-columns">4.2.4.
+Options 5 and 6 -&gt; dead time for the lamp columns</h4>
+<p>Atari drives the lamps in a time multiplex: four columns are switched
+on in turn, half a millisecond each. On the original MPU the column is
+switched at the very moment the new lamp values become valid. Because
+the column drivers on the Auxiliary Board take a few microseconds to
+turn off, the <em>wrong</em> lamp gets a very short pulse of current
+every time — the neighbouring lamp in the same driver group, from the
+previous column.</p>
+<p>On an incandescent bulb you will never notice. <strong>LED
+replacement lamps, however, glow visibly</strong> even though they are
+switched off. This is the well-known effect that LEDs in an Atari &quot;never
+go fully dark&quot;; the Atari manual describes it as a supposed &quot;keep-alive&quot;
+circuit, but it is the same thing.</p>
+<p>AtariFA therefore switches the column <strong>while all lamps are
+blanked</strong>, and then gives the old column a short <strong>dead
+time</strong> to decay before the new lamp values go live. How long a
+column driver needs to turn off differs from machine to machine — it
+depends on the components and on how much current the lamps of that
+column draw. The less current, the longer it takes. A column fitted with
+LED replacement lamps is therefore the worst case. That is why the dead
+time is selectable, through <strong>options 5 and 6
+together</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Option 5</th>
+<th>Option 6</th>
+<th>Dead time</th>
+<th>Brightness</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>OFF</strong></td>
+<td><strong>OFF</strong></td>
+<td><strong>about 65 µs — default</strong></td>
+<td>21.8 %</td>
+</tr>
+<tr>
+<td>OFF</td>
+<td>ON</td>
+<td>about 250 µs</td>
+<td>12.8 %</td>
+</tr>
+<tr>
+<td>ON</td>
+<td>OFF</td>
+<td><em>none</em> — timing of the original MPU</td>
+<td>24.5 %</td>
+</tr>
+<tr>
+<td>ON</td>
+<td>ON</td>
+<td>about 400 µs</td>
+<td>5.5 %</td>
+</tr>
+</tbody>
+</table>
+<p><strong>What to set:</strong></p>
+<ul>
+<li><p><strong>Incandescent bulbs in the machine:</strong> nothing. The
+default is right and the switches mean nothing to you.</p></li>
+<li><p><strong>LED replacement lamps, everything fine:</strong> nothing
+either. The default is enough in most machines.</p></li>
+<li><p><strong>Single LEDs glow although they should be off:</strong> go
+one step up — first option 6 = &#39;ON&#39; (250 µs), and only if that is not
+enough, both to &#39;ON&#39; (400 µs). <strong>Use the smallest step that
+removes the glow</strong>, because every step costs brightness. At 250
+µs that is barely noticeable in the machine; <strong>400 µs is clearly
+dimmer</strong>, which is intended and not a fault.</p></li>
+<li><p><strong>Option 5 = &#39;ON&#39; on its own</strong> selects the
+<strong>timing of the original MPU</strong>, glow included. Useful if
+you want to compare AtariFA against the original board, or if you prefer
+the original behaviour. Incandescent lamps do not care at all.</p></li>
+</ul>
+<p>Both switches are read continuously, so they may be changed while the
+game is running — which makes the difference easy to compare on the
+spot, without a power cycle. A column stays the same half millisecond
+long in all four positions; only how much of it is reserved for decay
+changes.</p>
+<blockquote>
+<p><strong>The meaning of the combination changed against software 0.1.7
+and 0.1.8.</strong> Option 5 alone and option 6 alone still mean what
+they did; <strong>both together</strong> used to select the original
+timing and are now the longest dead time. Which build is running is
+shown on the info display at power on (chapter 5.2).</p>
+</blockquote>
+<h4 id="425-if-the-glow-stays">4.2.5. If the glow stays</h4>
+<p><strong>If even the longest step (options 5 and 6 both &#39;ON&#39;) changes
+nothing:</strong> then the column turn-off time is not the cause, and
+turning it up further will not help — half a millisecond of column time
+does not allow much more than 400 microseconds anyway. There is a second
+reason that no software can do anything about: the lamp drivers
+(ULN2003A) pass a residual current of a few microamperes while switched
+off, and because one column is always powered, that is enough to make a
+modern LED glow. An incandescent bulb never shows it. The original MPU
+has the same residual current.</p>
+<p>The remedy at the affected socket: <strong>a resistor of about 2.2 kΩ
+(½ W) in parallel with the lamp</strong> — it drains the residual
+current without affecting the lamp in operation. Equally effective: use
+an incandescent bulb in that position, or an LED replacement lamp with a
+built-in bleeder resistor (&#39;ghost free&#39;).</p>
+<h3 id="43-six-of-the-ten-dips-are-read-once-at-boot">4.3. Six of the
+ten DIPs are read once, at boot</h3>
+<p><strong>This is the one thing that catches people out.</strong></p>
+<p>The first six switches - the three game select switches, free play,
+and options 1 and 2 - do not have six wires of their own. They are read
+through a small 3 x 2 matrix, and that matrix borrows three lines that
+belong to the lamp drivers. Reading it continuously would flicker the
+lamps, so it is read exactly once, during the boot phase, before the
+game starts. Afterwards the three lines go back to the lamps.</p>
+<p><strong>So: after changing game select, free play or option 1 / 2,
+switch the machine off and on again.</strong> A change while the game
+runs has no effect.</p>
+<p>The remaining four switches - options 3 to 6 - have their own lines
+and are read continuously. They can be changed at any time.</p>
+<h2 id="5-boot-sequence">5. Boot sequence</h2>
+<h3 id="51-phase-1-reading-the-dip-switches">5.1. Phase 1: reading the
+DIP switches</h3>
+<p>Immediately after switching on, and after the internal clock has
+locked, the board reads the first six DIP switches through the strobe
+matrix. This takes microseconds; you will not see it. The displays are
+dark up to this point.</p>
+<h3 id="52-phase-2-the-info-display">5.2. Phase 2: the info display</h3>
+<p>When the DIP read is done the displays come on and show the
+configuration for <strong>about 5 seconds</strong>. The CPU is still
+held in reset during this time - the game has not started yet.</p>
+<table>
+<thead>
+<tr>
+<th>Display</th>
+<th>Shows</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Player 1</strong></td>
+<td>version of the FPGA program, three digits:
+<code>&lt;board&gt; &lt;sub1&gt; &lt;sub2&gt;</code></td>
+</tr>
+<tr>
+<td><strong>Player 2</strong></td>
+<td>value of game select, two digits, 00 to 07</td>
+</tr>
+<tr>
+<td><strong>Player 3</strong></td>
+<td>the six option switches, option 1 on the left, option 6 on the right
+- <code>1</code> = ON</td>
+</tr>
+<tr>
+<td><strong>Player 4</strong></td>
+<td>free play: <code>1</code> = active, <code>0</code> = not active</td>
+</tr>
+<tr>
+<td><strong>Credit/Ball</strong></td>
+<td>dark</td>
+</tr>
+</tbody>
+</table>
+<p>Everything stands right aligned, the unused digits stay dark.</p>
+<p>Example: player 1 showing <code>033</code>, player 2 showing
+<code>02</code>, player 3 showing <code>000000</code>, player 4 showing
+<code>0</code> is software 0.3.3 on the standard board, running Airborne
+Avenger, no options set, no free play.</p>
+<p><strong>The leading digit of the version tells you which board
+variant you have</strong>, see chapter 12. <code>0</code> is the
+standard AtariFA board.</p>
+<p>About two seconds into this window the board says its name over the
+on-board amplifier - see chapter 8.3.</p>
+<p><strong>Use this display.</strong> It is the quickest way to see
+whether the DIP switches are what you think they are, and since six of
+them are only read here, it is the only place where you can check them
+at all.</p>
+<h3 id="53-phase-3-program-execution">5.3. Phase 3: program
+execution</h3>
+<p>After the info window the CPU is released and the game starts. From
+here on the displays belong to the game and behave exactly as with an
+original Atari MPU.</p>
+<p>The game roms are inside the FPGA; there is nothing to load and no
+waiting.</p>
+<h2 id="6-game-settings-and-self-test">6. Game settings and self
+test</h2>
+<p>Settings are made exactly as on the original Atari MPU. AtariFA
+rebuilds the original setting hardware 1:1, it does not replace it with
+a menu.</p>
+<h3 id="61-the-programming-dip-banks-and-the-replay-switch">6.1. The
+programming DIP banks and the replay switch</h3>
+<p>The board carries the two banks of 8 programming DIP switches and the
+rotary &#39;replay&#39; switch that the original Atari MPU has, at the same
+place in the address map. Set them following the manual of your pinball
+machine - AtariFA presents them to the game code exactly as the original
+does.</p>
+<p><strong>Do not confuse these with the ten configuration DIPs from
+chapter 4.</strong> The ten switches configure <em>AtariFA</em>; the two
+banks of eight and the replay switch configure <em>the game</em>.</p>
+<p>In addition there are three push buttons on the board, wired in
+parallel to the machine: <strong>&#39;Atari Test&#39;, &#39;Coin 2&#39; and
+&#39;Start&#39;</strong>. They make it possible to run and test the board on the
+bench without a coin door.</p>
+<h3 id="62-the-self-test">6.2. The self test</h3>
+<p>Press the test switch - either the one in the coin door or the one on
+the board. The game enters its self test, and you can step through
+switch tests, lamp tests, solenoid tests and displays following the
+manual of your pinball machine.</p>
+<p><strong>Exception: The Atarians.</strong> Atari&#39;s first game has no
+documented self test, and it does not react to the test switch. That is
+not a fault of AtariFA.</p>
+<h3 id="63-credits-and-high-scores-are-not-kept">6.3. Credits and high
+scores are not kept</h3>
+<p>When the machine is switched off, credits and scores are gone.
+<strong>The original Atari Generation 1 MPU behaves the same
+way</strong> - unlike later machines it has no battery buffered memory
+at all.</p>
+<p>The PCB does carry a FRAM chip to change that, but the feature is not
+finished and is switched off in this software version. See chapter
+13.</p>
+<p>If you want the machine to start without needing coins, use free play
+- chapter 7.</p>
+<h2 id="7-free-play">7. Free play</h2>
+<p>Switch 4 of the four switch bank, <strong>ON = free play
+active</strong>. Remember that this switch is read at boot only, so
+switch the machine off and on after changing it.</p>
+<p>Free play works for <strong>all five games</strong>. Atari sold the
+free play version as a different set of roms; AtariFA has those
+differences built in and overlays them on the game rom when the switch
+is on. Only 42 bytes differ across all five games, which is why this
+fits without a second set of roms in the FPGA.</p>
+<p>The result is byte for byte the same code the original free play roms
+contain.</p>
+<h2 id="8-sound">8. Sound</h2>
+<h3 id="81-what-is-rebuilt">8.1. What is rebuilt</h3>
+<p>The Atari Generation 1 tone generation, as it sits on the MPU board
+and the Auxiliary Board:</p>
+<ul>
+<li><strong>a waveform rom</strong> with 16 waveforms of 32 samples,
+selected by the game</li>
+<li><strong>a pitch divider</strong>, giving the note</li>
+<li><strong>a volume latch</strong>, driving the attenuator on the
+Auxiliary Board</li>
+</ul>
+<p>The game writes to three latches for waveform, pitch and volume,
+exactly as it does on the original, and AtariFA reproduces the resulting
+tone digitally.</p>
+<p>This is the complete sound of an Atari Generation 1 machine - these
+games have no separate sound board and no speech.</p>
+<h3 id="82-the-two-audio-paths">8.2. The two audio paths</h3>
+<p>Set with option 3, see chapter 4.2.1: either the original Auxiliary
+Board path (switch OFF) or the on-board amplifier (switch ON). Both
+produce the same tones; they differ in where the analog signal is
+made.</p>
+<p><strong>A note on how the games switch sound off.</strong> The game
+code does not set the volume to zero when a sound should stop - it pulls
+the &#39;audio reset&#39; line and leaves the volume latch where it was. AtariFA
+reproduces that: audio reset freezes the tone generation, which makes
+the output a constant level, which the Auxiliary Board blocks. If you
+hear a continuous tone that never stops, you are looking at a wiring
+problem on the audio lines to the Auxiliary Board, not at a volume
+problem.</p>
+<h3 id="83-the-boot-announcement">8.3. The boot announcement</h3>
+<p>About two seconds after switch-on, during the info display window,
+the board says <strong>&quot;Lisü&quot;</strong> over the on-board amplifier. It
+is a fixed announcement, it plays once, and it tells you that the FPGA
+is running and the on-board audio chain works.</p>
+<p>It always comes out of the <strong>on-board amplifier</strong>,
+regardless of option 3 - it is not part of the game sound and never
+reaches the Auxiliary Board.</p>
+<p>If you hear nothing here, check the on-board amplifier and its
+speaker connection before you look anywhere else.</p>
+<h3 id="84-background-music-from-the-mp3-player">8.4. Background music
+from the MP3 player</h3>
+<p>Since software 0.3.0 the small MP3 player on the board (an &#39;MP3 mini
+player&#39; with its own memory card) can play background music
+<strong>while a game is running</strong>. It is switched on with
+<strong>option 1</strong>, chapter 4.2.3, and it is off by default.</p>
+<p><strong>What you put on the memory card.</strong> Create a folder
+named <strong><code>02</code></strong> and put your tracks in it,
+numbered:</p>
+<pre><code>/02/001.mp3
+/02/002.mp3
+...</code></pre>
+<p>The player plays that folder in a loop, in its own order. There is no
+per-game selection and no random mode. If you also run a GottFA1_PLuS
+board, the same card works there.</p>
+<p><strong>What happens during play.</strong> The board takes its cue
+from the <strong>outhole switch</strong>: the music plays as long as no
+ball rests in the outhole. So it starts when the ball is kicked out at
+the beginning of a game, and it pauses when the last ball stays down. It
+resumes where it left off at the next game rather than starting from the
+beginning.</p>
+<p>So that it does not cut out at every ball change, the board only
+reacts after <strong>two seconds</strong>. If the ball is kicked out
+again sooner than that, the music plays straight through; if the bonus
+count takes longer, it pauses briefly and comes back with the next ball.
+For the same reason the music starts two seconds into a game and stops
+two seconds after the last ball.</p>
+<p><strong>A tilt does not pause the music right away</strong> - it
+keeps playing until the ball is down. (Up to software 0.3.0 the board
+followed the flipper relay and stopped on tilt immediately. Only Middle
+Earth and Space Riders actually have that relay, which is why this
+changed.)</p>
+<p><strong>If no ball rests in the outhole at power-on</strong> -
+because it sits in the shooter lane or on the playfield, say - the music
+also plays in attract mode. Put the ball in the outhole, or start and
+finish a game, and it goes quiet again.</p>
+<p><strong>The game sound is not affected.</strong> Music and game sound
+are two separate analog paths that only meet at the amplifier. The game
+tones of chapter 8.1 play over the music; nothing is faded or muted. Set
+the balance between them with the volume control of the player and the
+volume of your machine.</p>
+<p><strong>If you hear nothing:</strong> the switch is read at boot
+only, so power off and on after setting option 1. Check that the folder
+is really called <code>02</code>, that the card is in the player, and
+that the board reports version <strong>033</strong> on the info display
+- <strong>133</strong> or <strong>233</strong> on the two &#39;dev_open&#39;
+boards, chapter 5.2.</p>
+<p><strong>Give it time.</strong> After power-on the board allows the
+player five seconds to boot, then talks to it, then waits out the
+debounce. That adds up to <strong>about 15 seconds</strong> before the
+first note. Give up earlier and you will take a working module for a
+broken one.</p>
+<p>If it stays quiet after that while a ball is in play, check the game
+selection (appendix A) once more - the board reads a different outhole
+switch depending on the game you set.</p>
+<h2 id="9-the-fa-control-interface-esp32">9. The FA-Control interface
+(ESP32)</h2>
+<p>The board has a socket prepared for an <strong>ESP32-C3 Super
+Mini</strong>. It runs <strong>FA-Control</strong> - a small firmware
+that opens a WLAN and serves a test interface in your browser: switch
+every lamp individually, pulse every solenoid, watch all switches live,
+write digits to the displays, play sounds.</p>
+<p>This is a <strong>tool for the bench and for fault finding</strong>,
+not an accessory for normal play. If you plug nothing in, you will never
+notice this interface - the board behaves exactly as it does
+without.</p>
+<blockquote>
+<p>This feature is new in software version 0.1.3 and has been tried on a
+real machine.</p>
+</blockquote>
+<h3 id="91-the-permission-option-4">9.1. The permission: option 4</h3>
+<p>A test tool must not be able to interfere with a running game
+unasked. So <strong>two things</strong> have to come together:</p>
+<ol type="1">
+<li>The ESP32 module actively asks (&quot;I would like to take over&quot;).</li>
+<li><strong>Option DIP 4 is ON.</strong></li>
+</ol>
+<p>With option 4 OFF, the web interface says in plain words <em>&quot;control
+refused - set option DIP 4 to ON&quot;</em>, and the game carries on
+undisturbed. Reading is still allowed: you can follow switch states
+during a running game without giving anything up.</p>
+<h3 id="92-what-happens-while-it-has-control">9.2. What happens while it
+has control</h3>
+<p><strong>The game is stopped.</strong> The processor is held in reset,
+and everything - lamps, solenoids, displays, sound - now comes from the
+web interface. It has to work that way: if the game kept running it
+would overwrite every lamp you set by hand within a few
+milliseconds.</p>
+<p><strong>The game then starts over.</strong> It cannot be paused and
+resumed. A game in progress is lost, so only take control in attract
+mode or on the bench.</p>
+<h3 id="93-how-control-is-handed-back">9.3. How control is handed
+back</h3>
+<p>Three ways, and all three make every output drop and the game restart
+immediately:</p>
+<ul>
+<li><strong>In the web interface</strong>, press &quot;hand back
+control&quot;.</li>
+<li><strong>Set option DIP 4 to OFF.</strong> The switch is read
+continuously - this is the emergency stop.</li>
+<li><strong>Do nothing.</strong> If the module goes quiet for two
+seconds, AtariFA hands back by itself. That is the safety net for a
+module that locks up, reboots or loses contact - the machine does not
+stay stuck in the handover, it comes back as an ordinary pinball.</li>
+</ul>
+<h3 id="94-what-the-web-interface-learns-from-the-board">9.4. What the
+web interface learns from the board</h3>
+<p>On connecting, FA-Control asks the board what it is made of and
+configures itself - nothing has to be typed in. AtariFA answers:</p>
+<table>
+<tbody>
+<tr>
+<td>Identification</td>
+<td><code>AtariFA</code></td>
+</tr>
+<tr>
+<td>Software version</td>
+<td>the same one the info display shows, e.g. <code>0.3.3</code></td>
+</tr>
+<tr>
+<td>Lamps</td>
+<td>84</td>
+</tr>
+<tr>
+<td>Solenoids</td>
+<td>22 (20 playfield + coin counter + lockout coil)</td>
+</tr>
+<tr>
+<td>Switches</td>
+<td>80</td>
+</tr>
+<tr>
+<td>Sounds</td>
+<td>16</td>
+</tr>
+<tr>
+<td>Displays</td>
+<td>5 (status with 4 digits, four players with 6 each)</td>
+</tr>
+</tbody>
+</table>
+<p>The numbering follows the board: switches carry the same number as in
+the game&#39;s self test, and <strong>solenoids 1 to 20 are the drivers Q1
+to Q20 of the schematic</strong>, 21 is the coin counter and 22 the
+lockout coil. Solenoids are the only group starting at 1 - that is how
+the original counts them and how the LISY protocol counts them. Lamps (0
+to 83) and switches (0 to 79) start at 0. <em>(Up to version 0.1.9 the
+solenoids started at 0 as well; an FA-Control firmware older than 1.16
+will therefore fire the wrong coil.)</em></p>
+<h3 id="95-connecting-it">9.5. Connecting it</h3>
+<p>The ESP32 module simply plugs in; there is nothing to solder. The
+board powers it - <strong>no USB cable is needed in normal
+operation.</strong> You only plug one in to load the FA-Control firmware
+or to read the boot log. For the initial WLAN setup FA-Control opens its
+own access point on first start - see the FA-Control documentation for
+that.</p>
+<h2 id="10-the-status-leds">10. The status LEDs</h2>
+<p>The board has three status LEDs, wired in parallel to the LEDs of the
+piggy-back board. They are the fastest diagnosis without a logic
+analyser.</p>
+<table>
+<thead>
+<tr>
+<th>LED</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>D1</strong></td>
+<td>watchdog: lights up and stays lit once the internal watchdog has
+timed out at least once. <strong>Dark is the normal state.</strong></td>
+</tr>
+<tr>
+<td><strong>D2</strong></td>
+<td>CPU is fetching instructions from rom - blinks slowly, a few seconds
+per phase depending on the game. <strong>Steady, lit or dark, means the
+CPU is halted or stuck.</strong></td>
+</tr>
+<tr>
+<td><strong>D3</strong></td>
+<td>the NMI timer runs - blinks at 0.48 Hz, that is a good second lit
+and a good second dark. This is free running hardware and does not
+depend on the CPU.</td>
+</tr>
+</tbody>
+</table>
+<p>Read them together:</p>
+<ul>
+<li><strong>D2 and D3 blinking</strong> - board and game are alive. This
+is what you want to see.</li>
+<li><strong>D3 blinking, D2 steady</strong> - the hardware runs but the
+CPU is not executing. Check game select and the reset switch.</li>
+<li><strong>Nothing blinking at all</strong> - the FPGA is not
+configured or has no clock. Reprogram it (chapter 11).</li>
+</ul>
+<h2 id="11-programming-the-fpga">11. Programming the FPGA</h2>
+<p>Everything you need to get the software onto the board is described
+on my website, and it is kept up to date there:</p>
+<blockquote>
+<p><strong><a href="https://lisy.dev/documentation-01.html">https://lisy.dev/documentation-01.html</a></strong></p>
+</blockquote>
+<p>You will find there the latest FPGA program for download, which
+programmer software you need, how to install the driver for the USB
+Blaster, and how to program the FPGA.</p>
+<p><strong>Make sure you take the AtariFA version</strong> and, if there
+is more than one, the one for your board variant - see chapter 12. The
+board variant is the leading digit of the version on the info
+display.</p>
+<p>There is no SD card image for AtariFA. The game roms are part of the
+FPGA program.</p>
+<h2 id="12-board-variants">12. Board variants</h2>
+<p>The same design runs on three piggy-back boards. The FPGA program is
+<strong>not</strong> interchangeable between them - the pin assignment
+differs, and the third one carries an FPGA from a different family.</p>
+<table>
+<thead>
+<tr>
+<th>Variant</th>
+<th>Board</th>
+<th>FPGA</th>
+<th>Version starts with</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cyclone_10_pcb</code></td>
+<td>AtariFA PCB v1.x with the lisy.dev Cyclone 10 piggy-back board</td>
+<td>Cyclone 10 LP</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td><code>cyclone_10_dev_open</code></td>
+<td>AtariFA PCB v1.x with the &#39;dev_open&#39; Cyclone 10 board</td>
+<td>Cyclone 10 LP</td>
+<td><strong>1</strong></td>
+</tr>
+<tr>
+<td><code>cyclone_IV_dev_open</code></td>
+<td>the same &#39;dev_open&#39; board, but populated with a Cyclone IV</td>
+<td>Cyclone IV E</td>
+<td><strong>2</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>The info display tells you which program is running:</strong>
+the first of the three version digits on player display 1 is the board
+number. If you loaded the wrong one, the displays will most likely stay
+dark or show nonsense - check that digit first.</p>
+<p>Apart from the pin assignment all three are identical, with two small
+differences on the piggy-back board itself: the <code>dev_open</code>
+board has its reset switch and all four of its status LEDs on the
+piggy-back board (the fourth is a spare and stays dark), and it brings 3
+instead of 8 debug lines to the logic analyser header. The two
+&#39;dev_open&#39; versions differ only in the FPGA fitted and in two pins that
+sit elsewhere on the Cyclone IV.</p>
+<p><strong>Test status.</strong> Only <code>cyclone_10_pcb</code> has
+been played on a machine so far. <code>cyclone_10_dev_open</code> has
+been running on the bench since software 0.3.0 - boot, info display and
+the MP3 player are confirmed there, everything else depends on the
+wiring to the machine and is untested. <code>cyclone_IV_dev_open</code>
+has been built but has never run on hardware.</p>
+<h2 id="13-not-implemented-yet">13. Not implemented yet</h2>
+<p>This is on the PCB, wired, and not used by this software version. It
+does nothing, and it does no harm - the FPGA holds it in a safe idle
+state.</p>
+<ul>
+<li><strong>FRAM (credits and high scores over a power cycle).</strong>
+The chip is fitted and the low level driver works, but making it
+reliable across all five games turned out to need more reverse
+engineering of the game roms than expected. The feature is switched off.
+Option switch 1, which used to control it, is the background music
+switch since software 0.3.0, chapter 4.2.3. See chapter 6.3.</li>
+</ul>
+<h2 id="appendix-a-game-select">Appendix A &#39;game select&#39;</h2>
+<p>Switches of the <strong>4 switch bank</strong>. Dip4 of that bank is
+free play and is not part of the game number.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;"><strong>No</strong></th>
+<th><strong>Dip1</strong></th>
+<th><strong>Dip2</strong></th>
+<th><strong>Dip3</strong></th>
+<th><strong>Game</strong></th>
+<th><strong>Year</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td>off</td>
+<td>off</td>
+<td>off</td>
+<td>The Atarians</td>
+<td>1976</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td>on</td>
+<td>off</td>
+<td>off</td>
+<td>Time 2000</td>
+<td>1977</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td>off</td>
+<td>on</td>
+<td>off</td>
+<td>Airborne Avenger</td>
+<td>1977</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td>on</td>
+<td>on</td>
+<td>off</td>
+<td>Middle Earth</td>
+<td>1978</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td>off</td>
+<td>off</td>
+<td>on</td>
+<td>Space Riders</td>
+<td>1978</td>
+</tr>
+<tr>
+<td style="text-align: right;">5-7</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>not used, falls back to Middle Earth</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>All five run with free play as well (chapter 7).</p>
+<p><strong>The Atarians</strong> has no self test - see chapter 6.2.</p>
+<h2 id="appendix-b-quick-reference">Appendix B Quick reference</h2>
+<p><strong>The ten configuration switches</strong></p>
+<pre><code>bank of 4                          bank of 6
+ 1  game select bit 0  (+1)         1  background music      read at boot
+ 2  game select bit 1  (+2)         2  reserved              read at boot
+ 3  game select bit 2  (+4)         3  sound path            live
+ 4  free play, ON = active          4  FA-Control allowed    live
+                                    5  lamp dead time    \   live
+ all four read at boot only         6  lamp dead time    /   live</code></pre>
+<p><strong>Background music, option 1:</strong> OFF = off (standard) ·
+ON = the MP3 player plays folder <code>02</code> while a ball is in play
+(chapter 8.4)</p>
+<p><strong>Sound path, option 3:</strong> OFF = Auxiliary Board
+(standard) · ON = on-board amplifier</p>
+<p><strong>FA-Control, option 4:</strong> OFF = nobody interferes
+(standard) · ON = the ESP32 test tool may drive the machine (chapter
+9)</p>
+<p><strong>Lamp dead time, options 5 and 6 together</strong> (chapter
+4.2.4) — against glowing LED replacement lamps, use the smallest step
+that works:</p>
+<table>
+<thead>
+<tr>
+<th>Option 5</th>
+<th>Option 6</th>
+<th>Dead time</th>
+<th>Brightness</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OFF</td>
+<td>OFF</td>
+<td>about 65 µs (standard)</td>
+<td>21.8 %</td>
+</tr>
+<tr>
+<td>OFF</td>
+<td>ON</td>
+<td>about 250 µs</td>
+<td>12.8 %</td>
+</tr>
+<tr>
+<td>ON</td>
+<td>OFF</td>
+<td>none - timing of the original MPU, LEDs glow as on the original</td>
+<td>24.5 %</td>
+</tr>
+<tr>
+<td>ON</td>
+<td>ON</td>
+<td>about 400 µs, visibly dimmer</td>
+<td>5.5 %</td>
+</tr>
+</tbody>
+</table>
+<p>If it still glows at 400 µs, it is not the software - chapter
+4.2.5.</p>
+<p><strong>After changing a switch that is read at boot: power off,
+power on.</strong></p>
+<p><strong>The info display, first 5 seconds after power on</strong></p>
+<pre><code>Player 1   0 3 3      version, first digit = board variant
+Player 2      0 2     game select  (Appendix A)
+Player 3   000000     options 1..6, left to right, 1 = ON
+Player 4        0     free play, 1 = active
+Credit     (dark)</code></pre>
+<p><strong>LEDs:</strong> D1 watchdog (dark = good) · D2 CPU running
+(blinks slowly) · D3 NMI timer (blinks ~0.48 Hz)</p>
+<p><strong>No credits or scores are kept over a power cycle</strong> -
+as on the original Atari MPU.</p>
+</body>
+</html>
