@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="fr" xml:lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>AtariFA manuel d&#39;utilisation (HW 1.x)</title>
+  <style>
+
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+
+ul.task-list[class]{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+font-size: inherit;
+width: 0.8em;
+margin: 0 0.8em 0.2em -1.6em;
+vertical-align: middle;
+}
+.display.math{display: block; text-align: center; margin: 0.5rem auto;}
+</style>
+  <style type="text/css">:root {
+--bg: #fbfaf7;
+--fg: #1d1f21;
+--muted: #5a5f66;
+--accent: #0b5cad;
+--rule: #d9d6cf;
+--code-bg: #f0eee8;
+--th-bg: #ece9e1;
+--row-alt: #f5f3ee;
+--note-bg: #eef4fb;
+--note-rule: #0b5cad;
+}
+@media (prefers-color-scheme: dark) {
+:root:not([data-theme="light"]) {
+--bg: #17191c;
+--fg: #e4e2dd;
+--muted: #a3a7ad;
+--accent: #6fb1f2;
+--rule: #3a3d42;
+--code-bg: #24272b;
+--th-bg: #2a2d32;
+--row-alt: #1d2024;
+--note-bg: #1c2633;
+--note-rule: #6fb1f2;
+}
+}
+:root[data-theme="dark"] {
+--bg: #17191c;
+--fg: #e4e2dd;
+--muted: #a3a7ad;
+--accent: #6fb1f2;
+--rule: #3a3d42;
+--code-bg: #24272b;
+--th-bg: #2a2d32;
+--row-alt: #1d2024;
+--note-bg: #1c2633;
+--note-rule: #6fb1f2;
+}
+html { -webkit-text-size-adjust: 100%; }
+body {
+background: var(--bg);
+color: var(--fg);
+font: 16px/1.6 "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+max-width: 58rem;
+margin: 0 auto;
+padding: 2rem 1rem 4rem;
+}
+h1, h2, h3, h4 { line-height: 1.25; margin: 2.2em 0 0.6em; }
+h1 { font-size: 2.2rem; margin-top: 0.5em; border-bottom: 3px solid var(--accent); padding-bottom: 0.2em; }
+h2 { font-size: 1.5rem; border-bottom: 1px solid var(--rule); padding-bottom: 0.2em; }
+h3 { font-size: 1.2rem; }
+h4 { font-size: 1.05rem; color: var(--muted); }
+a { color: var(--accent); }
+a:not(:hover) { text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+p, ul, ol, table, pre, blockquote { margin: 0 0 1em; }
+li { margin: 0.15em 0; }
+li > p { margin: 0.2em 0; }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 2.5em 0; }
+img { max-width: 100%; height: auto; display: block; margin: 1em auto; border-radius: 4px; }
+code {
+font-family: Consolas, "Cascadia Mono", "SFMono-Regular", Menlo, monospace;
+font-size: 0.9em;
+background: var(--code-bg);
+padding: 0.1em 0.3em;
+border-radius: 3px;
+}
+pre {
+background: var(--code-bg);
+padding: 0.8em 1em;
+border-radius: 4px;
+overflow-x: auto;
+line-height: 1.4;
+}
+pre code { background: none; padding: 0; font-size: 0.85em; }
+blockquote {
+background: var(--note-bg);
+border-left: 4px solid var(--note-rule);
+margin-left: 0;
+padding: 0.6em 1em;
+}
+blockquote > :last-child { margin-bottom: 0; }
+table {
+border-collapse: collapse;
+display: block;
+overflow-x: auto;
+max-width: 100%;
+font-size: 0.95em;
+}
+th, td { border: 1px solid var(--rule); padding: 0.3em 0.6em; vertical-align: top; text-align: left; }
+th { background: var(--th-bg); }
+tbody tr:nth-child(even) { background: var(--row-alt); }
+table.gamelist td, table.gamelist th { padding: 0.15em 0.45em; white-space: nowrap; }
+
+.titlepage { margin-bottom: 2.5em; }
+.titlepage p { margin: 0.2em 0; }
+@media (max-width: 600px) {
+body { font-size: 15px; padding: 1rem 1rem 3rem; }
+h1 { font-size: 1.8rem; }
+}
+@media print {
+body { background: #fff; color: #000; max-width: none; font-size: 10.5pt; padding: 0; }
+a { color: #000; text-decoration: none; }
+h2, h3 { break-after: avoid; }
+pre, table, img, blockquote { break-inside: avoid; }
+tbody tr:nth-child(even) { background: #f3f3f3; }
+}
+</style>
+</head>
+<body>
+<h1 id="atarifa">AtariFA</h1>
+<p><strong>MPU Atari génération 1 à base de FPGA</strong></p>
+<p><strong>Version matérielle v1.x</strong></p>
+<p><strong>Version logicielle 0.3.3</strong></p>
+<p><strong>manuel d&#39;utilisation</strong></p>
+<p><a href="mailto:ralf@lisy.dev">ralf@lisy.dev</a></p>
+<p>v1.1 04.09.2026</p>
+<blockquote>
+<p>Version française de <a href="AtariFA_HWv1_x_user_manual.html">AtariFA_HWv1_x_user_manual.html</a>.
+Deutsche Fassung: <a href="AtariFA_HWv1_x_Bedienungsanleitung.html">AtariFA_HWv1_x_Bedienungsanleitung.html</a>.
+La numérotation des chapitres est la même dans les trois versions.</p>
+</blockquote>
+<h2 id="table-des-matières">Table des matières</h2>
+<ul>
+<li><a href="#remarque-importante">Remarque importante</a></li>
+<li><a href="#1-introduction">1. Introduction</a></li>
+<li><a href="#2-démarrage-rapide">2. Démarrage rapide</a></li>
+<li><a href="#3-installation">3. Installation</a>
+<ul>
+<li><a href="#31-ce-quatarifa-remplace-et-ce-quil-ne-remplace-pas">3.1.
+Ce qu&#39;AtariFA remplace et ce qu&#39;il ne remplace pas</a></li>
+<li><a href="#32-les-connecteurs-box">3.2. Les connecteurs box</a></li>
+<li><a href="#33-fusibles">3.3. Fusibles</a></li>
+</ul></li>
+<li><a href="#4-réglage-des-interrupteurs-dip">4. Réglage des
+interrupteurs DIP</a>
+<ul>
+<li><a href="#41-le-banc-de-4--choix-du-jeu-et-partie-gratuite">4.1. Le
+banc de 4 : choix du jeu et partie gratuite</a></li>
+<li><a href="#42-le-banc-de-6--options">4.2. Le banc de 6 : options</a>
+<ul>
+<li><a href="#421-option-3---par-où-sort-le-son">4.2.1. Option 3 -&gt;
+par où sort le son</a></li>
+<li><a href="#422-option-4---laisser-fa-control-prendre-la-main">4.2.2.
+Option 4 -&gt; laisser FA-Control prendre la main</a></li>
+<li><a href="#423-option-1---musique-de-fond-option-2-réservée">4.2.3.
+Option 1 -&gt; musique de fond, option 2 réservée</a></li>
+<li><a href="#424-options-5-et-6---temps-mort-des-colonnes-de-lampes">4.2.4.
+Options 5 et 6 -&gt; temps mort des colonnes de lampes</a></li>
+<li><a href="#425-si-la-lueur-persiste">4.2.5. Si la lueur
+persiste</a></li>
+</ul></li>
+<li><a href="#43-six-des-dix-dip-ne-sont-lus-quune-fois-au-démarrage">4.3. Six
+des dix DIP ne sont lus qu&#39;une fois, au démarrage</a></li>
+</ul></li>
+<li><a href="#5-séquence-de-démarrage">5. Séquence de démarrage</a>
+<ul>
+<li><a href="#51-phase-1--lecture-des-interrupteurs-dip">5.1. Phase 1 :
+lecture des interrupteurs DIP</a></li>
+<li><a href="#52-phase-2--laffichage-dinformations">5.2. Phase 2 :
+l&#39;affichage d&#39;informations</a></li>
+<li><a href="#53-phase-3--exécution-du-programme">5.3. Phase 3 :
+exécution du programme</a></li>
+</ul></li>
+<li><a href="#6-réglages-du-jeu-et-autotest">6. Réglages du jeu et
+autotest</a>
+<ul>
+<li><a href="#61-les-bancs-dip-de-programmation-et-le-commutateur-de-replay">6.1.
+Les bancs DIP de programmation et le commutateur de replay</a></li>
+<li><a href="#62-lautotest">6.2. L&#39;autotest</a></li>
+<li><a href="#63-crédits-et-meilleurs-scores-ne-sont-pas-conservés">6.3.
+Crédits et meilleurs scores ne sont pas conservés</a></li>
+</ul></li>
+<li><a href="#7-partie-gratuite">7. Partie gratuite</a></li>
+<li><a href="#8-son">8. Son</a>
+<ul>
+<li><a href="#81-ce-qui-est-reconstruit">8.1. Ce qui est
+reconstruit</a></li>
+<li><a href="#82-les-deux-chemins-audio">8.2. Les deux chemins
+audio</a></li>
+<li><a href="#83-lannonce-au-démarrage">8.3. L&#39;annonce au
+démarrage</a></li>
+<li><a href="#84-musique-de-fond-depuis-le-lecteur-mp3">8.4. Musique de
+fond depuis le lecteur MP3</a></li>
+</ul></li>
+<li><a href="#9-linterface-fa-control-esp32">9. L&#39;interface FA-Control
+(ESP32)</a>
+<ul>
+<li><a href="#91-lautorisation--option-4">9.1. L&#39;autorisation : option
+4</a></li>
+<li><a href="#92-ce-qui-se-passe-pendant-la-prise-de-contrôle">9.2. Ce
+qui se passe pendant la prise de contrôle</a></li>
+<li><a href="#93-comment-le-contrôle-est-rendu">9.3. Comment le contrôle
+est rendu</a></li>
+<li><a href="#94-ce-que-linterface-web-apprend-de-la-carte">9.4. Ce que
+l&#39;interface web apprend de la carte</a></li>
+<li><a href="#95-raccordement">9.5. Raccordement</a></li>
+</ul></li>
+<li><a href="#10-les-led-détat">10. Les LED d&#39;état</a></li>
+<li><a href="#11-programmer-le-fpga">11. Programmer le FPGA</a></li>
+<li><a href="#12-variantes-de-carte">12. Variantes de carte</a></li>
+<li><a href="#13-pas-encore-implémenté">13. Pas encore
+implémenté</a></li>
+<li><a href="#annexe-a-choix-du-jeu">Annexe A choix du jeu</a></li>
+<li><a href="#annexe-b-aide-mémoire">Annexe B aide-mémoire</a></li>
+</ul>
+<h2 id="remarque-importante">Remarque importante</h2>
+<p>L&#39;utilisation d&#39;AtariFA peut endommager votre flipper. Comme il
+s&#39;agit d&#39;un projet privé SANS intérêt commercial, l&#39;auteur décline toute
+responsabilité pour les dommages qui pourraient résulter de
+l&#39;utilisation d&#39;AtariFA !</p>
+<h2 id="1-introduction">1. Introduction</h2>
+<p>AtariFA remplace la MPU d&#39;un flipper Atari de génération 1 par une
+carte FPGA. Elle émule le processeur MC6800, fournit la RAM et les ROM
+de jeu, et reconstruit la logique TTL qui les entoure - les verrous
+d&#39;adresse, le multiplexeur d&#39;affichage, les décodeurs de la matrice
+d&#39;interrupteurs, les pilotes de lampes et les pilotes de bobines.</p>
+<p>Le FPGA est un Cyclone 10 LP (10CL006) monté sur une carte fille
+(piggy-back) qui se trouve sur la carte AtariFA. Celle-ci porte les
+connecteurs latéraux Atari d&#39;origine ; la carte prend donc la place de
+la MPU Atari retirée.</p>
+<p><strong>Cinq jeux sont pris en charge, et les cinq sont dans le FPGA
+en même temps :</strong></p>
+<p>The Atarians, Time 2000, Airborne Avenger, Middle Earth et Space
+Riders. Le jeu exécuté se choisit avec trois interrupteurs DIP - pas de
+carte SD, rien à télécharger par jeu. La partie gratuite est un
+quatrième interrupteur DIP, pas un autre jeu de ROM.</p>
+<p><strong>De quoi avez-vous besoin ?</strong></p>
+<ul>
+<li>Un PC avec un port USB et un USB Blaster pour programmer le
+FPGA</li>
+</ul>
+<p>C&#39;est tout. Pas de carte SD, pas de lecteur de cartes, pas de
+pile.</p>
+<p><strong>Deux choses sont bonnes à savoir avant de commencer
+:</strong></p>
+<ul>
+<li><p><strong>Six des dix interrupteurs DIP ne sont lus qu&#39;une fois, au
+démarrage.</strong> Les changer pendant que le jeu tourne n&#39;a aucun
+effet. Voir le chapitre 4.3.</p></li>
+<li><p><strong>Les crédits et les meilleurs scores sont perdus à
+l&#39;extinction du flipper.</strong> Ce n&#39;est pas une limite d&#39;AtariFA - la
+MPU Atari génération 1 d&#39;origine n&#39;a pas non plus de sauvegarde par
+pile. Voir le chapitre 6.3.</p></li>
+</ul>
+<h2 id="2-démarrage-rapide">2. Démarrage rapide</h2>
+<ol type="1">
+<li><p>Téléchargez le dernier programme FPGA pour
+<strong>AtariFA</strong> sur lisy.dev</p></li>
+<li><p>Programmez le FPGA (chapitre 11)</p></li>
+<li><p>Réglez « choix du jeu » selon votre flipper (annexe A)</p></li>
+<li><p>Décidez par où le son doit sortir - option 3, voir le chapitre
+4.2.1. Pour un flipper non modifié, avec sa carte auxiliaire (Auxiliary
+Board) en place, laissez-la sur <strong>OFF</strong></p></li>
+<li><p>Remplacez votre MPU Atari d&#39;origine par AtariFA</p></li>
+<li><p>Allumez le flipper</p></li>
+<li><p>Observez l&#39;affichage d&#39;informations pendant environ 5 secondes et
+vérifiez que le choix du jeu et la version sont ceux attendus (chapitre
+5.2)</p></li>
+<li><p>Amusez-vous</p></li>
+</ol>
+<p>Il n&#39;y a pas de procédure de « premier démarrage » et rien à
+initialiser - la carte n&#39;a pas de mémoire non volatile qui en aurait
+besoin.</p>
+<h2 id="3-installation">3. Installation</h2>
+<p>AtariFA a les mêmes connecteurs latéraux que la MPU Atari génération
+1 d&#39;origine et se monte à sa place. Éteignez le flipper, retirez la MPU
+d&#39;origine, mettez AtariFA en place, c&#39;est fini.</p>
+<h3 id="31-ce-quatarifa-remplace-et-ce-quil-ne-remplace-pas">3.1. Ce
+qu&#39;AtariFA remplace et ce qu&#39;il ne remplace pas</h3>
+<p><strong>Remplacé :</strong> la carte MPU, y compris la logique de
+pilotage des afficheurs, les décodeurs de la matrice d&#39;interrupteurs,
+les pilotes de lampes et les pilotes de bobines. Tout cela se trouve
+désormais sur la carte AtariFA - 12 ULN2003A pour la matrice de lampes,
+20 MOSFET IRL540 pour les bobines.</p>
+<p><strong>Toujours nécessaire : la carte auxiliaire Atari (Auxiliary
+Board).</strong> Deux choses en proviennent et ne sont pas reconstruites
+sur AtariFA :</p>
+<ul>
+<li><strong>les quatre strobes de lampes.</strong> La matrice de lampes
+fait 21 x 4 ; AtariFA pilote les 21 lignes, la carte auxiliaire produit
+les quatre strobes de colonne en +20 V à partir des deux lignes de
+sélection qu&#39;AtariFA lui envoie.</li>
+<li><strong>le chemin de sortie audio</strong>, sauf si vous basculez le
+son vers l&#39;amplificateur intégré - voir le chapitre 8.2.</li>
+</ul>
+<p>Le compteur de la porte à monnaie et les bobines de blocage (lockout)
+sont eux aussi pilotés via la carte auxiliaire.</p>
+<p>Donc : laissez la carte auxiliaire dans le flipper.</p>
+<h3 id="32-les-connecteurs-box">3.2. Les connecteurs box</h3>
+<p>À côté des connecteurs latéraux Atari d&#39;origine, la carte porte deux
+« connecteurs box » de 25 broches. Ils sortent les mêmes signaux sur un
+connecteur plus facile à sonder, pour des essais sur l&#39;établi sans
+plateau de jeu raccordé.</p>
+<p>Les connecteurs box portent aussi les quatre strobes de lampes,
+produits sur la carte par quatre MOSFET à canal P. <strong>Ils ne
+servent qu&#39;à des LED de test</strong> - ils ne sont pas conçus pour
+piloter la matrice de lampes 20 V d&#39;un vrai plateau. Dans un flipper,
+les strobes viennent de la carte auxiliaire.</p>
+<h3 id="33-fusibles">3.3. Fusibles</h3>
+<p>La carte a ses propres porte-fusibles pour l&#39;alimentation des
+bobines. Utilisez des fusibles <strong>2 A temporisés</strong>.</p>
+<p>Deux des vingt pilotes de bobines, Q14 et Q18, ne sont pas montés -
+selon le jeu, ces sorties n&#39;existent pas non plus sur l&#39;original. Il n&#39;y
+a tout simplement pas de MOSFET à cet endroit, et le jeu ne peut de
+toute façon pas les piloter.</p>
+<h2 id="4-réglage-des-interrupteurs-dip">4. Réglage des interrupteurs
+DIP</h2>
+<p>AtariFA a <strong>dix interrupteurs DIP</strong> répartis en deux
+bancs : un banc de quatre et un banc de six.</p>
+<p>Dans tout ce manuel, comme sur l&#39;affichage d&#39;informations, un
+interrupteur <strong>sur « ON » compte</strong>, et l&#39;interrupteur 1
+d&#39;un banc est toujours celui qui vaut 1.</p>
+<h3 id="41-le-banc-de-4--choix-du-jeu-et-partie-gratuite">4.1. Le banc
+de 4 : choix du jeu et partie gratuite</h3>
+<table>
+<thead>
+<tr>
+<th>DIP</th>
+<th>Fonction</th>
+<th>Poids</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dip1</td>
+<td>choix du jeu, bit 0</td>
+<td>1</td>
+</tr>
+<tr>
+<td>Dip2</td>
+<td>choix du jeu, bit 1</td>
+<td>2</td>
+</tr>
+<tr>
+<td>Dip3</td>
+<td>choix du jeu, bit 2</td>
+<td>4</td>
+</tr>
+<tr>
+<td>Dip4</td>
+<td><strong>partie gratuite</strong> - ON = active</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<p>Les trois interrupteurs de choix du jeu donnent un nombre de 0 à 7.
+Les nombres 0 à 4 sont les cinq jeux, voir l&#39;annexe A. <strong>Les
+nombres 5, 6 et 7 ne sont pas utilisés et retombent sur Middle
+Earth</strong> - un interrupteur mal réglé ne laisse donc jamais la
+carte sans jeu.</p>
+<p>La partie gratuite est décrite au chapitre 7.</p>
+<h3 id="42-le-banc-de-6--options">4.2. Le banc de 6 : options</h3>
+<p>Le réglage par défaut est <strong>tout sur « OFF »</strong> - c&#39;est
+le bon réglage pour un flipper standard.</p>
+<table>
+<thead>
+<tr>
+<th>DIP</th>
+<th>Fonction</th>
+<th>lu</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dip1</td>
+<td><strong>musique de fond</strong> - ON = active</td>
+<td>au démarrage</td>
+</tr>
+<tr>
+<td>Dip2</td>
+<td>réservé</td>
+<td>au démarrage</td>
+</tr>
+<tr>
+<td>Dip3</td>
+<td><strong>son : OFF = carte auxiliaire, ON = amplificateur
+intégré</strong></td>
+<td>en continu</td>
+</tr>
+<tr>
+<td>Dip4</td>
+<td><strong>laisser FA-Control prendre la main</strong> - ON =
+autorisé</td>
+<td>en continu</td>
+</tr>
+<tr>
+<td>Dip5</td>
+<td><strong>temps mort des lampes, bit de poids fort</strong> - seul =
+temporisation de la MPU d&#39;origine</td>
+<td>en continu</td>
+</tr>
+<tr>
+<td>Dip6</td>
+<td><strong>temps mort des lampes, bit de poids faible</strong> - quatre
+paliers avec Dip5, utile seulement si des LED luisent</td>
+<td>en continu</td>
+</tr>
+</tbody>
+</table>
+<h4 id="421-option-3---par-où-sort-le-son">4.2.1. Option 3 -&gt; par où
+sort le son</h4>
+<ul>
+<li><p><strong>« OFF »</strong> - <strong>le chemin d&#39;origine.</strong>
+AtariFA alimente la carte auxiliaire Atari exactement comme la MPU
+d&#39;origine : les quatre lignes audio et les quatre lignes du verrou de
+volume. Le son est alors produit par la carte auxiliaire et part vers
+l&#39;amplificateur de votre flipper. <strong>C&#39;est le réglage pour un
+flipper non modifié.</strong></p></li>
+<li><p><strong>« ON »</strong> - <strong>le chemin intégré.</strong> Le
+son est généré dans le FPGA, filtré et envoyé au petit amplificateur
+(TDA7267) de la carte AtariFA. À utiliser sur l&#39;établi, ou dans un
+flipper dont la partie audio de la carte auxiliaire est défectueuse. Les
+sorties vers la carte auxiliaire restent alors au repos.</p></li>
+</ul>
+<p><strong>Cet interrupteur peut être changé pendant que le jeu
+tourne</strong> - il est lu en continu. Le son bascule
+immédiatement.</p>
+<h4 id="422-option-4---laisser-fa-control-prendre-la-main">4.2.2. Option
+4 -&gt; laisser FA-Control prendre la main</h4>
+<ul>
+<li><p><strong>« OFF »</strong> - <strong>personne
+n&#39;intervient.</strong> Un module FA-Control branché peut observer les
+afficheurs et les interrupteurs, mais il ne peut rien commuter. C&#39;est le
+réglage pour jouer normalement, et c&#39;est le réglage par défaut.</p></li>
+<li><p><strong>« ON »</strong> - <strong>FA-Control peut piloter le
+flipper.</strong> C&#39;est seulement dans ce cas qu&#39;AtariFA cède le
+contrôle quand il le demande, et le jeu est arrêté pendant ce temps.
+Tout le reste est au chapitre 9.</p></li>
+</ul>
+<p>Cet interrupteur est lui aussi lu en continu : le passer sur « OFF »
+pendant que FA-Control a la main lui retire le contrôle
+<strong>immédiatement</strong> et redémarre le jeu. C&#39;est l&#39;arrêt
+d&#39;urgence pour un outil de test qui s&#39;est bloqué.</p>
+<h4 id="423-option-1---musique-de-fond-option-2-réservée">4.2.3. Option
+1 -&gt; musique de fond, option 2 réservée</h4>
+<ul>
+<li><p><strong>Option 1, « ON »</strong> - <strong>la musique de fond
+joue tant qu&#39;une bille est en jeu.</strong> Le lecteur MP3 de la carte
+joue en boucle le dossier 02 de sa carte mémoire et se met en pause dès
+que la bille repose dans l&#39;outhole et que la partie est finie. Tout est
+expliqué au chapitre 8.4.</p></li>
+<li><p><strong>Option 1, « OFF »</strong> - pas de musique de fond.
+C&#39;est le réglage par défaut, celui d&#39;un flipper qui doit se comporter
+comme l&#39;original.</p></li>
+</ul>
+<p>L&#39;option 1 servait auparavant à une fonction expérimentale de
+sauvegarde des crédits et des meilleurs scores, actuellement en attente,
+voir le chapitre 13. Depuis le logiciel 0.3.0, c&#39;est l&#39;interrupteur de
+la musique de fond.</p>
+<p><strong>L&#39;option 2</strong> n&#39;est pas utilisée. Laissez-la sur « OFF
+». Elle est câblée, apparaît sur l&#39;affichage d&#39;informations et est
+prévue pour de futures versions du logiciel.</p>
+<p>Les deux interrupteurs ne sont lus <strong>qu&#39;au démarrage</strong> -
+voir le chapitre 4.3.</p>
+<h4 id="424-options-5-et-6---temps-mort-des-colonnes-de-lampes">4.2.4.
+Options 5 et 6 -&gt; temps mort des colonnes de lampes</h4>
+<p>Atari pilote les lampes en multiplexage temporel : quatre colonnes
+sont allumées à tour de rôle, une demi-milliseconde chacune. Sur la MPU
+d&#39;origine, la colonne est commutée exactement au moment où les nouvelles
+valeurs de lampes deviennent valides. Comme les pilotes de colonne de la
+carte auxiliaire mettent quelques microsecondes à se couper, la
+<em>mauvaise</em> lampe reçoit à chaque fois une très brève impulsion de
+courant — la lampe voisine du même groupe de pilotes, dans la colonne
+précédente.</p>
+<p>Sur une ampoule à incandescence, vous ne le remarquerez jamais.
+<strong>Les lampes de remplacement à LED, en revanche, luisent
+visiblement</strong> alors qu&#39;elles sont éteintes. C&#39;est l&#39;effet bien
+connu des LED qui « ne s&#39;éteignent jamais complètement » sur un Atari ;
+le manuel Atari le décrit comme un prétendu circuit de « keep-alive »,
+mais c&#39;est la même chose.</p>
+<p>AtariFA commute donc la colonne <strong>pendant que toutes les lampes
+sont éteintes</strong>, puis laisse à l&#39;ancienne colonne un court
+<strong>temps mort</strong> pour se couper avant que les nouvelles
+valeurs ne soient appliquées. Le temps de coupure d&#39;un pilote de colonne
+varie d&#39;un flipper à l&#39;autre — il dépend des composants et du courant
+consommé par les lampes de la colonne. Moins il y a de courant, plus
+c&#39;est long. Une colonne équipée de lampes à LED est donc le pire cas.
+C&#39;est pourquoi le temps mort est réglable, avec <strong>les options 5 et
+6 ensemble</strong> :</p>
+<table>
+<thead>
+<tr>
+<th>Option 5</th>
+<th>Option 6</th>
+<th>Temps mort</th>
+<th>Luminosité</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>OFF</strong></td>
+<td><strong>OFF</strong></td>
+<td><strong>environ 65 µs — par défaut</strong></td>
+<td>21,8 %</td>
+</tr>
+<tr>
+<td>OFF</td>
+<td>ON</td>
+<td>environ 250 µs</td>
+<td>12,8 %</td>
+</tr>
+<tr>
+<td>ON</td>
+<td>OFF</td>
+<td><em>aucun</em> — temporisation de la MPU d&#39;origine</td>
+<td>24,5 %</td>
+</tr>
+<tr>
+<td>ON</td>
+<td>ON</td>
+<td>environ 400 µs</td>
+<td>5,5 %</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Que régler :</strong></p>
+<ul>
+<li><p><strong>Ampoules à incandescence dans le flipper :</strong> rien.
+Le réglage par défaut est le bon et ces interrupteurs ne vous concernent
+pas.</p></li>
+<li><p><strong>Lampes à LED, tout va bien :</strong> rien non plus. Le
+réglage par défaut suffit dans la plupart des flippers.</p></li>
+<li><p><strong>Certaines LED luisent alors qu&#39;elles devraient être
+éteintes :</strong> montez d&#39;un palier — d&#39;abord option 6 = « ON » (250
+µs), et seulement si cela ne suffit pas, les deux sur « ON » (400 µs).
+<strong>Prenez le plus petit palier qui supprime la lueur</strong>, car
+chaque palier coûte de la luminosité. À 250 µs, c&#39;est à peine visible
+dans le flipper ; <strong>à 400 µs, c&#39;est nettement plus
+sombre</strong>, ce qui est voulu et n&#39;est pas un défaut.</p></li>
+<li><p><strong>Option 5 = « ON » seule</strong> sélectionne la
+<strong>temporisation de la MPU d&#39;origine</strong>, lueur comprise.
+Utile pour comparer AtariFA à la carte d&#39;origine, ou si vous préférez le
+comportement d&#39;origine. Les ampoules à incandescence n&#39;y sont pas
+sensibles du tout.</p></li>
+</ul>
+<p>Les deux interrupteurs sont lus en continu ; on peut donc les changer
+pendant que le jeu tourne — ce qui permet de comparer facilement sur
+place, sans éteindre. Une colonne dure la même demi-milliseconde dans
+les quatre positions ; seule change la part réservée à la coupure.</p>
+<blockquote>
+<p><strong>La signification de la combinaison a changé par rapport aux
+logiciels 0.1.7 et 0.1.8.</strong> L&#39;option 5 seule et l&#39;option 6 seule
+gardent leur sens ; <strong>les deux ensemble</strong> sélectionnaient
+auparavant la temporisation d&#39;origine et donnent maintenant le temps
+mort le plus long. La version qui tourne est indiquée sur l&#39;affichage
+d&#39;informations à la mise sous tension (chapitre 5.2).</p>
+</blockquote>
+<h4 id="425-si-la-lueur-persiste">4.2.5. Si la lueur persiste</h4>
+<p><strong>Si même le palier le plus long (options 5 et 6 toutes deux
+sur « ON ») ne change rien :</strong> le temps de coupure des colonnes
+n&#39;est pas en cause, et l&#39;augmenter encore n&#39;aiderait pas — une
+demi-milliseconde de colonne ne laisse de toute façon guère plus de 400
+microsecondes. Il existe une deuxième cause sur laquelle aucun logiciel
+ne peut agir : les pilotes de lampes (ULN2003A) laissent passer un
+courant résiduel de quelques microampères à l&#39;état bloqué, et comme une
+colonne est toujours alimentée, cela suffit à faire luire une LED
+moderne. Une ampoule à incandescence ne le montre jamais. La MPU
+d&#39;origine a le même courant résiduel.</p>
+<p>Le remède sur la douille concernée : <strong>une résistance d&#39;environ
+2,2 kΩ (½ W) en parallèle avec la lampe</strong> — elle absorbe le
+courant résiduel sans gêner la lampe en fonctionnement. Tout aussi
+efficace : une ampoule à incandescence à cet emplacement, ou une lampe à
+LED avec résistance de décharge intégrée (« ghost free »).</p>
+<h3 id="43-six-des-dix-dip-ne-sont-lus-quune-fois-au-démarrage">4.3. Six
+des dix DIP ne sont lus qu&#39;une fois, au démarrage</h3>
+<p><strong>C&#39;est le seul piège dans lequel on tombe
+facilement.</strong></p>
+<p>Les six premiers interrupteurs - les trois de choix du jeu, la partie
+gratuite et les options 1 et 2 - n&#39;ont pas six fils à eux. Ils sont lus
+via une petite matrice 3 x 2, et cette matrice emprunte trois lignes qui
+appartiennent aux pilotes de lampes. Les lire en continu ferait
+scintiller les lampes ; ils sont donc lus une seule fois, pendant la
+phase de démarrage, avant que le jeu ne commence. Ensuite, les trois
+lignes retournent aux lampes.</p>
+<p><strong>Donc : après avoir changé le choix du jeu, la partie gratuite
+ou l&#39;option 1 / 2, éteignez puis rallumez le flipper.</strong> Un
+changement pendant que le jeu tourne n&#39;a aucun effet.</p>
+<p>Les quatre autres interrupteurs - options 3 à 6 - ont leurs propres
+lignes et sont lus en continu. On peut les changer à tout moment.</p>
+<h2 id="5-séquence-de-démarrage">5. Séquence de démarrage</h2>
+<h3 id="51-phase-1--lecture-des-interrupteurs-dip">5.1. Phase 1 :
+lecture des interrupteurs DIP</h3>
+<p>Juste après la mise sous tension, et une fois l&#39;horloge interne
+verrouillée, la carte lit les six premiers interrupteurs DIP via la
+matrice de strobes. Cela prend quelques microsecondes ; vous ne le
+verrez pas. Jusque-là, les afficheurs sont éteints.</p>
+<h3 id="52-phase-2--laffichage-dinformations">5.2. Phase 2 : l&#39;affichage
+d&#39;informations</h3>
+<p>Une fois la lecture des DIP terminée, les afficheurs s&#39;allument et
+montrent la configuration pendant <strong>environ 5 secondes</strong>.
+Le CPU est encore maintenu en reset pendant ce temps - le jeu n&#39;a pas
+encore démarré.</p>
+<table>
+<thead>
+<tr>
+<th>Afficheur</th>
+<th>Montre</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Joueur 1</strong></td>
+<td>la version du programme FPGA, trois chiffres :
+<code>&lt;carte&gt; &lt;sub1&gt; &lt;sub2&gt;</code></td>
+</tr>
+<tr>
+<td><strong>Joueur 2</strong></td>
+<td>la valeur du choix du jeu, deux chiffres, 00 à 07</td>
+</tr>
+<tr>
+<td><strong>Joueur 3</strong></td>
+<td>les six interrupteurs d&#39;options, option 1 à gauche, option 6 à
+droite - <code>1</code> = ON</td>
+</tr>
+<tr>
+<td><strong>Joueur 4</strong></td>
+<td>partie gratuite : <code>1</code> = active, <code>0</code> =
+inactive</td>
+</tr>
+<tr>
+<td><strong>Crédit/Bille</strong></td>
+<td>éteint</td>
+</tr>
+</tbody>
+</table>
+<p>Tout est aligné à droite, les chiffres inutilisés restent
+éteints.</p>
+<p>Exemple : joueur 1 affiche <code>033</code>, joueur 2
+<code>02</code>, joueur 3 <code>000000</code>, joueur 4 <code>0</code> -
+c&#39;est le logiciel 0.3.3 sur la carte standard, qui exécute Airborne
+Avenger, sans option ni partie gratuite.</p>
+<p><strong>Le premier chiffre de la version indique la variante de
+carte</strong>, voir le chapitre 12. <code>0</code> est la carte AtariFA
+standard.</p>
+<p>Environ deux secondes après le début de cette fenêtre, la carte dit
+son nom par l&#39;amplificateur intégré - voir le chapitre 8.3.</p>
+<p><strong>Servez-vous de cet affichage.</strong> C&#39;est le moyen le plus
+rapide de vérifier que les interrupteurs DIP sont bien réglés comme vous
+le pensez, et comme six d&#39;entre eux ne sont lus qu&#39;ici, c&#39;est le seul
+endroit où vous pouvez les contrôler.</p>
+<h3 id="53-phase-3--exécution-du-programme">5.3. Phase 3 : exécution du
+programme</h3>
+<p>Après la fenêtre d&#39;informations, le CPU est libéré et le jeu démarre.
+À partir de là, les afficheurs appartiennent au jeu et se comportent
+exactement comme avec une MPU Atari d&#39;origine.</p>
+<p>Les ROM de jeu sont dans le FPGA ; il n&#39;y a rien à charger et aucune
+attente.</p>
+<h2 id="6-réglages-du-jeu-et-autotest">6. Réglages du jeu et
+autotest</h2>
+<p>Les réglages se font exactement comme sur la MPU Atari d&#39;origine.
+AtariFA reconstruit le matériel de réglage d&#39;origine à l&#39;identique, il
+ne le remplace pas par un menu.</p>
+<h3 id="61-les-bancs-dip-de-programmation-et-le-commutateur-de-replay">6.1.
+Les bancs DIP de programmation et le commutateur de replay</h3>
+<p>La carte porte les deux bancs de 8 interrupteurs DIP de programmation
+et le commutateur rotatif « replay » de la MPU Atari d&#39;origine, à la
+même place dans la carte mémoire. Réglez-les selon le manuel de votre
+flipper - AtariFA les présente au code du jeu exactement comme
+l&#39;original.</p>
+<p><strong>Ne les confondez pas avec les dix DIP de configuration du
+chapitre 4.</strong> Les dix interrupteurs configurent <em>AtariFA</em>
+; les deux bancs de huit et le commutateur de replay configurent <em>le
+jeu</em>.</p>
+<p>La carte porte en plus trois boutons-poussoirs, câblés en parallèle
+avec le flipper : <strong>« Atari Test », « Coin 2 » et « Start
+»</strong>. Ils permettent de faire tourner et de tester la carte sur
+l&#39;établi sans porte à monnaie.</p>
+<h3 id="62-lautotest">6.2. L&#39;autotest</h3>
+<p>Appuyez sur l&#39;interrupteur de test - celui de la porte à monnaie ou
+celui de la carte. Le jeu entre dans son autotest, et vous pouvez
+parcourir les tests d&#39;interrupteurs, de lampes, de bobines et
+d&#39;afficheurs en suivant le manuel de votre flipper.</p>
+<p><strong>Exception : The Atarians.</strong> Le premier jeu d&#39;Atari n&#39;a
+pas d&#39;autotest documenté et ne réagit pas à l&#39;interrupteur de test. Ce
+n&#39;est pas un défaut d&#39;AtariFA.</p>
+<h3 id="63-crédits-et-meilleurs-scores-ne-sont-pas-conservés">6.3.
+Crédits et meilleurs scores ne sont pas conservés</h3>
+<p>À l&#39;extinction du flipper, les crédits et les scores sont perdus.
+<strong>La MPU Atari génération 1 d&#39;origine se comporte de la même
+façon</strong> - contrairement aux machines plus récentes, elle n&#39;a
+aucune mémoire secourue par pile.</p>
+<p>La carte porte bien une puce FRAM pour changer cela, mais la fonction
+n&#39;est pas terminée et est désactivée dans cette version du logiciel.
+Voir le chapitre 13.</p>
+<p>Si vous voulez que le flipper démarre sans pièces, utilisez la partie
+gratuite - chapitre 7.</p>
+<h2 id="7-partie-gratuite">7. Partie gratuite</h2>
+<p>Interrupteur 4 du banc de quatre, <strong>ON = partie gratuite
+active</strong>. N&#39;oubliez pas que cet interrupteur n&#39;est lu qu&#39;au
+démarrage : éteignez puis rallumez le flipper après l&#39;avoir changé.</p>
+<p>La partie gratuite fonctionne pour <strong>les cinq jeux</strong>.
+Atari vendait la version en partie gratuite comme un autre jeu de ROM ;
+AtariFA intègre ces différences et les superpose à la ROM du jeu quand
+l&#39;interrupteur est sur ON. Seuls 42 octets diffèrent sur l&#39;ensemble des
+cinq jeux, c&#39;est pourquoi cela tient sans second jeu de ROM dans le
+FPGA.</p>
+<p>Le résultat est, octet pour octet, le même code que celui des ROM de
+partie gratuite d&#39;origine.</p>
+<h2 id="8-son">8. Son</h2>
+<h3 id="81-ce-qui-est-reconstruit">8.1. Ce qui est reconstruit</h3>
+<p>La génération de son Atari génération 1, telle qu&#39;elle se trouve sur
+la carte MPU et la carte auxiliaire :</p>
+<ul>
+<li><strong>une ROM de formes d&#39;onde</strong> avec 16 formes d&#39;onde de
+32 échantillons, choisies par le jeu</li>
+<li><strong>un diviseur de hauteur</strong>, qui donne la note</li>
+<li><strong>un verrou de volume</strong>, qui pilote l&#39;atténuateur de la
+carte auxiliaire</li>
+</ul>
+<p>Le jeu écrit dans trois verrous pour la forme d&#39;onde, la hauteur et
+le volume, exactement comme sur l&#39;original, et AtariFA reproduit
+numériquement le son qui en résulte.</p>
+<p>C&#39;est le son complet d&#39;un flipper Atari génération 1 - ces jeux n&#39;ont
+ni carte son séparée ni voix.</p>
+<h3 id="82-les-deux-chemins-audio">8.2. Les deux chemins audio</h3>
+<p>Se règle avec l&#39;option 3, voir le chapitre 4.2.1 : soit le chemin
+d&#39;origine par la carte auxiliaire (interrupteur sur OFF), soit
+l&#39;amplificateur intégré (interrupteur sur ON). Les deux produisent les
+mêmes sons ; ils diffèrent par l&#39;endroit où le signal analogique est
+formé.</p>
+<p><strong>Une remarque sur la façon dont les jeux coupent le
+son.</strong> Le code du jeu ne met pas le volume à zéro quand un son
+doit s&#39;arrêter - il active la ligne « audio reset » et laisse le verrou
+de volume tel quel. AtariFA reproduit cela : audio reset fige la
+génération du son, la sortie devient un niveau constant, que la carte
+auxiliaire bloque. Si vous entendez un son continu qui ne s&#39;arrête
+jamais, cherchez un problème de câblage sur les lignes audio vers la
+carte auxiliaire, pas un problème de volume.</p>
+<h3 id="83-lannonce-au-démarrage">8.3. L&#39;annonce au démarrage</h3>
+<p>Environ deux secondes après la mise sous tension, pendant la fenêtre
+d&#39;informations, la carte dit <strong>« Lisü »</strong> par
+l&#39;amplificateur intégré. C&#39;est une annonce fixe, jouée une seule fois,
+qui indique que le FPGA tourne et que la chaîne audio intégrée
+fonctionne.</p>
+<p>Elle sort toujours par l&#39;<strong>amplificateur intégré</strong>,
+quelle que soit l&#39;option 3 - elle ne fait pas partie du son du jeu et
+n&#39;atteint jamais la carte auxiliaire.</p>
+<p>Si vous n&#39;entendez rien à ce moment-là, vérifiez l&#39;amplificateur
+intégré et le raccordement de son haut-parleur avant de chercher
+ailleurs.</p>
+<h3 id="84-musique-de-fond-depuis-le-lecteur-mp3">8.4. Musique de fond
+depuis le lecteur MP3</h3>
+<p>Depuis le logiciel 0.3.0, le petit lecteur MP3 de la carte (un « MP3
+mini player » avec sa propre carte mémoire) peut jouer une musique de
+fond <strong>pendant une partie</strong>. Il s&#39;active avec
+l&#39;<strong>option 1</strong>, chapitre 4.2.3, et il est désactivé par
+défaut.</p>
+<p><strong>Ce que vous mettez sur la carte mémoire.</strong> Créez un
+dossier nommé <strong><code>02</code></strong> et placez-y vos morceaux,
+numérotés :</p>
+<pre><code>/02/001.mp3
+/02/002.mp3
+...</code></pre>
+<p>Le lecteur joue ce dossier en boucle, dans son propre ordre. Il n&#39;y a
+ni sélection par jeu ni mode aléatoire. Si vous utilisez aussi une carte
+GottFA1_PLuS, la même carte mémoire y fonctionne.</p>
+<p><strong>Ce qui se passe pendant le jeu.</strong> La carte se règle
+sur l&#39;<strong>interrupteur de l&#39;outhole</strong> : la musique joue tant
+qu&#39;aucune bille ne repose dans l&#39;outhole. Elle démarre donc quand la
+bille est éjectée au début d&#39;une partie et se met en pause quand la
+dernière bille reste en bas. À la partie suivante, elle reprend là où
+elle s&#39;était arrêtée au lieu de recommencer au début.</p>
+<p>Pour ne pas s&#39;interrompre à chaque changement de bille, la carte ne
+réagit qu&#39;après <strong>deux secondes</strong>. Si la bille est éjectée
+à nouveau plus tôt, la musique continue sans coupure ; si le décompte du
+bonus dure plus longtemps, elle fait une courte pause et revient avec la
+bille suivante. Pour la même raison, la musique démarre deux secondes
+après le début d&#39;une partie et s&#39;arrête deux secondes après la dernière
+bille.</p>
+<p><strong>Un tilt ne met pas la musique en pause tout de suite</strong>
+- elle continue jusqu&#39;à ce que la bille soit en bas. (Jusqu&#39;au logiciel
+0.3.0, la carte suivait le relais des flippers et s&#39;arrêtait
+immédiatement au tilt. Seuls Middle Earth et Space Riders ont réellement
+ce relais, d&#39;où ce changement.)</p>
+<p><strong>Si aucune bille ne repose dans l&#39;outhole à la mise sous
+tension</strong> - parce qu&#39;elle est dans le couloir de lancement ou sur
+le plateau, par exemple - la musique joue aussi en mode attraction.
+Mettez la bille dans l&#39;outhole, ou lancez et terminez une partie, et
+elle se tait à nouveau.</p>
+<p><strong>Le son du jeu n&#39;est pas affecté.</strong> La musique et le
+son du jeu sont deux chemins analogiques séparés qui ne se rejoignent
+qu&#39;à l&#39;amplificateur. Les sons du jeu du chapitre 8.1 jouent par-dessus
+la musique ; rien n&#39;est atténué ni coupé. Réglez l&#39;équilibre entre les
+deux avec le volume du lecteur et celui de votre flipper.</p>
+<p><strong>Si vous n&#39;entendez rien :</strong> l&#39;interrupteur n&#39;est lu
+qu&#39;au démarrage, éteignez donc puis rallumez après avoir réglé l&#39;option
+1. Vérifiez que le dossier s&#39;appelle vraiment <code>02</code>, que la
+carte mémoire est dans le lecteur et que la carte affiche la version
+<strong>033</strong> sur l&#39;affichage d&#39;informations -
+<strong>133</strong> ou <strong>233</strong> sur les deux cartes «
+dev_open », chapitre 5.2.</p>
+<p><strong>Laissez-lui le temps.</strong> Après la mise sous tension, la
+carte laisse cinq secondes au lecteur pour démarrer, lui parle, puis
+attend la fin de l&#39;anti-rebond. Cela fait au total <strong>environ 15
+secondes</strong> avant la première note. Si vous abandonnez plus tôt,
+vous prendrez un module qui fonctionne pour un module défectueux.</p>
+<p>S&#39;il reste silencieux ensuite alors qu&#39;une bille est en jeu, vérifiez
+encore une fois le choix du jeu (annexe A) - la carte lit un
+interrupteur d&#39;outhole différent selon le jeu réglé.</p>
+<h2 id="9-linterface-fa-control-esp32">9. L&#39;interface FA-Control
+(ESP32)</h2>
+<p>La carte a un support prévu pour un <strong>ESP32-C3 Super
+Mini</strong>. Il fait tourner <strong>FA-Control</strong> - un petit
+firmware qui ouvre un réseau WLAN et propose une interface de test dans
+votre navigateur : allumer chaque lampe individuellement, envoyer une
+impulsion à chaque bobine, voir tous les interrupteurs en direct, écrire
+des chiffres sur les afficheurs, jouer des sons.</p>
+<p>C&#39;est un <strong>outil pour l&#39;établi et le dépannage</strong>, pas un
+accessoire pour le jeu normal. Si vous ne branchez rien, vous ne
+remarquerez jamais cette interface - la carte se comporte exactement
+comme sans.</p>
+<blockquote>
+<p>Cette fonction est nouvelle dans la version logicielle 0.1.3 et a été
+essayée sur un vrai flipper.</p>
+</blockquote>
+<h3 id="91-lautorisation--option-4">9.1. L&#39;autorisation : option 4</h3>
+<p>Un outil de test ne doit pas pouvoir intervenir sans y être invité
+dans une partie en cours. <strong>Deux conditions</strong> doivent donc
+être réunies :</p>
+<ol type="1">
+<li>Le module ESP32 le demande activement (« je voudrais prendre la main
+»).</li>
+<li><strong>Le DIP d&#39;option 4 est sur ON.</strong></li>
+</ol>
+<p>Avec l&#39;option 4 sur OFF, l&#39;interface web l&#39;indique en clair - <em>«
+control refused - set option DIP 4 to ON »</em> - et le jeu continue
+sans être dérangé. La lecture reste autorisée : vous pouvez suivre
+l&#39;état des interrupteurs pendant une partie sans rien céder.</p>
+<h3 id="92-ce-qui-se-passe-pendant-la-prise-de-contrôle">9.2. Ce qui se
+passe pendant la prise de contrôle</h3>
+<p><strong>Le jeu est arrêté.</strong> Le processeur est maintenu en
+reset, et tout - lampes, bobines, afficheurs, son - vient désormais de
+l&#39;interface web. Il faut que ce soit ainsi : si le jeu continuait à
+tourner, il écraserait en quelques millisecondes chaque lampe réglée à
+la main.</p>
+<p><strong>Le jeu redémarre ensuite depuis le début.</strong> Il ne peut
+pas être mis en pause puis repris. Une partie en cours est perdue ; ne
+prenez donc le contrôle qu&#39;en mode attraction ou sur l&#39;établi.</p>
+<h3 id="93-comment-le-contrôle-est-rendu">9.3. Comment le contrôle est
+rendu</h3>
+<p>Trois façons, et toutes les trois coupent immédiatement toutes les
+sorties et redémarrent le jeu :</p>
+<ul>
+<li><strong>Dans l&#39;interface web</strong>, appuyez sur « hand back
+control » (rendre le contrôle).</li>
+<li><strong>Mettez le DIP d&#39;option 4 sur OFF.</strong> L&#39;interrupteur
+est lu en continu - c&#39;est l&#39;arrêt d&#39;urgence.</li>
+<li><strong>Ne faites rien.</strong> Si le module reste silencieux
+pendant deux secondes, AtariFA reprend la main de lui-même. C&#39;est le
+filet de sécurité pour un module qui se bloque, redémarre ou perd le
+contact - le flipper ne reste pas coincé dans la prise de contrôle, il
+redevient un flipper ordinaire.</li>
+</ul>
+<h3 id="94-ce-que-linterface-web-apprend-de-la-carte">9.4. Ce que
+l&#39;interface web apprend de la carte</h3>
+<p>À la connexion, FA-Control demande à la carte de quoi elle est faite
+et se configure seul - il n&#39;y a rien à saisir. AtariFA répond :</p>
+<table>
+<tbody>
+<tr>
+<td>Identification</td>
+<td><code>AtariFA</code></td>
+</tr>
+<tr>
+<td>Version du logiciel</td>
+<td>la même que sur l&#39;affichage d&#39;informations, par ex.
+<code>0.3.3</code></td>
+</tr>
+<tr>
+<td>Lampes</td>
+<td>84</td>
+</tr>
+<tr>
+<td>Bobines</td>
+<td>22 (20 du plateau + compteur de pièces + bobine de blocage)</td>
+</tr>
+<tr>
+<td>Interrupteurs</td>
+<td>80</td>
+</tr>
+<tr>
+<td>Sons</td>
+<td>16</td>
+</tr>
+<tr>
+<td>Afficheurs</td>
+<td>5 (état avec 4 chiffres, quatre joueurs avec 6 chacun)</td>
+</tr>
+</tbody>
+</table>
+<p>La numérotation suit la carte : les interrupteurs portent le même
+numéro que dans l&#39;autotest du jeu, et <strong>les bobines 1 à 20 sont
+les pilotes Q1 à Q20 du schéma</strong>, 21 est le compteur de pièces et
+22 la bobine de blocage. Les bobines sont le seul groupe qui commence à
+1 - c&#39;est ainsi que l&#39;original les compte, et le protocole LISY aussi.
+Les lampes (0 à 83) et les interrupteurs (0 à 79) commencent à 0.
+<em>(Jusqu&#39;à la version 0.1.9, les bobines commençaient aussi à 0 ; un
+firmware FA-Control antérieur à 1.16 actionnera donc la mauvaise
+bobine.)</em></p>
+<h3 id="95-raccordement">9.5. Raccordement</h3>
+<p>Le module ESP32 s&#39;enfiche simplement ; il n&#39;y a rien à souder. La
+carte l&#39;alimente - <strong>aucun câble USB n&#39;est nécessaire en
+fonctionnement normal.</strong> On n&#39;en branche un que pour charger le
+firmware FA-Control ou lire le journal de démarrage. Pour la
+configuration WLAN initiale, FA-Control ouvre son propre point d&#39;accès
+au premier démarrage - voir la documentation de FA-Control.</p>
+<h2 id="10-les-led-détat">10. Les LED d&#39;état</h2>
+<p>La carte a trois LED d&#39;état, câblées en parallèle avec les LED de la
+carte fille. C&#39;est le diagnostic le plus rapide sans analyseur
+logique.</p>
+<table>
+<thead>
+<tr>
+<th>LED</th>
+<th>Signification</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>D1</strong></td>
+<td>chien de garde (watchdog) : s&#39;allume et reste allumée dès que le
+chien de garde interne a expiré au moins une fois. <strong>Éteinte est
+l&#39;état normal.</strong></td>
+</tr>
+<tr>
+<td><strong>D2</strong></td>
+<td>le CPU lit des instructions dans la ROM - clignote lentement,
+quelques secondes par phase selon le jeu. <strong>Fixe, allumée ou
+éteinte, signifie que le CPU est arrêté ou bloqué.</strong></td>
+</tr>
+<tr>
+<td><strong>D3</strong></td>
+<td>le timer NMI tourne - clignote à 0,48 Hz, soit un peu plus d&#39;une
+seconde allumée et un peu plus d&#39;une seconde éteinte. C&#39;est du matériel
+autonome qui ne dépend pas du CPU.</td>
+</tr>
+</tbody>
+</table>
+<p>Lisez-les ensemble :</p>
+<ul>
+<li><strong>D2 et D3 clignotent</strong> - la carte et le jeu sont
+vivants. C&#39;est ce que vous voulez voir.</li>
+<li><strong>D3 clignote, D2 fixe</strong> - le matériel tourne mais le
+CPU n&#39;exécute rien. Vérifiez le choix du jeu et l&#39;interrupteur de
+reset.</li>
+<li><strong>Rien ne clignote</strong> - le FPGA n&#39;est pas configuré ou
+n&#39;a pas d&#39;horloge. Reprogrammez-le (chapitre 11).</li>
+</ul>
+<h2 id="11-programmer-le-fpga">11. Programmer le FPGA</h2>
+<p>Tout ce qu&#39;il faut pour mettre le logiciel sur la carte est décrit
+sur mon site, et c&#39;est tenu à jour là-bas :</p>
+<blockquote>
+<p><strong><a href="https://lisy.dev/documentation-01.html">https://lisy.dev/documentation-01.html</a></strong></p>
+</blockquote>
+<p>Vous y trouverez le dernier programme FPGA à télécharger, le logiciel
+de programmation nécessaire, l&#39;installation du pilote USB Blaster et la
+programmation du FPGA.</p>
+<p><strong>Veillez à prendre la version AtariFA</strong> et, s&#39;il y en a
+plusieurs, celle de votre variante de carte - voir le chapitre 12. La
+variante de carte est le premier chiffre de la version sur l&#39;affichage
+d&#39;informations.</p>
+<p>Il n&#39;y a pas d&#39;image de carte SD pour AtariFA. Les ROM de jeu font
+partie du programme FPGA.</p>
+<h2 id="12-variantes-de-carte">12. Variantes de carte</h2>
+<p>Le même design fonctionne sur trois cartes filles. Le programme FPGA
+n&#39;est <strong>pas</strong> interchangeable entre elles - le brochage
+diffère, et la troisième porte un FPGA d&#39;une autre famille.</p>
+<table>
+<thead>
+<tr>
+<th>Variante</th>
+<th>Carte</th>
+<th>FPGA</th>
+<th>La version commence par</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cyclone_10_pcb</code></td>
+<td>carte AtariFA v1.x avec la carte fille Cyclone 10 de lisy.dev</td>
+<td>Cyclone 10 LP</td>
+<td><strong>0</strong></td>
+</tr>
+<tr>
+<td><code>cyclone_10_dev_open</code></td>
+<td>carte AtariFA v1.x avec la carte Cyclone 10 « dev_open »</td>
+<td>Cyclone 10 LP</td>
+<td><strong>1</strong></td>
+</tr>
+<tr>
+<td><code>cyclone_IV_dev_open</code></td>
+<td>la même carte « dev_open », mais équipée d&#39;un Cyclone IV</td>
+<td>Cyclone IV E</td>
+<td><strong>2</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>L&#39;affichage d&#39;informations indique quel programme tourne
+:</strong> le premier des trois chiffres de version sur l&#39;afficheur du
+joueur 1 est le numéro de carte. Si vous avez chargé le mauvais, les
+afficheurs resteront très probablement éteints ou montreront n&#39;importe
+quoi - vérifiez d&#39;abord ce chiffre.</p>
+<p>À part le brochage, les trois sont identiques, avec deux petites
+différences sur la carte fille elle-même : la carte
+<code>dev_open</code> porte son interrupteur de reset et ses quatre LED
+d&#39;état sur la carte fille (la quatrième est en réserve et reste
+éteinte), et elle amène 3 lignes de débogage au lieu de 8 sur le
+connecteur de l&#39;analyseur logique. Les deux versions « dev_open » ne
+diffèrent que par le FPGA monté et par deux broches placées ailleurs sur
+le Cyclone IV.</p>
+<p><strong>État des tests.</strong> Seule <code>cyclone_10_pcb</code> a
+été jouée sur un flipper jusqu&#39;à présent.
+<code>cyclone_10_dev_open</code> tourne sur l&#39;établi depuis le logiciel
+0.3.0 - le démarrage, l&#39;affichage d&#39;informations et le lecteur MP3 y
+sont confirmés, tout le reste dépend du câblage vers le flipper et n&#39;est
+pas testé. <code>cyclone_IV_dev_open</code> a été construite mais n&#39;a
+jamais tourné sur du matériel.</p>
+<h2 id="13-pas-encore-implémenté">13. Pas encore implémenté</h2>
+<p>Ceci est présent sur la carte, câblé, et n&#39;est pas utilisé par cette
+version du logiciel. Cela ne fait rien et ne fait pas de mal - le FPGA
+le maintient dans un état de repos sûr.</p>
+<ul>
+<li><strong>FRAM (crédits et meilleurs scores après une coupure de
+courant).</strong> La puce est montée et le pilote de bas niveau
+fonctionne, mais la rendre fiable pour les cinq jeux s&#39;est révélé
+demander plus de rétro-ingénierie des ROM de jeu que prévu. La fonction
+est désactivée. L&#39;interrupteur d&#39;option 1, qui la commandait auparavant,
+est l&#39;interrupteur de la musique de fond depuis le logiciel 0.3.0,
+chapitre 4.2.3. Voir le chapitre 6.3.</li>
+</ul>
+<h2 id="annexe-a-choix-du-jeu">Annexe A choix du jeu</h2>
+<p>Interrupteurs du <strong>banc de 4</strong>. Le Dip4 de ce banc est
+la partie gratuite et ne fait pas partie du numéro de jeu.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;"><strong>N°</strong></th>
+<th><strong>Dip1</strong></th>
+<th><strong>Dip2</strong></th>
+<th><strong>Dip3</strong></th>
+<th><strong>Jeu</strong></th>
+<th><strong>Année</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">0</td>
+<td>off</td>
+<td>off</td>
+<td>off</td>
+<td>The Atarians</td>
+<td>1976</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td>on</td>
+<td>off</td>
+<td>off</td>
+<td>Time 2000</td>
+<td>1977</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td>off</td>
+<td>on</td>
+<td>off</td>
+<td>Airborne Avenger</td>
+<td>1977</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td>on</td>
+<td>on</td>
+<td>off</td>
+<td>Middle Earth</td>
+<td>1978</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td>off</td>
+<td>off</td>
+<td>on</td>
+<td>Space Riders</td>
+<td>1978</td>
+</tr>
+<tr>
+<td style="text-align: right;">5-7</td>
+<td>–</td>
+<td>–</td>
+<td>–</td>
+<td>non utilisé, retombe sur Middle Earth</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Les cinq fonctionnent aussi en partie gratuite (chapitre 7).</p>
+<p><strong>The Atarians</strong> n&#39;a pas d&#39;autotest - voir le chapitre
+6.2.</p>
+<h2 id="annexe-b-aide-mémoire">Annexe B aide-mémoire</h2>
+<p><strong>Les dix interrupteurs de configuration</strong></p>
+<pre><code>banc de 4                          banc de 6
+ 1  choix du jeu bit 0  (+1)        1  musique de fond       lu au démarrage
+ 2  choix du jeu bit 1  (+2)        2  réservé               lu au démarrage
+ 3  choix du jeu bit 2  (+4)        3  chemin du son         en continu
+ 4  partie gratuite, ON = active    4  FA-Control autorisé   en continu
+                                    5  temps mort lampes \   en continu
+ les quatre lus au démarrage        6  temps mort lampes /   en continu</code></pre>
+<p><strong>Musique de fond, option 1 :</strong> OFF = désactivée
+(standard) · ON = le lecteur MP3 joue le dossier <code>02</code> tant
+qu&#39;une bille est en jeu (chapitre 8.4)</p>
+<p><strong>Chemin du son, option 3 :</strong> OFF = carte auxiliaire
+(standard) · ON = amplificateur intégré</p>
+<p><strong>FA-Control, option 4 :</strong> OFF = personne n&#39;intervient
+(standard) · ON = l&#39;outil de test ESP32 peut piloter le flipper
+(chapitre 9)</p>
+<p><strong>Temps mort des lampes, options 5 et 6 ensemble</strong>
+(chapitre 4.2.4) — contre la lueur des lampes à LED, prenez le plus
+petit palier qui fonctionne :</p>
+<table>
+<thead>
+<tr>
+<th>Option 5</th>
+<th>Option 6</th>
+<th>Temps mort</th>
+<th>Luminosité</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OFF</td>
+<td>OFF</td>
+<td>environ 65 µs (standard)</td>
+<td>21,8 %</td>
+</tr>
+<tr>
+<td>OFF</td>
+<td>ON</td>
+<td>environ 250 µs</td>
+<td>12,8 %</td>
+</tr>
+<tr>
+<td>ON</td>
+<td>OFF</td>
+<td>aucun - temporisation de la MPU d&#39;origine, les LED luisent comme sur
+l&#39;original</td>
+<td>24,5 %</td>
+</tr>
+<tr>
+<td>ON</td>
+<td>ON</td>
+<td>environ 400 µs, visiblement plus sombre</td>
+<td>5,5 %</td>
+</tr>
+</tbody>
+</table>
+<p>Si cela luit encore à 400 µs, ce n&#39;est pas le logiciel - chapitre
+4.2.5.</p>
+<p><strong>Après avoir changé un interrupteur lu au démarrage :
+éteindre, rallumer.</strong></p>
+<p><strong>L&#39;affichage d&#39;informations, les 5 premières secondes après la
+mise sous tension</strong></p>
+<pre><code>Joueur 1   0 3 3      version, premier chiffre = variante de carte
+Joueur 2      0 2     choix du jeu  (annexe A)
+Joueur 3   000000     options 1..6, de gauche à droite, 1 = ON
+Joueur 4        0     partie gratuite, 1 = active
+Crédit     (éteint)</code></pre>
+<p><strong>LED :</strong> D1 chien de garde (éteinte = bon) · D2 CPU en
+marche (clignote lentement) · D3 timer NMI (clignote ~0,48 Hz)</p>
+<p><strong>Aucun crédit ni score n&#39;est conservé après une coupure de
+courant</strong> - comme sur la MPU Atari d&#39;origine.</p>
+</body>
+</html>

@@ -16,6 +16,7 @@ Ralf Thelen ('bontango') · <https://lisy.dev>
 
 - [User manual HW 1.x (English)](https://bontango.github.io/AtariFA/AtariFA_HWv1_x_user_manual.html)
 - [Bedienungsanleitung HW 1.x (Deutsch)](https://bontango.github.io/AtariFA/AtariFA_HWv1_x_Bedienungsanleitung.html)
+- [Manuel d'utilisation HW 1.x (Français)](https://bontango.github.io/AtariFA/AtariFA_HWv1_x_manuel_utilisateur.html)
 
 ---
 
@@ -70,8 +71,10 @@ archive/        historic modules, in no build
 (source `docs/AtariFA_HWv1_x_user_manual.html`) — for
 whoever puts the board into a machine: DIP switches, boot sequence, sound paths, LEDs, free play.
 In German: [online](https://bontango.github.io/AtariFA/AtariFA_HWv1_x_Bedienungsanleitung.html)
-(`docs/AtariFA_HWv1_x_Bedienungsanleitung.html`).
-Same chapter numbering, so a hint like "see chapter 4.3" fits both.
+(`docs/AtariFA_HWv1_x_Bedienungsanleitung.html`), in French:
+[online](https://bontango.github.io/AtariFA/AtariFA_HWv1_x_manuel_utilisateur.html)
+(`docs/AtariFA_HWv1_x_manuel_utilisateur.html`).
+Same chapter numbering, so a hint like "see chapter 4.3" fits all three.
 
 Everything else in `docs/` is development material: measurements, schematic extracts and the
 analyses behind individual design decisions. [`docs/WORKFLOW.md`](docs/WORKFLOW.md) is for working
