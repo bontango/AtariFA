@@ -189,8 +189,18 @@ Spiels mitlesen, ohne es anzuhalten:
 | 50 / 51 | Sound spielen / stoppen | Track, Nr | – |
 | 100 | Init — **Übernahme anfordern** | – | 1 Byte, s. Kapitel 3 |
 | 101 | Watchdog | – | 1 Byte 0 |
+| 110 | **Monitor** (FA_Control-Erweiterung, nicht LISY) — Istzustand ohne Übernahme | – | Länge + Daten |
 
 Unbekannte Opcodes werden ohne Parameter angenommen und mit `0x00` beantwortet.
+
+**Opcode 110 (Monitor, seit 25.10.2026):** FA_Control fragt im MONITOR MODE ohne Übernahme
+den Istzustand des laufenden Spiels ab. `fa_control.vhd` transportiert nur: Generic
+`MON_BYTES` (Default 0 = kein Monitor, Antwort `0x00` wie bei einem unbekannten Opcode),
+Eingang `mon_data`, Ausgänge `mon_rd`/`mon_idx` je gesendetem Byte (zum Löschen von Merkbits).
+Was in den Bytes steht, belegt das Top-Level; das Layout steht in
+`N:\Projekte\FA_Control\docs\TECHNICAL_REFERENCE.md` § 4.2. Umgesetzt bisher nur in
+GottFA1_PLuS (v7). **AtariFA hat diese Fassung des Moduls noch nicht** — wer sie übernimmt,
+bekommt mit `MON_BYTES = 0` exakt das alte Verhalten.
 
 ### Bewusste Vereinfachungen
 
