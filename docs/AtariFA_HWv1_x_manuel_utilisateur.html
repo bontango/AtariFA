@@ -990,6 +990,9 @@ partie du programme FPGA.</p>
 <p>Le même design fonctionne sur trois cartes filles. Le programme FPGA
 n&#39;est <strong>pas</strong> interchangeable entre elles - le brochage
 diffère, et la troisième porte un FPGA d&#39;une autre famille.</p>
+<p><strong><code>cyclone_10_pcb</code> est uniquement pour le prototype
+(version matérielle 0.7).</strong> Sur une carte AtariFA v1.x, utilisez
+l&#39;une des deux variantes « dev_open ».</p>
 <table>
 <thead>
 <tr>
@@ -1002,7 +1005,8 @@ diffère, et la troisième porte un FPGA d&#39;une autre famille.</p>
 <tbody>
 <tr>
 <td><code>cyclone_10_pcb</code></td>
-<td>carte AtariFA v1.x avec la carte fille Cyclone 10 de lisy.dev</td>
+<td>prototype AtariFA (version matérielle 0.7) avec la carte fille
+Cyclone 10 de lisy.dev</td>
 <td>Cyclone 10 LP</td>
 <td><strong>0</strong></td>
 </tr>
@@ -1034,7 +1038,7 @@ connecteur de l&#39;analyseur logique. Les deux versions « dev_open » ne
 diffèrent que par le FPGA monté et par deux broches placées ailleurs sur
 le Cyclone IV.</p>
 <p><strong>État des tests.</strong> Seule <code>cyclone_10_pcb</code> a
-été jouée sur un flipper jusqu&#39;à présent.
+été jouée sur un flipper jusqu&#39;à présent, sur le prototype.
 <code>cyclone_10_dev_open</code> tourne sur l&#39;établi depuis le logiciel
 0.3.0 - le démarrage, l&#39;affichage d&#39;informations et le lecteur MP3 y
 sont confirmés, tout le reste dépend du câblage vers le flipper et n&#39;est
@@ -1063,6 +1067,7 @@ la partie gratuite et ne fait pas partie du numéro de jeu.</p>
 <th><strong>Dip1</strong></th>
 <th><strong>Dip2</strong></th>
 <th><strong>Dip3</strong></th>
+<th><strong>Dip4</strong></th>
 <th><strong>Jeu</strong></th>
 <th><strong>Année</strong></th>
 </tr>
@@ -1073,12 +1078,14 @@ la partie gratuite et ne fait pas partie du numéro de jeu.</p>
 <td>off</td>
 <td>off</td>
 <td>off</td>
+<td>off</td>
 <td>The Atarians</td>
 <td>1976</td>
 </tr>
 <tr>
 <td style="text-align: right;">1</td>
-<td>on</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
 <td>off</td>
 <td>off</td>
 <td>Time 2000</td>
@@ -1087,15 +1094,17 @@ la partie gratuite et ne fait pas partie du numéro de jeu.</p>
 <tr>
 <td style="text-align: right;">2</td>
 <td>off</td>
-<td>on</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
 <td>off</td>
 <td>Airborne Avenger</td>
 <td>1977</td>
 </tr>
 <tr>
 <td style="text-align: right;">3</td>
-<td>on</td>
-<td>on</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
 <td>off</td>
 <td>Middle Earth</td>
 <td>1978</td>
@@ -1104,12 +1113,59 @@ la partie gratuite et ne fait pas partie du numéro de jeu.</p>
 <td style="text-align: right;">4</td>
 <td>off</td>
 <td>off</td>
-<td>on</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
 <td>Space Riders</td>
 <td>1978</td>
 </tr>
 <tr>
+<td style="text-align: right;">0</td>
+<td>off</td>
+<td>off</td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>The Atarians, partie gratuite</td>
+<td>1976</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>Time 2000, partie gratuite</td>
+<td>1977</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>Airborne Avenger, partie gratuite</td>
+<td>1977</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>Middle Earth, partie gratuite</td>
+<td>1978</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td>off</td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>Space Riders, partie gratuite</td>
+<td>1978</td>
+</tr>
+<tr>
 <td style="text-align: right;">5-7</td>
+<td>–</td>
 <td>–</td>
 <td>–</td>
 <td>–</td>
@@ -1118,7 +1174,7 @@ la partie gratuite et ne fait pas partie du numéro de jeu.</p>
 </tr>
 </tbody>
 </table>
-<p>Les cinq fonctionnent aussi en partie gratuite (chapitre 7).</p>
+<p>La partie gratuite est décrite au chapitre 7.</p>
 <p><strong>The Atarians</strong> n&#39;a pas d&#39;autotest - voir le chapitre
 6.2.</p>
 <h2 id="annexe-b-aide-mémoire">Annexe B aide-mémoire</h2>

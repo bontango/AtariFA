@@ -946,6 +946,9 @@ FPGA program.</p>
 <p>The same design runs on three piggy-back boards. The FPGA program is
 <strong>not</strong> interchangeable between them - the pin assignment
 differs, and the third one carries an FPGA from a different family.</p>
+<p><strong><code>cyclone_10_pcb</code> is only for the prototype
+(hardware version 0.7).</strong> On an AtariFA PCB v1.x use one of the
+two &#39;dev_open&#39; variants.</p>
 <table>
 <thead>
 <tr>
@@ -958,7 +961,8 @@ differs, and the third one carries an FPGA from a different family.</p>
 <tbody>
 <tr>
 <td><code>cyclone_10_pcb</code></td>
-<td>AtariFA PCB v1.x with the lisy.dev Cyclone 10 piggy-back board</td>
+<td>AtariFA prototype (hardware version 0.7) with the lisy.dev Cyclone
+10 piggy-back board</td>
 <td>Cyclone 10 LP</td>
 <td><strong>0</strong></td>
 </tr>
@@ -988,11 +992,12 @@ instead of 8 debug lines to the logic analyser header. The two
 &#39;dev_open&#39; versions differ only in the FPGA fitted and in two pins that
 sit elsewhere on the Cyclone IV.</p>
 <p><strong>Test status.</strong> Only <code>cyclone_10_pcb</code> has
-been played on a machine so far. <code>cyclone_10_dev_open</code> has
-been running on the bench since software 0.3.0 - boot, info display and
-the MP3 player are confirmed there, everything else depends on the
-wiring to the machine and is untested. <code>cyclone_IV_dev_open</code>
-has been built but has never run on hardware.</p>
+been played on a machine so far, on the prototype.
+<code>cyclone_10_dev_open</code> has been running on the bench since
+software 0.3.0 - boot, info display and the MP3 player are confirmed
+there, everything else depends on the wiring to the machine and is
+untested. <code>cyclone_IV_dev_open</code> has been built but has never
+run on hardware.</p>
 <h2 id="13-not-implemented-yet">13. Not implemented yet</h2>
 <p>This is on the PCB, wired, and not used by this software version. It
 does nothing, and it does no harm - the FPGA holds it in a safe idle
@@ -1015,6 +1020,7 @@ free play and is not part of the game number.</p>
 <th><strong>Dip1</strong></th>
 <th><strong>Dip2</strong></th>
 <th><strong>Dip3</strong></th>
+<th><strong>Dip4</strong></th>
 <th><strong>Game</strong></th>
 <th><strong>Year</strong></th>
 </tr>
@@ -1025,12 +1031,14 @@ free play and is not part of the game number.</p>
 <td>off</td>
 <td>off</td>
 <td>off</td>
+<td>off</td>
 <td>The Atarians</td>
 <td>1976</td>
 </tr>
 <tr>
 <td style="text-align: right;">1</td>
-<td>on</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
 <td>off</td>
 <td>off</td>
 <td>Time 2000</td>
@@ -1039,15 +1047,17 @@ free play and is not part of the game number.</p>
 <tr>
 <td style="text-align: right;">2</td>
 <td>off</td>
-<td>on</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
 <td>off</td>
 <td>Airborne Avenger</td>
 <td>1977</td>
 </tr>
 <tr>
 <td style="text-align: right;">3</td>
-<td>on</td>
-<td>on</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
 <td>off</td>
 <td>Middle Earth</td>
 <td>1978</td>
@@ -1056,12 +1066,59 @@ free play and is not part of the game number.</p>
 <td style="text-align: right;">4</td>
 <td>off</td>
 <td>off</td>
-<td>on</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
 <td>Space Riders</td>
 <td>1978</td>
 </tr>
 <tr>
+<td style="text-align: right;">0</td>
+<td>off</td>
+<td>off</td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>The Atarians, free play</td>
+<td>1976</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>Time 2000, free play</td>
+<td>1977</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>Airborne Avenger, free play</td>
+<td>1977</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>Middle Earth, free play</td>
+<td>1978</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td>off</td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>Space Riders, free play</td>
+<td>1978</td>
+</tr>
+<tr>
 <td style="text-align: right;">5-7</td>
+<td>–</td>
 <td>–</td>
 <td>–</td>
 <td>–</td>
@@ -1070,7 +1127,7 @@ free play and is not part of the game number.</p>
 </tr>
 </tbody>
 </table>
-<p>All five run with free play as well (chapter 7).</p>
+<p>Free play is described in chapter 7.</p>
 <p><strong>The Atarians</strong> has no self test - see chapter 6.2.</p>
 <h2 id="appendix-b-quick-reference">Appendix B Quick reference</h2>
 <p><strong>The ten configuration switches</strong></p>

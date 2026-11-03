@@ -982,6 +982,9 @@ des FPGA-Programms.</p>
 ist zwischen ihnen <strong>nicht</strong> austauschbar — die Pinbelegung
 unterscheidet sich, und bei der dritten sitzt ein FPGA aus einer anderen
 Familie.</p>
+<p><strong><code>cyclone_10_pcb</code> ist nur für den Prototyp
+(Hardware-Version 0.7).</strong> Auf einer AtariFA-Platine v1.x nehmen
+Sie eine der beiden „dev_open&quot;-Varianten.</p>
 <table>
 <thead>
 <tr>
@@ -994,7 +997,7 @@ Familie.</p>
 <tbody>
 <tr>
 <td><code>cyclone_10_pcb</code></td>
-<td>AtariFA-Platine v1.x mit der
+<td>AtariFA-Prototyp (Hardware-Version 0.7) mit der
 lisy.dev-Cyclone-10-Huckepackplatine</td>
 <td>Cyclone 10 LP</td>
 <td><strong>0</strong></td>
@@ -1027,11 +1030,12 @@ Logikanalysator. Die beiden „dev_open&quot;-Fassungen unterscheiden sich nur
 im bestückten FPGA und in zwei Pins, die auf dem Cyclone IV anders
 liegen.</p>
 <p><strong>Erprobungsstand.</strong> Am Automaten gespielt ist bisher
-nur <code>cyclone_10_pcb</code>. <code>cyclone_10_dev_open</code> läuft
-seit Software 0.3.0 auf dem Prüfstand — Start, Info-Anzeige und der
-MP3-Spieler sind dort bestätigt, alles übrige hängt an der Verdrahtung
-zum Automaten und ist ungeprüft. <code>cyclone_IV_dev_open</code> ist
-gebaut, aber noch nie auf Hardware gelaufen.</p>
+nur <code>cyclone_10_pcb</code>, auf dem Prototyp.
+<code>cyclone_10_dev_open</code> läuft seit Software 0.3.0 auf dem
+Prüfstand — Start, Info-Anzeige und der MP3-Spieler sind dort bestätigt,
+alles übrige hängt an der Verdrahtung zum Automaten und ist ungeprüft.
+<code>cyclone_IV_dev_open</code> ist gebaut, aber noch nie auf Hardware
+gelaufen.</p>
 <h2 id="13-noch-nicht-implementiert">13. Noch nicht implementiert</h2>
 <p>Das Folgende ist auf der Platine vorhanden und verdrahtet, wird von
 dieser Software-Version aber nicht genutzt. Es tut nichts, und es
@@ -1055,6 +1059,7 @@ Freispiel und gehört nicht zur Spielnummer.</p>
 <th><strong>Dip1</strong></th>
 <th><strong>Dip2</strong></th>
 <th><strong>Dip3</strong></th>
+<th><strong>Dip4</strong></th>
 <th><strong>Spiel</strong></th>
 <th><strong>Jahr</strong></th>
 </tr>
@@ -1065,12 +1070,14 @@ Freispiel und gehört nicht zur Spielnummer.</p>
 <td>off</td>
 <td>off</td>
 <td>off</td>
+<td>off</td>
 <td>The Atarians</td>
 <td>1976</td>
 </tr>
 <tr>
 <td style="text-align: right;">1</td>
-<td>on</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
 <td>off</td>
 <td>off</td>
 <td>Time 2000</td>
@@ -1079,15 +1086,17 @@ Freispiel und gehört nicht zur Spielnummer.</p>
 <tr>
 <td style="text-align: right;">2</td>
 <td>off</td>
-<td>on</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
 <td>off</td>
 <td>Airborne Avenger</td>
 <td>1977</td>
 </tr>
 <tr>
 <td style="text-align: right;">3</td>
-<td>on</td>
-<td>on</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
 <td>off</td>
 <td>Middle Earth</td>
 <td>1978</td>
@@ -1096,12 +1105,59 @@ Freispiel und gehört nicht zur Spielnummer.</p>
 <td style="text-align: right;">4</td>
 <td>off</td>
 <td>off</td>
-<td>on</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
 <td>Space Riders</td>
 <td>1978</td>
 </tr>
 <tr>
+<td style="text-align: right;">0</td>
+<td>off</td>
+<td>off</td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>The Atarians, Freispiel</td>
+<td>1976</td>
+</tr>
+<tr>
+<td style="text-align: right;">1</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>Time 2000, Freispiel</td>
+<td>1977</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>Airborne Avenger, Freispiel</td>
+<td>1977</td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>Middle Earth, Freispiel</td>
+<td>1978</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td>off</td>
+<td>off</td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td><span style="color:var(--accent);font-weight:bold">on</span></td>
+<td>Space Riders, Freispiel</td>
+<td>1978</td>
+</tr>
+<tr>
 <td style="text-align: right;">5–7</td>
+<td>–</td>
 <td>–</td>
 <td>–</td>
 <td>–</td>
@@ -1110,7 +1166,7 @@ Freispiel und gehört nicht zur Spielnummer.</p>
 </tr>
 </tbody>
 </table>
-<p>Alle fünf laufen auch mit Freispiel (Kapitel 7).</p>
+<p>Das Freispiel ist in Kapitel 7 beschrieben.</p>
 <p><strong>The Atarians</strong> hat keinen Selbsttest — siehe Kapitel
 6.2.</p>
 <h2 id="anhang-b-kurzübersicht">Anhang B Kurzübersicht</h2>

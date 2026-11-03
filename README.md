@@ -29,7 +29,7 @@ memory and PLL megafunctions come out of.
 
 | Variant | Board | FPGA | Status |
 |---|---|---|---|
-| `cyclone_10_pcb` | AtariFA PCB v1.0 with the lisy.dev Cyclone 10 piggy-back board | 10CL006YE144C8G | lead variant, hardware tested through SW 0.1.5 |
+| `cyclone_10_pcb` | AtariFA prototype (hardware version 0.7) with the lisy.dev Cyclone 10 piggy-back board - prototype only | 10CL006YE144C8G | lead variant, hardware tested through SW 0.1.5 |
 | `cyclone_10_dev_open` | AtariFA PCB v1.0 carrying the 'dev_open' Cyclone 10 board | 10CL006YE144C8G | hardware tested on the bench since SW 0.3.0 |
 | `cyclone_IV_dev_open` | AtariFA PCB v1.0 carrying the 'dev_open' board with a Cyclone IV | EP4CE6E22C8 | **not** hardware tested |
 
