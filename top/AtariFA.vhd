@@ -285,7 +285,9 @@ constant FP_PATCHES : fp_patch_array_t := (
 	(4,1,16#1EB#,x"00"),(4,1,16#1EC#,x"A8"),(4,1,16#1ED#,x"97"),(4,1,16#1EE#,x"B7"),
 	(4,1,16#1EF#,x"01"),(4,1,16#1F0#,x"01"),(4,1,16#7F7#,x"90"),
 	-- Space Riders ROM2 (spacerf) 0x000 + 0x752..0x755
-	(4,2,16#000#,x"42"),(4,2,16#752#,x"97"),(4,2,16#753#,x"04"),(4,2,16#754#,x"96"),
+	-- SW 0.3.4: 0x752/0x753 war im Fremd-ROM "97 04" = STAA $04 -> schrieb beim Start von
+	-- Spieler 2 eine 07 ins Display von Spieler 3. Jetzt NOP NOP, Pruefsumme 0x000 42 -> DB.
+	(4,2,16#000#,x"DB"),(4,2,16#752#,x"01"),(4,2,16#753#,x"01"),(4,2,16#754#,x"96"),
 	(4,2,16#755#,x"B7")
 );
 

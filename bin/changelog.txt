@@ -49,3 +49,9 @@
   cyclone_10_dev_open    1.3.3    AtariFA_v133.jic  sha256:B9F3FF033B220372
   cyclone_10_pcb         0.3.3    AtariFA_v033.jic  sha256:53727C84E63B150C
   cyclone_IV_dev_open    2.3.3    AtariFA_v233.jic  sha256:F3C64BFFA0CAEFCB
+
+2026-11-10 11:19  version .3.4
+  Space Riders free play: the 3rd player display no longer shows 07 when a second player is added. The fault was in the free play rom spacerf itself, not in the FPGA - its credit check patch at 0x7752 read 97 04 = STAA $04, and the start routine at 0x76B2 calls that code only with A = 07, so 07 landed in RAM $0004 = the last two digits of player 3 (PinMAME ram_w). On the first start the game start routine clears the displays again, on adding player 2 it does not. Fix: 0x752/0x753 -> 01 01 (NOP NOP), checksum byte 0x000 42 -> DB so the rom byte sum stays 00. rom/freeplay/spacerf.hex and FP_PATCHES changed accordingly, still 42 bytes. The other four free play roms were checked and are clean. Reg 1544 / Memory 202752 unchanged on all three variants, comb drift -14..+11 is constant folding. Not yet on hardware.
+  cyclone_10_dev_open    1.3.4    AtariFA_v134.jic  sha256:E060DC30F4C5CA73
+  cyclone_10_pcb         0.3.4    AtariFA_v034.jic  sha256:7D2AC7F71AF6C1AE
+  cyclone_IV_dev_open    2.3.4    AtariFA_v234.jic  sha256:FEB7FAA7EF4829CD

@@ -17,6 +17,13 @@ Spielzuordnung (game-Index wie im VHDL-Mux):
   0=Atarians 1=Time2000 2=Airborne 3=MiddleEarth 4=SpaceRiders
 Ersetzte ROM je Spiel: Atarians/Time/ME=ROM2 (slot 2), Airborne=ROM1 (slot 1),
 SpaceRiders=ROM1+ROM2.
+
+ACHTUNG spacerf.hex ist seit SW 0.3.4 KORRIGIERT, nicht mehr das Fremd-ROM:
+Im Original-Freeplay-ROM stand bei 0x752/0x753 (CPU $7752) "97 04" = STAA $04.
+Die Startroutine ($76B2) ruft $7752 nur mit A = $07 auf -> $07 landete in RAM
+$0004 = letzte zwei Ziffern von Spieler 3 ("07" beim Hinzufuegen von Spieler 2).
+Jetzt "01 01" (NOP NOP), Pruefsummenbyte 0x000 42 -> DB (Bytesumme bleibt 00).
+Wer das Fremd-ROM neu uebernimmt, muss diesen Fix wieder einspielen.
 """
 import os
 import sys
