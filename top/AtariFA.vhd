@@ -313,6 +313,36 @@ signal sk_valid		: std_logic;
 signal sk_saved		: std_logic;
 signal sk_fram_ok	: std_logic;
 signal sk_boot_done	: std_logic;
+-- Credits ueber Power-Cycle (SW 0.4.3). Adresse des Credit-Zaehlers je Spiel, aus den ROMs:
+--   Atarians  $CE BCD  (Muenze 7B54..7B68, Limit $E0; Start 7B76..7B87 zieht ab)
+--   Time 2000 $D6 BCD  (Muenze 7C93..7CA7, Limit $CA; Start 7CB4..7CC2)
+--   Airborne  $D5 binaer (7CA7..7CBF, Limit $BC; HW-erprobt mit SW 0.0.9)
+--   Mid. Earth $1D BCD = direkt das Credit-Display-Byte (Muenze 7232..723E, Limit $1A;
+--              Start 725B..7280; der Boot schreibt dort $88 = Segmenttest, 71C1 behandelt $88 als 0)
+--   Space Rid. $B7 BCD (Muenze 7BDA..7BEF, Limit $A8; Start 77A0 addiert $99 = -1)
+-- Ausser der Muenz-/Startroutine schreibt in allen fuenf ROMs nur der Boot-RAM-Clear dorthin.
+type cred_addr_t is array (0 to 4) of std_logic_vector(8 downto 0);
+constant CRED_ADDR   : cred_addr_t := ('0' & x"CE", '0' & x"D6", '0' & x"D5", '0' & x"1D", '0' & x"B7");
+constant CRED_DELAY  : integer := 2500000;   -- 50 ms nach CPU-Start: Boot-RAM-Clear ist sicher vorbei
+constant HALT_SETTLE : integer := 4096;      -- ~82 us: CPU sicher im halt_state (wie SW 0.0.9)
+type inj_state_t is (INJ_WAIT, INJ_HALT, INJ_WRITE, INJ_WRITE2, INJ_DONE);
+signal inj_disp	: std_logic := '0';      -- '1' = 2. Injektionsbyte: Credit-Display $1D
+signal inj_st		: inj_state_t := INJ_WAIT;
+signal inj_cnt		: integer range 0 to CRED_DELAY := 0;
+signal cpu_halt	: std_logic := '0';
+signal inj_active	: std_logic := '0';      -- '1' = RAM-Port auf den Injektor gemuxt
+signal inj_wren	: std_logic := '0';
+signal cred_arm	: std_logic := '0';      -- Credit-Mitschreiben scharf (nach der Injektion)
+signal cred_wr		: std_logic := '0';
+signal cred_val	: std_logic_vector(7 downto 0) := (others => '0');
+signal sk_credit	: std_logic_vector(7 downto 0);
+signal sk_active	: std_logic;
+signal cred_disp	: std_logic_vector(7 downto 0) := (others => '0');   -- Boot-Info, BCD
+signal cb_v			: std_logic_vector(7 downto 0) := (others => '0');
+signal cb_t			: std_logic_vector(3 downto 0) := (others => '0');
+signal ram_p_addr	: std_logic_vector(8 downto 0);
+signal ram_p_data	: std_logic_vector(7 downto 0);
+signal ram_p_wren	: std_logic;
 
 signal dma_clk		: std_logic;
 signal audio_clk		: std_logic;
@@ -897,6 +927,10 @@ port map(
 	display2  => display2,
 	display3  => display3,
 	display4  => display4,
+	credit_wr => cred_wr,
+	credit_in => cred_val,
+	credit_out=> sk_credit,
+	active_out=> sk_active,
 	out1      => sk_display1,
 	out2      => sk_display2,
 	out3      => sk_display3,
@@ -1044,7 +1078,31 @@ end process;
 -- display_control.vhd, spiegelte aber die Spielanzeige doppelt -> jetzt nur hier.)
 -- x"F"=blank, Digit 6 = Player-up-LED (hier aus = x"0", nicht Teil der Ziffernfolge).
 ------------------------------------------------------------------------------
-boot_info : process(game_select, options, freeplay, sk_fram_ok, sk_valid)
+-- Credit-Stand fuer die Boot-Info als 2 BCD-Ziffern, registriert. Airborne zaehlt binaer: dort
+-- zieht der Zaehler je clk_50 einmal 10 ab (fertig nach <= 10 Takten, laeuft dauernd im Kreis).
+-- Die erste Fassung rechnete das kombinatorisch in neun Stufen direkt vor display_control:
+-- +~100 LEs und Setup -5,4 ns auf dem cpu_clk-Pfad.
+cred_bcd : process(clk_50)
+begin
+	if rising_edge(clk_50) then
+		if game_sel /= 2 then
+			cred_disp <= sk_credit;                -- BCD wie im Spiel-RAM
+		elsif cb_v >= 10 then
+			cb_v <= cb_v - 10;
+			cb_t <= cb_t + 1;
+		else
+			cred_disp <= cb_t & cb_v(3 downto 0);
+			cb_t      <= x"0";
+			if sk_credit > 99 then
+				cb_v <= x"63";
+			else
+				cb_v <= sk_credit;
+			end if;
+		end if;
+	end if;
+end process;
+
+boot_info : process(game_select, options, freeplay, sk_fram_ok, sk_valid, sk_active, cred_disp)
 begin
 	-- Display 1: Version SW_MAIN SW_SUB1 SW_SUB2 (rechtsbuendig: SUB2 ganz rechts = Index 0)
 	bi_display1 <= (others => x"F");
@@ -1097,8 +1155,14 @@ begin
 	end if;
 	bi_display4(6) <= x"0";
 
-	-- Status-Display: blank
+	-- Status-Display: blank; seit SW 0.4.3 rechts der gespeicherte Credit-Stand (wie $1D im
+	-- Spiel: Index 2 = Zehner, 3 = Einer), solange DIP 2 ON ist. Airborne fuehrt die Credits
+	-- binaer ($D5), die anderen vier in BCD.
 	bi_status <= (others => x"F");
+	if sk_active = '1' then
+		bi_status(2) <= cred_disp(7 downto 4);
+		bi_status(3) <= cred_disp(3 downto 0);
+	end if;
 end process;
 
 -- Mux: FA-Control hat Vorrang (dann steht die CPU und display1..4 waeren ohnehin
@@ -1471,31 +1535,34 @@ gen_gamedisp : if not DISPLAY_TEST generate
 process(clk_50)
 begin
 	if rising_edge(clk_50) then
-		if ram_wren = '1' and cpu_addr(8 downto 5) = "0000" then
-			case cpu_addr(4 downto 0) is
+		-- SW 0.4.3: ram_p_* statt cpu_* - so sieht die Anzeige auch die Credit-Injektion nach dem
+		-- Boot (sonst bliebe dort das $88 des Segmenttests stehen, bis Muenze/Start kommen).
+		-- Ausserhalb der Injektion ist ram_p_* = CPU-Bus, das Verhalten also unveraendert.
+		if ram_p_wren = '1' and ram_p_addr(8 downto 5) = "0000" then
+			case ram_p_addr(4 downto 0) is
 				-- Player 1 score (RAM 0x00-0x03) -> display4 (HW: Player-Feld gespiegelt, Nibble-Paar getauscht)
-				when "00000" => display4(1) <= cpu_dout(7 downto 4); display4(0) <= cpu_dout(3 downto 0);
-				when "00001" => display4(3) <= cpu_dout(7 downto 4); display4(2) <= cpu_dout(3 downto 0);
-				when "00010" => display4(5) <= cpu_dout(7 downto 4); display4(4) <= cpu_dout(3 downto 0);
-				when "00011" => display4(6) <= cpu_dout(3 downto 0);  -- Player 1 up LED (8=on,0=off)
+				when "00000" => display4(1) <= ram_p_data(7 downto 4); display4(0) <= ram_p_data(3 downto 0);
+				when "00001" => display4(3) <= ram_p_data(7 downto 4); display4(2) <= ram_p_data(3 downto 0);
+				when "00010" => display4(5) <= ram_p_data(7 downto 4); display4(4) <= ram_p_data(3 downto 0);
+				when "00011" => display4(6) <= ram_p_data(3 downto 0);  -- Player 1 up LED (8=on,0=off)
 				-- Player 2 score (RAM 0x04-0x07) -> display3
-				when "00100" => display3(1) <= cpu_dout(7 downto 4); display3(0) <= cpu_dout(3 downto 0);
-				when "00101" => display3(3) <= cpu_dout(7 downto 4); display3(2) <= cpu_dout(3 downto 0);
-				when "00110" => display3(5) <= cpu_dout(7 downto 4); display3(4) <= cpu_dout(3 downto 0);
-				when "00111" => display3(6) <= cpu_dout(3 downto 0);  -- Player 2 up LED
+				when "00100" => display3(1) <= ram_p_data(7 downto 4); display3(0) <= ram_p_data(3 downto 0);
+				when "00101" => display3(3) <= ram_p_data(7 downto 4); display3(2) <= ram_p_data(3 downto 0);
+				when "00110" => display3(5) <= ram_p_data(7 downto 4); display3(4) <= ram_p_data(3 downto 0);
+				when "00111" => display3(6) <= ram_p_data(3 downto 0);  -- Player 2 up LED
 				-- Player 3 score (RAM 0x08-0x0B) -> display2
-				when "01000" => display2(1) <= cpu_dout(7 downto 4); display2(0) <= cpu_dout(3 downto 0);
-				when "01001" => display2(3) <= cpu_dout(7 downto 4); display2(2) <= cpu_dout(3 downto 0);
-				when "01010" => display2(5) <= cpu_dout(7 downto 4); display2(4) <= cpu_dout(3 downto 0);
-				when "01011" => display2(6) <= cpu_dout(3 downto 0);  -- Player 3 up LED
+				when "01000" => display2(1) <= ram_p_data(7 downto 4); display2(0) <= ram_p_data(3 downto 0);
+				when "01001" => display2(3) <= ram_p_data(7 downto 4); display2(2) <= ram_p_data(3 downto 0);
+				when "01010" => display2(5) <= ram_p_data(7 downto 4); display2(4) <= ram_p_data(3 downto 0);
+				when "01011" => display2(6) <= ram_p_data(3 downto 0);  -- Player 3 up LED
 				-- Player 4 score (RAM 0x0C-0x0F) -> display1
-				when "01100" => display1(1) <= cpu_dout(7 downto 4); display1(0) <= cpu_dout(3 downto 0);
-				when "01101" => display1(3) <= cpu_dout(7 downto 4); display1(2) <= cpu_dout(3 downto 0);
-				when "01110" => display1(5) <= cpu_dout(7 downto 4); display1(4) <= cpu_dout(3 downto 0);
-				when "01111" => display1(6) <= cpu_dout(3 downto 0);  -- Player 4 up LED
+				when "01100" => display1(1) <= ram_p_data(7 downto 4); display1(0) <= ram_p_data(3 downto 0);
+				when "01101" => display1(3) <= ram_p_data(7 downto 4); display1(2) <= ram_p_data(3 downto 0);
+				when "01110" => display1(5) <= ram_p_data(7 downto 4); display1(4) <= ram_p_data(3 downto 0);
+				when "01111" => display1(6) <= ram_p_data(3 downto 0);  -- Player 4 up LED
 				-- Match/Credit: RAM 0x1C, 0x1D (korrekt, NICHT getauscht — Status-Konvention weicht ab)
-				when "11100" => status_d(0) <= cpu_dout(7 downto 4); status_d(1) <= cpu_dout(3 downto 0);
-				when "11101" => status_d(2) <= cpu_dout(7 downto 4); status_d(3) <= cpu_dout(3 downto 0);
+				when "11100" => status_d(0) <= ram_p_data(7 downto 4); status_d(1) <= ram_p_data(3 downto 0);
+				when "11101" => status_d(2) <= ram_p_data(7 downto 4); status_d(3) <= ram_p_data(3 downto 0);
 				when others => null;
 			end case;
 		end if;
@@ -1615,13 +1682,96 @@ begin
 end process;
 
 
+------------------------------------------------------------------------------
+-- Credits ueber Power-Cycle (SW 0.4.3), Mechanik wie die Airborne-Injektion aus SW 0.0.9:
+-- nach jedem CPU-Start (auch nach einer FA-Control-Uebernahme) CRED_DELAY warten, bis der
+-- Boot-RAM-Clear durch ist, dann die CPU per halt anhalten, den gespeicherten Credit-Stand
+-- direkt ins Spiel-RAM schreiben und die CPU weiterlaufen lassen. Zweites Byte: das
+-- Credit-Display $1D in BCD, wie es das Spiel nach einer Muenze selbst schreibt - sonst zeigt
+-- das Display bis zur ersten Muenze das $88 des Segmenttests (HW-Test 0.4.3, 11.11.2026).
+-- Bei Middle Earth ist $1D zugleich der Zaehler, beide Bytes sind dort gleich. Erst danach wird der
+-- Credit-Zaehler mitgeschrieben - sonst landete der Boot-Clear (0) bzw. das $88 von
+-- Middle Earth im FRAM. Credit 0 wird nicht geschrieben (= Originalverhalten, bei Middle
+-- Earth bleibt dann das $88 des Boots stehen). DIP 2 OFF: sk_active='0', nichts von alledem.
+------------------------------------------------------------------------------
+credit_inject : process(clk_50)
+begin
+	if rising_edge(clk_50) then
+		if reset_l_stable = '0' then
+			inj_st     <= INJ_WAIT;
+			inj_cnt    <= 0;
+			cpu_halt   <= '0';
+			inj_active <= '0';
+			inj_wren   <= '0';
+			inj_disp   <= '0';
+			cred_arm   <= '0';
+		else
+			case inj_st is
+			when INJ_WAIT =>
+				if inj_cnt = CRED_DELAY then
+					inj_cnt <= 0;
+					if sk_active = '1' and sk_credit /= x"00" then
+						cpu_halt <= '1';           -- wird im naechsten Fetch honoriert
+						inj_st   <= INJ_HALT;
+					else
+						inj_st   <= INJ_DONE;
+					end if;
+				else
+					inj_cnt <= inj_cnt + 1;
+				end if;
+			when INJ_HALT =>
+				if inj_cnt = HALT_SETTLE then
+					inj_active <= '1';             -- Port umschalten und im selben Takt schreiben
+					inj_wren   <= '1';
+					inj_disp   <= '0';             -- 1. Byte: Credit-Zaehler
+					inj_st     <= INJ_WRITE;
+				else
+					inj_cnt <= inj_cnt + 1;
+				end if;
+			when INJ_WRITE =>
+				inj_disp <= '1';                   -- 2. Byte: Credit-Display $1D (BCD), wie es das
+				inj_st   <= INJ_WRITE2;            -- Spiel nach einer Muenze selbst schreibt
+			when INJ_WRITE2 =>
+				inj_wren <= '0';
+				inj_disp <= '0';
+				inj_st   <= INJ_DONE;
+			when INJ_DONE =>
+				inj_active <= '0';
+				cpu_halt   <= '0';
+				cred_arm   <= sk_active;
+			end case;
+		end if;
+	end if;
+end process;
+
+-- Credit-Zaehler mitschreiben: jede CPU-Schreibung auf die Adresse des gewaehlten Spiels
+-- (auch ueber den RAM-Mirror, daher nur Adressbits 8..0). score_keeper vergleicht selbst.
+credit_sniffer : process(clk_50)
+begin
+	if rising_edge(clk_50) then
+		cred_wr <= '0';
+		if cred_arm = '1' and ram_wren = '1' and cpu_addr(8 downto 0) = CRED_ADDR(game_sel) then
+			cred_val <= cpu_dout;
+			cred_wr  <= '1';
+		end if;
+	end if;
+end process;
+
+-- RAM-Port-Mux: waehrend der Injektion treibt der Injektor. Die Sniffer (Display, Lampen,
+-- Credits) beobachten weiter ram_wren = CPU-Writes.
+ram_p_addr <= '0' & x"1D"         when inj_active = '1' and inj_disp = '1'
+         else CRED_ADDR(game_sel) when inj_active = '1' else cpu_addr(8 downto 0);
+ram_p_data <= cred_disp           when inj_active = '1' and inj_disp = '1'
+         else sk_credit           when inj_active = '1' else cpu_dout(7 downto 0);
+ram_p_wren <= inj_wren            when inj_active = '1' else ram_wren;
+
 -- RAM -- 0x0000-0x01FF (512 Byte); 0x0200 ist 1-Byte-NVRAM-Register (s.o., nvram_dout)
 RAM: entity work.RAM --512byte
 port map(
-	address	=> cpu_addr(8 downto 0),
+	address	=> ram_p_addr,
 	clock		=> clk_50,
-	data		=>  cpu_dout (7 DOWNTO 0),
-	wren 		=> ram_wren,
+	data		=> ram_p_data,
+	wren 		=> ram_p_wren,
 	q			=> ram_dout
 );
 
@@ -1696,7 +1846,7 @@ port map(
 	data_in => cpu_din,
 	data_out => cpu_dout,
 	hold => '0',
-	halt => '0',
+	halt => cpu_halt,                    -- SW 0.4.3: Credit-Injektion nach dem Boot
 	irq => '0',
 	nmi => not dma_int
 );

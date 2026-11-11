@@ -18,13 +18,21 @@
 --          HS_CYCLES Highscore auf allen vier Spieler-Displays (wie Bally). Die Player-up-LEDs
 --          (Index 6) und das Status-Display bleiben immer die des Spiels.
 --
--- FRAM-Slot je Spiel (16 Byte ab game_sel*16):
---   [0]      Magic 0xA5
+--   Credits (SW 0.4.3): das Top-Level meldet jede CPU-Schreibung auf den Credit-Zaehler des
+--          Spiels (credit_wr/credit_in, erst nach dem Boot-RAM-Clear scharf). Aendert sich der
+--          Wert, wird der Slot sofort geschrieben. credit_out = zuletzt bekannter Stand (beim Boot
+--          aus dem FRAM), das Top-Level schreibt ihn nach jedem CPU-Start ins Spiel-RAM zurueck.
+--
+-- FRAM-Slot je Spiel (17 Byte ab game_sel*32; SW 0.4.0..0.4.2: 16 Byte ab game_sel*16 mit
+-- Magic 0xA5 - durch das neue Magic 0xA6 werden diese alten Slots als leer gelesen):
+--   [0]      Magic 0xA6
 --   [1..12]  letzte Staende, je Display 3 Byte (display1, display2, display3, display4),
 --            Byte = Ziffer(2k+1) & Ziffer(2k), k = 2,1,0 (linkes Paar zuerst)
 --   [13..15] Highscore, gleiche Kodierung
+--   [16]     Credits, roh wie im Spiel-RAM (BCD bzw. binaer bei Airborne)
 -- Ziffern werden roh gespeichert (Blank-Nibbles bleiben Blank); beim Vergleich zaehlt ein
--- Nibble > 9 als 0.
+-- Nibble > 9 als 0. Ein Slot, der nur wegen der Credits geschrieben wurde, enthaelt bei den
+-- Staenden Blank-Ziffern; beim Boot werden die Staende nur eingeblendet, wenn eine Ziffer 1..9 dabei ist.
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -55,6 +63,10 @@ entity score_keeper is
 		out2      : out DISPLAY_T;
 		out3      : out DISPLAY_T;
 		out4      : out DISPLAY_T;
+		credit_wr : in  std_logic;              -- 1-clk: CPU hat den Credit-Zaehler geschrieben
+		credit_in : in  std_logic_vector(7 downto 0);
+		credit_out: out std_logic_vector(7 downto 0);  -- zuletzt bekannter Credit-Stand
+		active_out: out std_logic;              -- Funktion an (DIP 2 ON), Boot-Transfer fertig
 		valid     : out std_logic;              -- Slot gueltig (beim Boot gelesen oder gespeichert)
 		saved     : out std_logic;              -- 1-clk-Puls je Speichervorgang (Diagnose)
 		fram_ok   : out std_logic;              -- FRAM hat im letzten Transfer quittiert
@@ -65,8 +77,8 @@ end score_keeper;
 
 architecture rtl of score_keeper is
 
-	constant N_REC  : integer := 16;
-	constant MAGIC  : std_logic_vector(7 downto 0) := x"A5";
+	constant N_REC  : integer := 17;
+	constant MAGIC  : std_logic_vector(7 downto 0) := x"A6";
 	constant ZERO24 : std_logic_vector(23 downto 0) := (others => '0');
 
 	type score_arr is array (0 to 3) of std_logic_vector(23 downto 0);  -- 6 Ziffern je Display
@@ -83,6 +95,9 @@ architecture rtl of score_keeper is
 	signal show_hs   : std_logic := '0';
 	signal in_game_d : std_logic := '0';
 	signal active    : std_logic := '0';     -- Funktion an (beim Boot nicht geloescht)
+	signal booted    : std_logic := '0';     -- Boot-Transfer abgeschlossen
+	signal credit    : std_logic_vector(7 downto 0) := (others => '0');
+	signal cred_pend : std_logic := '0';     -- Credit geaendert, Slot noch nicht geschrieben
 	signal phase_cnt : integer range 0 to NORMAL_CYCLES + HS_CYCLES := 0;
 
 	signal f_go, f_rd, f_busy, f_done, f_ack : std_logic := '0';
@@ -115,6 +130,19 @@ architecture rtl of score_keeper is
 		return r;
 	end function;
 
+	-- '1', wenn mindestens eine Ziffer 1..9 ist (billiger als norm(..) /= 0 ueber den Vergleicher)
+	function has_digit(a : std_logic_vector(23 downto 0)) return std_logic is
+		variable n : std_logic_vector(3 downto 0);
+	begin
+		for i in 0 to 5 loop
+			n := a(i*4+3 downto i*4);
+			if n /= x"0" and n <= x"9" then
+				return '1';
+			end if;
+		end loop;
+		return '0';
+	end function;
+
 	-- Anzeige: Score-Ziffern aus v, Player-up-LED aus dem Spiel
 	function unpack(v : std_logic_vector(23 downto 0); g : DISPLAY_T) return DISPLAY_T is
 		variable r : DISPLAY_T;
@@ -128,7 +156,7 @@ architecture rtl of score_keeper is
 
 begin
 
-	f_addr <= x"00" & '0' & conv_std_logic_vector(game_sel, 3) & "0000";
+	f_addr <= x"00" & conv_std_logic_vector(game_sel, 3) & "00000";   -- game_sel * 32
 
 	-- Schreibdaten direkt aus den Registern (keine zweite Kopie); beim Loeschen Nullen
 	f_wr(0) <= x"00" when f_erase = '1' else MAGIC;
@@ -140,6 +168,10 @@ begin
 	f_wr(13) <= x"00" when f_erase = '1' else hs(23 downto 16);
 	f_wr(14) <= x"00" when f_erase = '1' else hs(15 downto 8);
 	f_wr(15) <= x"00" when f_erase = '1' else hs(7 downto 0);
+	f_wr(16) <= x"00" when f_erase = '1' else credit;
+
+	credit_out <= credit;
+	active_out <= active and booted;
 
 	FRAM: entity work.fram_i2c
 	generic map(
@@ -183,6 +215,9 @@ begin
 				hs_valid  <= '0';
 				in_game_d <= '0';
 				active    <= '0';
+				booted    <= '0';
+				credit    <= (others => '0');
+				cred_pend <= '0';
 				snap_sc   <= (others => (others => '1'));
 			else
 				in_game_d <= in_game;
@@ -191,6 +226,11 @@ begin
 					snap_sc(1) <= pack(display2);
 					snap_sc(2) <= pack(display3);
 					snap_sc(3) <= pack(display4);
+				end if;
+				-- Credit-Zaehler geaendert -> Slot schreiben, sobald die FSM in S_RUN ist
+				if credit_wr = '1' and active = '1' and booted = '1' and credit_in /= credit then
+					credit    <= credit_in;
+					cred_pend <= '1';
 				end if;
 
 				case st is
@@ -209,13 +249,17 @@ begin
 								last_sc(p) <= f_rdd(1 + p*3) & f_rdd(2 + p*3) & f_rdd(3 + p*3);
 							end loop;
 							hs     <= f_rdd(13) & f_rdd(14) & f_rdd(15);
+							credit <= f_rdd(16);
 							valid  <= '1';
-							loaded <= '1';
-							if norm(f_rdd(13) & f_rdd(14) & f_rdd(15)) /= ZERO24 then
-								hs_valid <= '1';
-							end if;
+							-- nur einblenden, wenn wirklich Staende gespeichert sind (nicht nur Credits)
+							loaded <= has_digit(f_rdd(1) & f_rdd(2) & f_rdd(3))
+							       or has_digit(f_rdd(4) & f_rdd(5) & f_rdd(6))
+							       or has_digit(f_rdd(7) & f_rdd(8) & f_rdd(9))
+							       or has_digit(f_rdd(10) & f_rdd(11) & f_rdd(12));
+							hs_valid <= has_digit(f_rdd(13) & f_rdd(14) & f_rdd(15));
 						end if;
 						f_erase <= '0';
+						booted  <= '1';
 						st      <= S_RUN;
 					end if;
 				when S_RUN =>
@@ -230,6 +274,13 @@ begin
 						any_sc <= '0';
 						idx    <= 0;
 						st     <= S_CMP;
+					elsif cred_pend = '1' then
+						-- nur der Credit-Stand hat sich geaendert: ganzen Slot neu schreiben
+						cred_pend <= '0';
+						valid     <= '1';
+						f_rd      <= '0';
+						f_go      <= '1';
+						st        <= S_SAVE;
 					end if;
 				when S_CMP =>
 					cur := snap_sc(idx);
@@ -251,6 +302,7 @@ begin
 						hs       <= best;
 						hs_valid <= '1';
 						valid    <= '1';
+						cred_pend <= '0';             -- der Slot traegt den aktuellen Credit-Stand mit
 						f_rd     <= '0';
 						f_go     <= '1';
 						st       <= S_SAVE;
