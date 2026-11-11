@@ -31,9 +31,7 @@ set_global_assignment -name VHDL_FILE ../../rtl/common/sound.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/speech.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/speech_rom.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/watchdog.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/common/fram_i2c.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/common/score_keeper.vhd
 set_global_assignment -name VHDL_FILE ../../top/AtariFA.vhd
-# Deliberately NOT listed: rtl/common/fram_i2c.vhd. The FRAM/NVRAM feature is on
-# hold (see docs/FRAM_Persistence.md); the source is kept, the module is out of the
-# build and the top level drives the pins to a safe idle. Adding this line back is
-# one half of reactivating it, the other half is the top level feature itself.
 set_global_assignment -name SDC_FILE AtariFA.sdc

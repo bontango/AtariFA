@@ -161,6 +161,8 @@ set_global_assignment -name VHDL_FILE ../../rtl/common/sound.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/speech.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/speech_rom.vhd
 set_global_assignment -name VHDL_FILE ../../rtl/common/watchdog.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/common/fram_i2c.vhd
+set_global_assignment -name VHDL_FILE ../../rtl/common/score_keeper.vhd
 set_global_assignment -name VHDL_FILE ../../top/AtariFA.vhd
 set_global_assignment -name SDC_FILE AtariFA.sdc
 set_global_assignment -name QIP_FILE ../../rtl/cyclone_IV/RAM.qip

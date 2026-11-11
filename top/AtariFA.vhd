@@ -291,6 +291,29 @@ constant FP_PATCHES : fp_patch_array_t := (
 	(4,2,16#755#,x"B7")
 );
 
+-- Spielerkennung (Player-up-Lampen) fuer Highscore/letzte Spielstaende
+constant UP_HOLD_CYCLES : integer := 100000000;          -- 2 s @ clk_50
+constant UP_STABLE_CYCLES : integer := 100000000;        -- 2 s Leuchtdauer derselben Lampe
+signal up_on		: std_logic_vector(3 downto 0);   -- up-Lampe Spieler 1..4 an
+signal up_one		: std_logic;                      -- genau eine an
+signal up_all		: std_logic;                      -- alle vier an (Segmenttest)
+signal up_hold_cnt	: integer range 0 to UP_HOLD_CYCLES := 0;
+signal up_last		: std_logic_vector(3 downto 0) := "0000"; -- zuletzt allein leuchtende Lampe
+signal up_stab_cnt	: integer range 0 to UP_STABLE_CYCLES := 0; -- deren Leuchtdauer
+signal up_gap_cnt	: integer range 0 to UP_HOLD_CYCLES := 0;   -- Dauer "keine an"
+signal up_trust		: std_logic := '0';               -- up_last ist die Lampe eines laufenden Spiels
+signal in_game		: std_logic := '0';
+signal up_refresh	: std_logic := '0';               -- up-Lampe des Spielers am Zug leuchtet (Schnappschuss)
+-- letzte Spielstaende + Highscore (score_keeper, SW 0.4.0)
+signal sk_display1	: DISPLAY_T;
+signal sk_display2	: DISPLAY_T;
+signal sk_display3	: DISPLAY_T;
+signal sk_display4	: DISPLAY_T;
+signal sk_valid		: std_logic;
+signal sk_saved		: std_logic;
+signal sk_fram_ok	: std_logic;
+signal sk_boot_done	: std_logic;
+
 signal dma_clk		: std_logic;
 signal audio_clk		: std_logic;
 signal dma_int		: std_logic;
@@ -364,10 +387,13 @@ constant DISPLAY_TEST : boolean := false;
 --       dip_strobe0/i_disp_Load) — zeigt Fortschritt der Power-on-/Boot-Sequenz
 --   4 = Lampen-Langzeit — Messung zu docs/Lamp_Refresh_Analysis.md (Software-Refresh?)
 --   5 = Lampen-Detail   — eine Multiplex-Phase in Feinauflösung
+--   6 = Spielerkennung  — Player-up-Lampen P1..P4, in_game roh/gehalten, Segmenttest, Schreib-
+--       strobe auf die up-Bytes; zusaetzlich LED_D1 = in_game (Messung "laeuft ein Spiel?" fuer
+--       Highscore/letzte Spielstaende, docs/FRAM_Persistence.md)
 -- Fuer die Messung "Lampe 21 / A20" auf 5 stellen (Prozedur, Sondenplan und Auswertung:
 -- docs/Lamp_Preglow_Experiment.md 6.3) -- danach WIEDER AUF 0 und scripts\check.ps1 -Fit
 -- gegen scripts/baseline.csv fahren, sonst wandert Diagnoselogik in ein Release.
-constant DBG_MODE : integer range 0 to 5 := 0;
+constant DBG_MODE : integer range 0 to 6 := 0;
 -- Lampen-Trace (nur DBG_MODE 4/5, sonst ohne Wirkung — die Logik steckt in den generate-Bloecken
 -- und wird bei DBG_MODE=0 gar nicht elaboriert, die Baseline bleibt also unberuehrt).
 --   DBG_WATCH_LAMP : Lampe, die waehrend der Messung AUS ist (Beweis-Lampe, Kanaele 3+4)
@@ -654,6 +680,17 @@ begin
 	                   when lamp_strobe_sel = STROBE_ENC(W_PHASE) else '0';
 	debug_signal(7) <= '1' when wr_cnt /= 0 else '0';
 end generate gen_dbg5;
+-- DBG_MODE=6 (Spielerkennung): ob "genau eine Player-up-Lampe an" ein spielunabhaengiges
+-- in_game-Signal liefert. Kanal 0..3 = up-Lampe Spieler 1..4 (RAM 0x03/07/0B/0F, Nibble 8),
+-- 4 = genau eine an (roh), 5 = in_game (gehalten), 6 = FRAM-Slot gueltig (seit SW 0.4.0),
+-- 7 = Puls je FRAM-Speichervorgang am Spielende (seit SW 0.4.0).
+gen_dbg6: if DBG_MODE = 6 generate
+	debug_signal(3 downto 0) <= up_on;
+	debug_signal(4) <= up_one;
+	debug_signal(5) <= in_game;
+	debug_signal(6) <= sk_valid;      -- SW 0.4.0: FRAM-Slot beim Boot gueltig
+	debug_signal(7) <= sk_saved;      -- SW 0.4.0: Puls je Speichervorgang am Spielende
+end generate gen_dbg6;
 
 -------------------------------
 -- CPU-Release erst nach DIP-Read (Phase 1) + Info-Anzeige (Phase 2) -- und nur solange
@@ -668,7 +705,8 @@ reset_h <= (not reset_l_stable) or por_active;
    -- Reaktivieren (or wd_reset) sobald Kick-Bedingung aus Schaltplan/ROM-Disassembly bekannt.
 
 -- LEDs (Schnell-Diagnose ohne LA) — Board-LEDs aktiv-LOW (gegen VCC, Pin nach GND => leuchten bei '0')
-LED_D1   <= not wd_seen;           -- Watchdog-Sticky: leuchtet, wenn der WD mind. einmal resettet hat
+LED_D1   <= not in_game when DBG_MODE = 6  -- Messbuild Spielerkennung: leuchtet = Spiel laeuft
+            else not wd_seen;      -- Watchdog-Sticky: leuchtet, wenn der WD mind. einmal resettet hat
 LED_D2   <= not cpu_fetch_cnt(20); -- CPU-Fetch-Blinker: blinkt = cpu68 fetcht ROM-Befehle. Rate ist
                                     -- spielabhaengig (Ereigniszaehler, s. Deklaration), ~3 s je Phase
                                     -- (steht dauerhaft hell oder dunkel: CPU halted oder haengt ohne ROM-Zugriff)
@@ -836,15 +874,39 @@ port map(
 	                                     -- FA-Control-Uebernahme muss das Modul noch
 	                                     -- das Pause-Kommando absetzen koennen.
 	trigger   => music_trig and music_enable,
-	start_new => '0',                    -- fortsetzen statt neu starten; options(2) Reserve
+	start_new => '0',                    -- fortsetzen statt neu starten (options(2) seit SW 0.4.0 = Highscore an/aus)
 	txd       => SB_Audio
 	);
--- FRAM I2C: 2026-07-10 DEAKTIVIERT (NVRAM/Credit-Persistenz-Thematik zurueckgestellt, Aufwand<->Nutzen).
--- Modul aus dem Build genommen (AtariFA.qsf: VHDL_FILE fram_i2c.vhd entfernt), Source `fram_i2c.vhd`
--- als Quelle behalten. Pins auf sicherem Leerlauf: Open-Drain freigegeben (externer Pull-up zieht high),
--- SCL idle high. Hintergrund + Zukunftsweg (RE statt Probe): doc/FRAM_Persistence.md.
-fram_i2c_sda <= 'Z';
-fram_i2c_scl <= '1';
+-- FRAM I2C: seit SW 0.4.0 wieder aktiv - letzte Spielstaende + Highscore je Spiel (score_keeper).
+-- Schreibt nichts ins Spiel-RAM, blendet die gespeicherten Werte nur im Attract in die Anzeige ein.
+-- DIP 2 (options(2), Boot-Matrix, ON='0') = Funktion an. OFF schaltet sie aus und loescht beim
+-- Boot den Slot des gewaehlten Spiels (seit SW 0.4.2; 0.4.0/0.4.1 hatten es umgekehrt).
+-- Die alte Credit-Injektion (SW 0.0.9, nur Airborne) ist NICHT reaktiviert, s. docs/FRAM_Persistence.md.
+sk_boot_done <= boot_phase(1) and not por_active;   -- DIP-Read fertig + PLL gelockt
+SCORES: entity work.score_keeper
+port map(
+	clk_50    => clk_50,
+	reset     => not boot_phase(0),
+	boot_done => sk_boot_done,
+	run       => reset_l_stable,
+	erase     => options(2),               -- SW 0.4.2: DIP 2 OFF ('1') = aus + loeschen
+	game_sel  => game_sel,
+	in_game   => in_game,
+	snap      => up_refresh,
+	display1  => display1,
+	display2  => display2,
+	display3  => display3,
+	display4  => display4,
+	out1      => sk_display1,
+	out2      => sk_display2,
+	out3      => sk_display3,
+	out4      => sk_display4,
+	valid     => sk_valid,
+	saved     => sk_saved,
+	fram_ok   => sk_fram_ok,
+	sda       => fram_i2c_sda,
+	scl       => fram_i2c_scl
+);
 ------------------------------------------------------------------------------
 
 
@@ -982,7 +1044,7 @@ end process;
 -- display_control.vhd, spiegelte aber die Spielanzeige doppelt -> jetzt nur hier.)
 -- x"F"=blank, Digit 6 = Player-up-LED (hier aus = x"0", nicht Teil der Ziffernfolge).
 ------------------------------------------------------------------------------
-boot_info : process(game_select, options, freeplay)
+boot_info : process(game_select, options, freeplay, sk_fram_ok, sk_valid)
 begin
 	-- Display 1: Version SW_MAIN SW_SUB1 SW_SUB2 (rechtsbuendig: SUB2 ganz rechts = Index 0)
 	bi_display1 <= (others => x"F");
@@ -1011,11 +1073,27 @@ begin
 	bi_display3(6) <= x"0";
 
 	-- Display 4: Freeplay (active-low) -> '1' wenn aktiv, sonst '0' (ganz rechts = Index 0)
+	-- SW 0.4.1: links davon der FRAM-Zustand nach dem Boot-Transfer (score_keeper, ~2 ms
+	-- nach dem DIP-Read, also lange vor Ende des 5-s-Fensters):
+	--   Index 5 (ganz links) = FRAM antwortet: 1 = mind. ein ACK im Transfer, 0 = keine Antwort
+	--   Index 4              = Slot: 2 = aus + geloescht (DIP 2 OFF), 1 = gueltig gelesen, 0 = leer/ungueltig
 	bi_display4 <= (others => x"F");
 	if freeplay = '0' then
 		bi_display4(0) <= x"1";
 	else
 		bi_display4(0) <= x"0";
+	end if;
+	if sk_fram_ok = '1' then
+		bi_display4(5) <= x"1";
+	else
+		bi_display4(5) <= x"0";
+	end if;
+	if options(2) = '1' then
+		bi_display4(4) <= x"2";
+	elsif sk_valid = '1' then
+		bi_display4(4) <= x"1";
+	else
+		bi_display4(4) <= x"0";
 	end if;
 	bi_display4(6) <= x"0";
 
@@ -1026,10 +1104,10 @@ end process;
 -- Mux: FA-Control hat Vorrang (dann steht die CPU und display1..4 waeren ohnehin
 -- ein eingefrorenes Standbild), sonst in Phase 2 (boot_phase(2)='0') die Boot-Info,
 -- sonst die Spiel/Normal-Daten.
-dc_display1 <= fa_display1 when fa_ctrl_active = '1' else bi_display1 when boot_phase(2) = '0' else display1;
-dc_display2 <= fa_display2 when fa_ctrl_active = '1' else bi_display2 when boot_phase(2) = '0' else display2;
-dc_display3 <= fa_display3 when fa_ctrl_active = '1' else bi_display3 when boot_phase(2) = '0' else display3;
-dc_display4 <= fa_display4 when fa_ctrl_active = '1' else bi_display4 when boot_phase(2) = '0' else display4;
+dc_display1 <= fa_display1 when fa_ctrl_active = '1' else bi_display1 when boot_phase(2) = '0' else sk_display1;
+dc_display2 <= fa_display2 when fa_ctrl_active = '1' else bi_display2 when boot_phase(2) = '0' else sk_display2;
+dc_display3 <= fa_display3 when fa_ctrl_active = '1' else bi_display3 when boot_phase(2) = '0' else sk_display3;
+dc_display4 <= fa_display4 when fa_ctrl_active = '1' else bi_display4 when boot_phase(2) = '0' else sk_display4;
 dc_status   <= fa_status   when fa_ctrl_active = '1' else bi_status   when boot_phase(2) = '0' else status_d;
 
 
@@ -1424,6 +1502,102 @@ begin
 	end if;
 end process;
 end generate gen_gamedisp;
+
+-- ============================================================
+-- Spielerkennung (in_game) fuer Highscore/letzte Spielstaende, spielunabhaengig:
+-- Die Player-up-Lampe (4. Byte je Spieler, PinMAME ram_w: Nibble 8 = an) brennt im Spiel
+-- genau fuer den Spieler am Zug. Alle vier an = Segmenttest nach dem Boot, keine = Attract.
+-- in_game haelt UP_HOLD_CYCLES (~2 s) nach, falls die Lampe im Spiel blinkt; am Spielende
+-- faellt es damit ~2 s nach dem Erloeschen. Annahme wird mit DBG_MODE 6 am Board geprueft.
+-- Messbuild 2 (10.11.2026): "genau eine an" allein reicht nicht - Time 2000, Airborne und
+-- Space Riders zeigen im Attract ein Lauflicht ueber die vier up-Lampen, das in jedem Moment
+-- genau eine Lampe zeigt. Deshalb zaehlt erst DIESELBE Lampe nach UP_STABLE_CYCLES Leucht-
+-- dauer (Dunkelphasen beim Blinken frieren den Zaehler ein, statt ihn zu loeschen). Ein
+-- Wechsel auf einen anderen Spieler haelt in_game nur, wenn die alte Lampe schon stabil war
+-- (= Spielerwechsel); im Lauflicht ist sie das nie. Mehr als UP_HOLD_CYCLES dunkel oder
+-- 2..4 Lampen an (Segmenttest, Airborne-Abschaltfolge) setzen die Stabilitaet zurueck.
+-- ============================================================
+up_on(0) <= '1' when display4(6) = x"8" else '0';   -- Spieler 1 (RAM 0x03)
+up_on(1) <= '1' when display3(6) = x"8" else '0';   -- Spieler 2 (RAM 0x07)
+up_on(2) <= '1' when display2(6) = x"8" else '0';   -- Spieler 3 (RAM 0x0B)
+up_on(3) <= '1' when display1(6) = x"8" else '0';   -- Spieler 4 (RAM 0x0F)
+up_all <= '1' when up_on = "1111" else '0';
+with up_on select up_one <=
+	'1' when "0001" | "0010" | "0100" | "1000",
+	'0' when others;
+
+in_game_hold : process(clk_50)
+	variable refresh : boolean;
+begin
+	if rising_edge(clk_50) then
+		if reset_l_stable = '0' then
+			up_hold_cnt <= 0;
+			up_last     <= "0000";
+			up_stab_cnt <= 0;
+			up_gap_cnt  <= 0;
+			up_trust    <= '0';
+			up_refresh  <= '0';
+			in_game     <= '0';
+		else
+			refresh := false;
+			if up_one = '1' then
+				up_gap_cnt <= 0;
+				if up_on /= up_last then
+					-- anderer Spieler: nur Spielerwechsel, wenn die alte Lampe stabil war
+					-- (Fehler Messbuild 2, Space Riders nach Spielende: ohne up_trust frischte
+					-- jede Lauflicht-Lampe in_game wieder auf, D1 ging nie aus)
+					refresh := (in_game = '1' and up_stab_cnt = UP_STABLE_CYCLES);
+					if refresh then
+						up_trust <= '1';
+					else
+						up_trust <= '0';
+					end if;
+					up_last     <= up_on;
+					up_stab_cnt <= 0;
+				else
+					-- dieselbe Lampe: nach akzeptiertem Spielerwechsel sofort nachtriggern
+					-- (sonst ginge in_game waehrend der neuen Zaehlung aus), sonst erst stabil
+					refresh := (up_trust = '1' or up_stab_cnt = UP_STABLE_CYCLES);
+					if up_stab_cnt = UP_STABLE_CYCLES then
+						up_trust <= '1';
+					end if;
+					if up_stab_cnt /= UP_STABLE_CYCLES then
+						up_stab_cnt <= up_stab_cnt + 1;
+					end if;
+				end if;
+			elsif up_on = "0000" then
+				-- Dunkelphase (Blinken): Zaehler einfrieren, nach UP_HOLD_CYCLES verwerfen
+				if up_gap_cnt = UP_HOLD_CYCLES then
+					up_last     <= "0000";
+					up_stab_cnt <= 0;
+					up_trust    <= '0';
+				else
+					up_gap_cnt <= up_gap_cnt + 1;
+				end if;
+			else
+				-- 2..4 Lampen an: Segmenttest bzw. Abschaltfolge nach dem Boot
+				up_gap_cnt  <= 0;
+				up_last     <= "0000";
+				up_stab_cnt <= 0;
+				up_trust    <= '0';
+			end if;
+
+			if refresh then
+				up_refresh  <= '1';
+			else
+				up_refresh  <= '0';
+			end if;
+			if refresh then
+				up_hold_cnt <= UP_HOLD_CYCLES;
+				in_game     <= '1';
+			elsif up_hold_cnt /= 0 then
+				up_hold_cnt <= up_hold_cnt - 1;
+			else
+				in_game     <= '0';
+			end if;
+		end if;
+	end if;
+end process;
 
 -- lamp shadow buffer: sniff CPU writes to lamp RAM (0x30-0x3F) into lamp_state.
 -- 16 Byte = 128 Bit; Bit-Index = offset*8 + b (offset = cpu_addr(3:0)). Das Multiplex-/
