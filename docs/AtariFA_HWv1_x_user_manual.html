@@ -138,7 +138,7 @@ tbody tr:nth-child(even) { background: #f3f3f3; }
 <p><strong>Software Version 0.3.3</strong></p>
 <p><strong>user manual</strong></p>
 <p><a href="mailto:ralf@lisy.dev">ralf@lisy.dev</a></p>
-<p>v1.1 04.09.2026</p>
+<p>v1.2 11.11.2026</p>
 <blockquote>
 <p>German version: <a href="AtariFA_HWv1_x_Bedienungsanleitung.html">AtariFA_HWv1_x_Bedienungsanleitung.html</a>.
 French version: <a href="AtariFA_HWv1_x_manuel_utilisateur.html">AtariFA_HWv1_x_manuel_utilisateur.html</a>.
@@ -167,8 +167,8 @@ options</a>
 -&gt; where the sound comes out</a></li>
 <li><a href="#422-option-4---let-fa-control-take-over">4.2.2. Option 4
 -&gt; let FA-Control take over</a></li>
-<li><a href="#423-option-1---background-music-option-2-reserved">4.2.3.
-Option 1 -&gt; background music, option 2 reserved</a></li>
+<li><a href="#423-option-1---background-music-option-2---save-credits-and-high-score">4.2.3.
+Option 1 -&gt; background music, option 2 -&gt; save credits and high score</a></li>
 <li><a href="#424-options-5-and-6---dead-time-for-the-lamp-columns">4.2.4.
 Options 5 and 6 -&gt; dead time for the lamp columns</a></li>
 <li><a href="#425-if-the-glow-stays">4.2.5. If the glow stays</a></li>
@@ -191,8 +191,8 @@ test</a>
 <li><a href="#61-the-programming-dip-banks-and-the-replay-switch">6.1.
 The programming DIP banks and the replay switch</a></li>
 <li><a href="#62-the-self-test">6.2. The self test</a></li>
-<li><a href="#63-credits-and-high-scores-are-not-kept">6.3. Credits and
-high scores are not kept</a></li>
+<li><a href="#63-credits-high-score-and-last-scores">6.3. Credits, high
+score and last scores</a></li>
 </ul></li>
 <li><a href="#7-free-play">7. Free play</a></li>
 <li><a href="#8-sound">8. Sound</a>
@@ -255,9 +255,10 @@ program the FPGA</li>
 <li><p><strong>Six of the ten DIP switches are read once, during
 boot.</strong> Changing them while the game runs has no effect. See
 chapter 4.3.</p></li>
-<li><p><strong>Credits and high scores are lost when you switch the
-machine off.</strong> That is not a limitation of AtariFA - the original
-Atari Generation 1 MPU has no battery backup either. See chapter
+<li><p><strong>Credits, high score and the last scores survive a power
+cycle only with option 2 &#39;ON&#39;.</strong> The original Atari
+Generation 1 MPU cannot do this at all - it has no buffered memory.
+AtariFA uses a FRAM chip for it, no battery needed. See chapter
 6.3.</p></li>
 </ul>
 <h2 id="2-quickstart">2. Quickstart</h2>
@@ -380,7 +381,8 @@ setting for a standard machine.</p>
 </tr>
 <tr>
 <td>Dip2</td>
-<td>reserved</td>
+<td><strong>Save credits, high score and last scores</strong> - ON = on,
+OFF = off and erase the game&#39;s memory</td>
 <td>at boot</td>
 </tr>
 <tr>
@@ -442,8 +444,8 @@ and the game is stopped while it does. Everything else is in chapter
 FA-Control is in charge takes control away <strong>immediately</strong>
 and restarts the game. That is the emergency stop for a test tool that
 has locked up.</p>
-<h4 id="423-option-1---background-music-option-2-reserved">4.2.3. Option
-1 -&gt; background music, option 2 reserved</h4>
+<h4 id="423-option-1---background-music-option-2---save-credits-and-high-score">4.2.3. Option
+1 -&gt; background music, option 2 -&gt; save credits and high score</h4>
 <ul>
 <li><p><strong>Option 1, &#39;ON&#39;</strong> - <strong>background music plays
 while a ball is in play.</strong> The MP3 player on the board plays
@@ -454,12 +456,17 @@ chapter 8.4.</p></li>
 the default, and it is the setting for a machine that should behave like
 the original.</p></li>
 </ul>
-<p>Option 1 used to belong to an experimental credit/high score save
-feature that is currently on hold, see chapter 13. From software 0.3.0
-on it is the background music switch.</p>
-<p><strong>Option 2</strong> is not used. Leave it &#39;OFF&#39;. It is wired,
-it is shown on the info display, and it is there for later software
-versions.</p>
+<ul>
+<li><p><strong>Option 2, &#39;ON&#39;</strong> - <strong>credits, high score
+and the last scores are saved</strong> and survive a power cycle.
+Everything about it is in chapter 6.3.</p></li>
+<li><p><strong>Option 2, &#39;OFF&#39;</strong> - the feature is off, and the
+memory of the selected game is erased at boot. The machine behaves like
+it does with the original MPU. This is the default.</p></li>
+</ul>
+<p>Option 1 belonged to an experimental credit save feature up to
+software 0.2.x. From software 0.3.0 on it is the background music
+switch; saving moved to option 2 with software 0.4.0.</p>
 <p>Both switches are read <strong>at boot only</strong> - see chapter
 4.3.</p>
 <h4 id="424-options-5-and-6---dead-time-for-the-lamp-columns">4.2.4.
@@ -614,19 +621,26 @@ held in reset during this time - the game has not started yet.</p>
 </tr>
 <tr>
 <td><strong>Player 4</strong></td>
-<td>free play: <code>1</code> = active, <code>0</code> = not active</td>
+<td>rightmost free play: <code>1</code> = active, <code>0</code> = not
+active. Leftmost the memory (chapter 6.3): first digit <code>1</code> =
+the FRAM chip answers, <code>0</code> = it does not; second digit
+<code>1</code> = saved values read, <code>0</code> = nothing saved yet,
+<code>2</code> = option 2 is &#39;OFF&#39;, memory erased</td>
 </tr>
 <tr>
 <td><strong>Credit/Ball</strong></td>
-<td>dark</td>
+<td>on the right the saved credits (only with option 2 &#39;ON&#39;),
+otherwise dark</td>
 </tr>
 </tbody>
 </table>
 <p>Everything stands right aligned, the unused digits stay dark.</p>
-<p>Example: player 1 showing <code>033</code>, player 2 showing
-<code>02</code>, player 3 showing <code>000000</code>, player 4 showing
-<code>0</code> is software 0.3.3 on the standard board, running Airborne
-Avenger, no options set, no free play.</p>
+<p>Example: player 1 showing <code>044</code>, player 2 showing
+<code>02</code>, player 3 showing <code>010000</code>, player 4 showing
+<code>11&#160;&#160;&#160;0</code>, credit showing <code>03</code> is
+software 0.4.4 on board variant 0, running Airborne Avenger, only option
+2 set, no free play; the FRAM chip answers, values were saved, among
+them 3 credits.</p>
 <p><strong>The leading digit of the version tells you which board
 variant you have</strong>, see chapter 12. <code>0</code> is the
 standard AtariFA board.</p>
@@ -670,15 +684,38 @@ manual of your pinball machine.</p>
 <p><strong>Exception: The Atarians.</strong> Atari&#39;s first game has no
 documented self test, and it does not react to the test switch. That is
 not a fault of AtariFA.</p>
-<h3 id="63-credits-and-high-scores-are-not-kept">6.3. Credits and high
-scores are not kept</h3>
-<p>When the machine is switched off, credits and scores are gone.
-<strong>The original Atari Generation 1 MPU behaves the same
-way</strong> - unlike later machines it has no battery buffered memory
-at all.</p>
-<p>The PCB does carry a FRAM chip to change that, but the feature is not
-finished and is switched off in this software version. See chapter
-13.</p>
+<h3 id="63-credits-high-score-and-last-scores">6.3. Credits, high score
+and last scores</h3>
+<p>The original Atari Generation 1 MPU has no buffered memory: when the
+machine is switched off, credits and scores are gone, and the games do
+not know a high score at all. AtariFA carries a FRAM chip for this,
+which keeps its content without a battery. From software 0.4.4 on it is
+used when <strong>option 2 is &#39;ON&#39;</strong>:</p>
+<ul>
+<li><p><strong>Credits</strong> are saved on every change (coin, game
+start) and written back into the game after power on. The credit display
+shows them right after the info display.</p></li>
+<li><p><strong>Last scores:</strong> at the end of every game the scores
+of all four players are saved. After power on they stand in the player
+displays until the first game starts - also during the display test
+<code>888888</code>.</p></li>
+<li><p><strong>High score:</strong> the highest single score of all
+saved games. While no game is running the display alternates: 8 seconds
+the normal display, 4 seconds the high score on all four player
+displays.</p></li>
+</ul>
+<p>Each of the five games has its own memory. A game without a single
+point is not saved. The player up lamps and the ball display always stay
+the game&#39;s own.</p>
+<p><strong>Reset:</strong> set option 2 to &#39;OFF&#39; and power on. The
+feature is then off, and the memory of the selected game - credits,
+scores and high score - is erased. The other four games keep theirs.
+Set option 2 back to &#39;ON&#39; when the feature should run again.</p>
+<p>Whether the memory works is shown on the info display at power on,
+see chapter 5.2.</p>
+<p><strong>Test status:</strong> checked on the bench with
+<code>cyclone_10_pcb</code>. For the two &#39;dev_open&#39; variants it is
+built, but has not run on hardware yet.</p>
 <p>If you want the machine to start without needing coins, use free play
 - chapter 7.</p>
 <h2 id="7-free-play">7. Free play</h2>
@@ -999,17 +1036,8 @@ there, everything else depends on the wiring to the machine and is
 untested. <code>cyclone_IV_dev_open</code> has been built but has never
 run on hardware.</p>
 <h2 id="13-not-implemented-yet">13. Not implemented yet</h2>
-<p>This is on the PCB, wired, and not used by this software version. It
-does nothing, and it does no harm - the FPGA holds it in a safe idle
-state.</p>
-<ul>
-<li><strong>FRAM (credits and high scores over a power cycle).</strong>
-The chip is fitted and the low level driver works, but making it
-reliable across all five games turned out to need more reverse
-engineering of the game roms than expected. The feature is switched off.
-Option switch 1, which used to control it, is the background music
-switch since software 0.3.0, chapter 4.2.3. See chapter 6.3.</li>
-</ul>
+<p>Nothing at the moment. Since software 0.4.4 the FRAM chip is used as
+well, as the last part of the PCB (chapter 6.3).</p>
 <h2 id="appendix-a-game-select">Appendix A &#39;game select&#39;</h2>
 <p>Switches of the <strong>4 switch bank</strong>. Dip4 of that bank is
 free play and is not part of the game number.</p>
@@ -1133,7 +1161,7 @@ free play and is not part of the game number.</p>
 <p><strong>The ten configuration switches</strong></p>
 <pre><code>bank of 4                          bank of 6
  1  game select bit 0  (+1)         1  background music      read at boot
- 2  game select bit 1  (+2)         2  reserved              read at boot
+ 2  game select bit 1  (+2)         2  save (FRAM)           read at boot
  3  game select bit 2  (+4)         3  sound path            live
  4  free play, ON = active          4  FA-Control allowed    live
                                     5  lamp dead time    \   live
@@ -1141,6 +1169,9 @@ free play and is not part of the game number.</p>
 <p><strong>Background music, option 1:</strong> OFF = off (standard) ·
 ON = the MP3 player plays folder <code>02</code> while a ball is in play
 (chapter 8.4)</p>
+<p><strong>Save, option 2:</strong> OFF = off, the game&#39;s memory is
+erased at boot (standard) · ON = credits, high score and last scores
+survive a power cycle (chapter 6.3)</p>
 <p><strong>Sound path, option 3:</strong> OFF = Auxiliary Board
 (standard) · ON = on-board amplifier</p>
 <p><strong>FA-Control, option 4:</strong> OFF = nobody interferes
@@ -1190,14 +1221,16 @@ that works:</p>
 <p><strong>After changing a switch that is read at boot: power off,
 power on.</strong></p>
 <p><strong>The info display, first 5 seconds after power on</strong></p>
-<pre><code>Player 1   0 3 3      version, first digit = board variant
+<pre><code>Player 1   0 4 4      version, first digit = board variant
 Player 2      0 2     game select  (Appendix A)
-Player 3   000000     options 1..6, left to right, 1 = ON
-Player 4        0     free play, 1 = active
-Credit     (dark)</code></pre>
+Player 3   010000     options 1..6, left to right, 1 = ON
+Player 4   11   0     left: FRAM answers (1) · memory 1 = read,
+                      0 = empty, 2 = erased · right: free play, 1 = active
+Credit       03       saved credits (only with option 2 ON)</code></pre>
 <p><strong>LEDs:</strong> D1 watchdog (dark = good) · D2 CPU running
 (blinks slowly) · D3 NMI timer (blinks ~0.48 Hz)</p>
-<p><strong>No credits or scores are kept over a power cycle</strong> -
-as on the original Atari MPU.</p>
+<p><strong>Credits, high score and last scores survive a power cycle
+only with option 2 &#39;ON&#39;</strong> (chapter 6.3) - without it the
+machine behaves like the original Atari MPU.</p>
 </body>
 </html>

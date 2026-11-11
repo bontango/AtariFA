@@ -138,7 +138,7 @@ tbody tr:nth-child(even) { background: #f3f3f3; }
 <p><strong>Software-Version 0.3.3</strong></p>
 <p><strong>Bedienungsanleitung</strong></p>
 <p><a href="mailto:ralf@lisy.dev">ralf@lisy.dev</a></p>
-<p>v1.1 04.09.2026</p>
+<p>v1.2 11.11.2026</p>
 <blockquote>
 <p>Deutsche Fassung von <a href="AtariFA_HWv1_x_user_manual.html">AtariFA_HWv1_x_user_manual.html</a>.
 Version française : <a href="AtariFA_HWv1_x_manuel_utilisateur.html">AtariFA_HWv1_x_manuel_utilisateur.html</a>.
@@ -167,8 +167,8 @@ DIP-Schalter-Einstellungen</a>
 -&gt; wo der Ton herauskommt</a></li>
 <li><a href="#422-option-4---fa-control-darf-übernehmen">4.2.2. Option 4
 -&gt; FA-Control darf übernehmen</a></li>
-<li><a href="#423-option-1---hintergrundmusik-option-2-reserviert">4.2.3.
-Option 1 -&gt; Hintergrundmusik, Option 2 reserviert</a></li>
+<li><a href="#423-option-1---hintergrundmusik-option-2---credits-und-highscore-speichern">4.2.3.
+Option 1 -&gt; Hintergrundmusik, Option 2 -&gt; Credits und Highscore speichern</a></li>
 <li><a href="#424-optionen-5-und-6---totzeit-der-lampenspalten">4.2.4.
 Optionen 5 und 6 -&gt; Totzeit der Lampenspalten</a></li>
 <li><a href="#425-wenn-das-glimmen-bleibt">4.2.5. Wenn das Glimmen
@@ -192,8 +192,8 @@ und Selbsttest</a>
 <li><a href="#61-die-programmier-dip-bänke-und-der-replay-schalter">6.1.
 Die Programmier-DIP-Bänke und der Replay-Schalter</a></li>
 <li><a href="#62-der-selbsttest">6.2. Der Selbsttest</a></li>
-<li><a href="#63-credits-und-highscores-bleiben-nicht-erhalten">6.3.
-Credits und Highscores bleiben nicht erhalten</a></li>
+<li><a href="#63-credits-highscore-und-letzte-spielstände">6.3.
+Credits, Highscore und letzte Spielstände</a></li>
 </ul></li>
 <li><a href="#7-freispiel">7. Freispiel</a></li>
 <li><a href="#8-ton">8. Ton</a>
@@ -260,10 +260,11 @@ programmieren zu können</li>
 <li><p><strong>Sechs der zehn DIP-Schalter werden nur einmal beim
 Einschalten gelesen.</strong> Eine Änderung im laufenden Spiel bleibt
 wirkungslos. Siehe Kapitel 4.3.</p></li>
-<li><p><strong>Credits und Highscores gehen beim Ausschalten
-verloren.</strong> Das ist keine Einschränkung von AtariFA — die
-originale Atari-Generation-1-MPU hat ebenfalls keine Batteriepufferung.
-Siehe Kapitel 6.3.</p></li>
+<li><p><strong>Credits, Highscore und die letzten Spielstände bleiben
+nur mit Option 2 „ON&quot; über das Ausschalten erhalten.</strong> Die
+originale Atari-Generation-1-MPU kann das gar nicht — sie hat keinen
+gepufferten Speicher. AtariFA nutzt dafür einen FRAM-Baustein ohne
+Batterie. Siehe Kapitel 6.3.</p></li>
 </ul>
 <h2 id="2-schnellstart">2. Schnellstart</h2>
 <ol type="1">
@@ -388,7 +389,8 @@ Standardautomaten richtig.</p>
 </tr>
 <tr>
 <td>Dip2</td>
-<td>reserviert</td>
+<td><strong>Credits, Highscore und letzte Spielstände speichern</strong>
+— ON = an, OFF = aus und Speicher des Spiels löschen</td>
 <td>beim Einschalten</td>
 </tr>
 <tr>
@@ -450,8 +452,8 @@ das Spiel wird dabei angehalten. Alles Weitere in Kapitel 9.</p></li>
 Betrieb auf „OFF&quot; stellt, nimmt FA-Control die Kontrolle
 <strong>sofort</strong> wieder weg, und das Spiel startet neu. Das ist
 der Not-Aus für den Fall, dass ein Testgerät sich aufhängt.</p>
-<h4 id="423-option-1---hintergrundmusik-option-2-reserviert">4.2.3.
-Option 1 -&gt; Hintergrundmusik, Option 2 reserviert</h4>
+<h4 id="423-option-1---hintergrundmusik-option-2---credits-und-highscore-speichern">4.2.3.
+Option 1 -&gt; Hintergrundmusik, Option 2 -&gt; Credits und Highscore speichern</h4>
 <ul>
 <li><p><strong>Option 1, „ON&quot;</strong> — <strong>solange eine Kugel im
 Spiel ist, läuft Hintergrundmusik.</strong> Der MP3-Spieler auf der
@@ -462,12 +464,19 @@ Alles Weitere in Kapitel 8.4.</p></li>
 ist die Vorgabe und die Einstellung für einen Automaten, der sich wie
 das Original verhalten soll.</p></li>
 </ul>
-<p>Option 1 gehörte früher zu einer versuchsweisen Speicherung von
-Credits und Highscores, die derzeit zurückgestellt ist, siehe Kapitel
-13. Ab Software 0.3.0 ist sie der Schalter für die Hintergrundmusik.</p>
-<p><strong>Option 2</strong> ist nicht belegt, bitte auf „OFF&quot; lassen.
-Sie ist verdrahtet, sie wird auf der Info-Anzeige dargestellt, und sie
-ist für spätere Software-Versionen vorgesehen.</p>
+<ul>
+<li><p><strong>Option 2, „ON&quot;</strong> — <strong>Credits, Highscore
+und die letzten Spielstände werden gespeichert</strong> und überleben das
+Ausschalten. Alles Weitere in Kapitel 6.3.</p></li>
+<li><p><strong>Option 2, „OFF&quot;</strong> — die Funktion ist aus, und
+beim Einschalten wird der Speicher des gewählten Spiels gelöscht. So
+verhält sich der Automat wie mit der Original-MPU. Das ist die
+Vorgabe.</p></li>
+</ul>
+<p>Option 1 gehörte bis Software 0.2.x zu einer versuchsweisen
+Speicherung der Credits. Ab Software 0.3.0 ist sie der Schalter für die
+Hintergrundmusik, die Speicherung liegt seit Software 0.4.0 auf
+Option 2.</p>
 <p>Beide Schalter werden <strong>nur beim Einschalten gelesen</strong> —
 siehe Kapitel 4.3.</p>
 <h4 id="424-optionen-5-und-6---totzeit-der-lampenspalten">4.2.4.
@@ -631,20 +640,28 @@ nicht begonnen.</p>
 </tr>
 <tr>
 <td><strong>Spieler 4</strong></td>
-<td>Freispiel: <code>1</code> = aktiv, <code>0</code> = nicht aktiv</td>
+<td>ganz rechts Freispiel: <code>1</code> = aktiv, <code>0</code> = nicht
+aktiv. Ganz links der Speicher (Kapitel 6.3): erste Ziffer
+<code>1</code> = der FRAM-Baustein antwortet, <code>0</code> = er
+antwortet nicht; zweite Ziffer <code>1</code> = gespeicherte Werte
+gelesen, <code>0</code> = noch nichts gespeichert, <code>2</code> =
+Option 2 steht auf „OFF&quot;, Speicher gelöscht</td>
 </tr>
 <tr>
 <td><strong>Credit/Ball</strong></td>
-<td>dunkel</td>
+<td>rechts die gespeicherten Credits (nur mit Option 2 „ON&quot;), sonst
+dunkel</td>
 </tr>
 </tbody>
 </table>
 <p>Alles steht rechtsbündig, die nicht benutzten Stellen bleiben
 dunkel.</p>
-<p>Beispiel: Spieler 1 zeigt <code>033</code>, Spieler 2 zeigt
-<code>02</code>, Spieler 3 zeigt <code>000000</code>, Spieler 4 zeigt
-<code>0</code> — das ist Software 0.3.3 auf der Standardplatine,
-Airborne Avenger, keine Optionen gesetzt, kein Freispiel.</p>
+<p>Beispiel: Spieler 1 zeigt <code>044</code>, Spieler 2 zeigt
+<code>02</code>, Spieler 3 zeigt <code>010000</code>, Spieler 4 zeigt
+<code>11&#160;&#160;&#160;0</code>, Credit zeigt <code>03</code> — das
+ist Software 0.4.4 auf der Platinen-Variante 0, Airborne Avenger, nur
+Option 2 gesetzt, kein Freispiel; der FRAM-Baustein antwortet, es waren
+Werte gespeichert, darunter 3 Credits.</p>
 <p><strong>Die erste Ziffer der Version sagt Ihnen, welche
 Platinen-Variante Sie haben</strong>, siehe Kapitel 12. <code>0</code>
 ist die Standard-AtariFA-Platine.</p>
@@ -689,15 +706,41 @@ Spulentest und Anzeigen durchgehen.</p>
 <p><strong>Ausnahme: The Atarians.</strong> Ataris erstes Spiel hat
 keinen dokumentierten Selbsttest und reagiert nicht auf den
 Testschalter. Das ist kein Fehler von AtariFA.</p>
-<h3 id="63-credits-und-highscores-bleiben-nicht-erhalten">6.3. Credits
-und Highscores bleiben nicht erhalten</h3>
-<p>Beim Ausschalten des Automaten sind Credits und Spielstände weg.
-<strong>Die originale Atari-Generation-1-MPU verhält sich
-genauso</strong> — anders als spätere Geräte hat sie überhaupt keinen
-batteriegepufferten Speicher.</p>
-<p>Auf der Platine sitzt zwar ein FRAM-Baustein, um das zu ändern, aber
-diese Funktion ist noch nicht fertig und in dieser Software-Version
-abgeschaltet. Siehe Kapitel 13.</p>
+<h3 id="63-credits-highscore-und-letzte-spielstände">6.3. Credits,
+Highscore und letzte Spielstände</h3>
+<p>Die originale Atari-Generation-1-MPU hat keinen gepufferten Speicher:
+beim Ausschalten sind Credits und Spielstände weg, und einen Highscore
+kennen die Spiele überhaupt nicht. AtariFA hat dafür einen FRAM-Baustein
+auf der Platine, der seinen Inhalt ohne Batterie behält. Ab Software
+0.4.4 wird er genutzt, wenn <strong>Option 2 auf „ON&quot;</strong>
+steht:</p>
+<ul>
+<li><p><strong>Credits</strong> werden bei jeder Änderung gespeichert
+(Münze, Spielstart) und nach dem Einschalten wieder ins Spiel
+geschrieben. Das Credit-Display zeigt sie gleich nach der
+Info-Anzeige.</p></li>
+<li><p><strong>Letzte Spielstände:</strong> Am Ende jedes Spiels werden
+die Stände aller vier Spieler gespeichert. Nach dem Einschalten stehen
+sie bis zum ersten Spielstart in den Spieler-Anzeigen — auch während des
+Anzeigetests <code>888888</code>.</p></li>
+<li><p><strong>Highscore:</strong> der höchste Einzelstand aller
+gespeicherten Spiele. Solange kein Spiel läuft, wechselt die Anzeige:
+8 Sekunden die normale Anzeige, 4 Sekunden der Highscore auf allen vier
+Spieler-Anzeigen.</p></li>
+</ul>
+<p>Jedes der fünf Spiele hat seinen eigenen Speicher. Ein Spiel ohne
+einen einzigen Punkt wird nicht gespeichert. Die Player-up-Lampen und
+die Ball-Anzeige bleiben immer die des Spiels.</p>
+<p><strong>Zurücksetzen:</strong> Option 2 auf „OFF&quot; stellen und
+einschalten. Damit ist die Funktion aus, und der Speicher des gewählten
+Spiels — Credits, Stände und Highscore — ist gelöscht. Die anderen vier
+Spiele behalten ihren Speicher. Danach Option 2 wieder auf „ON&quot;,
+wenn die Funktion wieder laufen soll.</p>
+<p>Ob der Speicher arbeitet, zeigt die Info-Anzeige beim Einschalten,
+siehe Kapitel 5.2.</p>
+<p><strong>Erprobungsstand:</strong> geprüft auf dem Prüfstand mit
+<code>cyclone_10_pcb</code>. Für die beiden „dev_open&quot;-Varianten
+ist es gebaut, aber noch nicht auf Hardware gelaufen.</p>
 <p>Wenn der Automat ohne Münzeinwurf starten soll, verwenden Sie
 Freispiel — Kapitel 7.</p>
 <h2 id="7-freispiel">7. Freispiel</h2>
@@ -1037,18 +1080,8 @@ alles übrige hängt an der Verdrahtung zum Automaten und ist ungeprüft.
 <code>cyclone_IV_dev_open</code> ist gebaut, aber noch nie auf Hardware
 gelaufen.</p>
 <h2 id="13-noch-nicht-implementiert">13. Noch nicht implementiert</h2>
-<p>Das Folgende ist auf der Platine vorhanden und verdrahtet, wird von
-dieser Software-Version aber nicht genutzt. Es tut nichts, und es
-schadet nichts — das FPGA hält es in einem sicheren Ruhezustand.</p>
-<ul>
-<li><strong>FRAM (Credits und Highscores über das Ausschalten
-hinweg).</strong> Der Baustein ist bestückt und die Ansteuerung
-funktioniert, aber es zuverlässig für alle fünf Spiele hinzubekommen
-erfordert mehr Analyse der Spiel-ROMs als erwartet. Die Funktion ist
-abgeschaltet. Optionsschalter 1, der sie früher gesteuert hat, ist seit
-Software 0.3.0 der Schalter für die Hintergrundmusik, Kapitel 4.2.3.
-Siehe Kapitel 6.3.</li>
-</ul>
+<p>Derzeit nichts. Seit Software 0.4.4 wird auch der FRAM-Baustein
+genutzt, als letzter Teil der Platine (Kapitel 6.3).</p>
 <h2 id="anhang-a-game-select">Anhang A &#39;game select&#39;</h2>
 <p>Schalter der <strong>4er-Bank</strong>. Dip4 dieser Bank ist
 Freispiel und gehört nicht zur Spielnummer.</p>
@@ -1173,7 +1206,7 @@ Freispiel und gehört nicht zur Spielnummer.</p>
 <p><strong>Die zehn Konfigurationsschalter</strong></p>
 <pre><code>4er-Bank                            6er-Bank
  1  Spielauswahl Bit 0  (+1)         1  Hintergrundmusik    beim Einschalten
- 2  Spielauswahl Bit 1  (+2)         2  reserviert          beim Einschalten
+ 2  Spielauswahl Bit 1  (+2)         2  Speichern (FRAM)    beim Einschalten
  3  Spielauswahl Bit 2  (+4)         3  Tonweg              fortlaufend
  4  Freispiel, ON = aktiv            4  FA-Control erlaubt  fortlaufend
                                      5  Lampen-Totzeit  \  fortlaufend
@@ -1181,6 +1214,10 @@ Freispiel und gehört nicht zur Spielnummer.</p>
 <p><strong>Hintergrundmusik, Option 1:</strong> OFF = aus (Standard) ·
 ON = der MP3-Spieler spielt den Ordner <code>02</code>, solange eine
 Kugel im Spiel ist (Kapitel 8.4)</p>
+<p><strong>Speichern, Option 2:</strong> OFF = aus, der Speicher des
+Spiels wird beim Einschalten gelöscht (Standard) · ON = Credits,
+Highscore und letzte Spielstände überleben das Ausschalten
+(Kapitel 6.3)</p>
 <p><strong>Tonweg, Option 3:</strong> OFF = Auxiliary Board (Standard) ·
 ON = Verstärker auf der Platine</p>
 <p><strong>FA-Control, Option 4:</strong> OFF = niemand redet dazwischen
@@ -1232,14 +1269,16 @@ Kapitel 4.2.5.</p>
 wird: aus- und wieder einschalten.</strong></p>
 <p><strong>Die Info-Anzeige, die ersten 5 Sekunden nach dem
 Einschalten</strong></p>
-<pre><code>Spieler 1   0 3 3      Version, erste Ziffer = Platinen-Variante
+<pre><code>Spieler 1   0 4 4      Version, erste Ziffer = Platinen-Variante
 Spieler 2      0 2     Spielauswahl  (Anhang A)
-Spieler 3   000000     Optionen 1..6, von links nach rechts, 1 = ON
-Spieler 4        0     Freispiel, 1 = aktiv
-Credit      (dunkel)</code></pre>
+Spieler 3   010000     Optionen 1..6, von links nach rechts, 1 = ON
+Spieler 4   11   0     links: FRAM antwortet (1) · Speicher 1 = gelesen,
+                       0 = leer, 2 = gelöscht · rechts: Freispiel, 1 = aktiv
+Credit        03       gespeicherte Credits (nur mit Option 2 ON)</code></pre>
 <p><strong>LEDs:</strong> D1 Watchdog (dunkel = gut) · D2 Prozessor
 läuft (blinkt langsam) · D3 NMI-Zeitgeber (blinkt ~0,48 Hz)</p>
-<p><strong>Credits und Spielstände überleben das Ausschalten
-nicht</strong> — wie bei der originalen Atari-MPU.</p>
+<p><strong>Credits, Highscore und letzte Spielstände überleben das
+Ausschalten nur mit Option 2 „ON&quot;</strong> (Kapitel 6.3) — ohne
+verhält sich der Automat wie mit der originalen Atari-MPU.</p>
 </body>
 </html>

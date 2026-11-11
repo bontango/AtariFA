@@ -1,11 +1,84 @@
-# FRAM-Persistenz — Credits & Highscore über Power-Cycle (Airborne)
+# FRAM-Persistenz — Credits, Highscore, letzte Spielstände
 
-> **⚠ STATUS 2026-07-10 — ZURÜCKGESTELLT / I²C deaktiviert.** Die Ausweitung auf alle 5 Spiele
-> scheiterte (empirischer CRED_PROBE unzuverlässig, s. Abschnitt am Ende); das gesamte NVRAM/FRAM-Feature
-> ist pausiert. Das **I²C-Modul ist aus dem Build genommen** (`AtariFA.qsf` ohne `fram_i2c.vhd`; Pins auf
-> sicherem Leerlauf), die **Source `fram_i2c.vhd` bleibt** erhalten. Der HW-verifizierte Airborne-Stand
-> (SW 0.0.9, `959ff6b`) bleibt in der git-History. Aktueller Build: **SW 0.1.0**. Details/Zukunftsweg:
-> Abschnitt *„Ausweitung auf alle 5 Spiele — ZURÜCKGESTELLT"* unten.
+> **STATUS 2026-11-11 — AKTIV seit SW 0.4.0, alle 5 Spiele, HW-getestet auf `cyclone_10_pcb`
+> mit SW 0.4.4.** Der aktuelle Stand steht im ersten Abschnitt *„SW 0.4.x"*. Alles danach ist
+> die Vorgeschichte (SW 0.0.8–0.1.0, nur Airborne, ab 2026-07-10 zurückgestellt) und bleibt als
+> Beleg für die Mechanik und die Fehlversuche stehen. Testprotokolle:
+> `docs/TEST_Highscore_Schritt0.md`, `…Schritt1.md` (Highscore), `…Schritt2.md` (Credits).
+
+## SW 0.4.x — aktueller Stand
+
+**Bedienung:** Options-DIP 2 (`options(2)`, Boot-Matrix). **ON = an**, **OFF = aus und beim
+Boot den Slot des gewählten Spiels löschen**. (0.4.0/0.4.1 hatten es umgekehrt; im Test wurde
+DIP 2 als „an/aus“ verstanden und stand auf ON, was bei jedem Boot löschte. Gedreht in 0.4.2.)
+
+**Modul `rtl/common/score_keeper.vhd`** (instanziiert in `top/AtariFA.vhd`, Instanz `SCORES`)
+enthält `fram_i2c.vhd` und ist spielunabhängig, bis auf die Credit-Adresse, die das Top-Level
+liefert.
+
+- **Letzte Stände + Highscore** (0.4.0): arbeitet nur auf den Display-Shadow-Buffern. Die
+  Player-up-Erkennung im Top-Level (`in_game`, `up_refresh`) liefert Spielende und
+  Schnappschuss-Strobe. Am Spielende (fallende Flanke `in_game`) werden die vier Stände
+  gespeichert, Highscore = max(alt, bester Spieler); ein Spiel ohne Punkt wird nicht gespeichert.
+  Nach dem Boot zeigen die Spieler-Displays bis zum ersten Spiel die gespeicherten Stände (auch
+  über dem Segmenttest `888888`), im Attract wechseln 8 s Spielanzeige / 4 s Highscore. Nichts
+  davon wird ins Spiel-RAM geschrieben, es wird nur in die Anzeige eingeblendet.
+- **Credits** (0.4.3/0.4.4): Credit-Zähler je Spiel per ROM-Disassembly (`tools/dis6800.py`):
+
+  | Spiel | Adresse | Format | Münze / Start |
+  |---|---|---|---|
+  | Atarians | `$CE` | BCD | `7B54`–`7B68` (Limit `$E0`) / `7B76`–`7B87` |
+  | Time 2000 | `$D6` | BCD | `7C93`–`7CA7` (Limit `$CA`) / `7CB4`–`7CC2` |
+  | Airborne | `$D5` | binär | `7CA7`–`7CBF` (Limit `$BC`), Anzeige über BCD-Wandlung `7CD5` |
+  | Middle Earth | `$1D` | BCD | = Credit-Display-Byte selbst; `7232` / `725B`; Boot schreibt `$88` (`7FE9`), `71C1` behandelt `$88` als 0 |
+  | Space Riders | `$B7` | BCD | `7BDA`–`7BEF` (Limit `$A8`) / `77A0` (addiert `$99` = −1) |
+
+  Außer Münz-/Startroutine schreibt in allen fünf ROMs nur der Boot-RAM-Clear auf diese Adressen.
+  Der alte CRED_PROBE (unten) lag bei Atarians/Time/Space Riders also richtig (206/214/183),
+  bei Airborne und Middle Earth falsch.
+- **Mitschreiben:** `credit_sniffer` im Top-Level meldet jede CPU-Schreibung auf
+  `CRED_ADDR(game_sel)` (Adressbits 8..0, also auch über den RAM-Mirror). Ändert sich der Wert,
+  schreibt `score_keeper` sofort den ganzen Slot. Scharf erst nach der Injektion — sonst landeten
+  der Boot-Clear (0) bzw. das `$88` von Middle Earth im FRAM.
+- **Zurückschreiben:** `credit_inject` im Top-Level, Mechanik wie Stufe 2 von SW 0.0.9: nach
+  **jedem** CPU-Start (auch nach einer FA-Control-Übernahme) `CRED_DELAY` = 50 ms warten, CPU per
+  `halt` anhalten (`HALT_SETTLE` ≈ 82 µs), RAM-Port muxen, **zwei Bytes** schreiben: den
+  Credit-Zähler und `$1D` = Credits in BCD (so schreibt es das Spiel nach einer Münze selbst).
+  Ohne das zweite Byte zeigte das Credit-Display bis zur ersten Münze das `88` des Segmenttests
+  (HW-Test 0.4.3). Der Display-Sniffer liest dafür `ram_p_*` statt des CPU-Busses. Credit 0
+  wird nicht injiziert (= Originalverhalten).
+- **Boot-Info:** Display 4 links = FRAM-Status (Ziffer 1: FRAM hat quittiert; Ziffer 2:
+  `2` = aus/gelöscht, `1` = gültig gelesen, `0` = leer), Status-Display rechts = gespeicherte
+  Credits. Die binären Airborne-Credits wandelt `cred_bcd` getaktet in BCD (kombinatorisch
+  kostete das ~100 LEs und −5,4 ns Setup).
+
+**FRAM-Slot je Spiel** (17 Byte ab `game_sel × 32`):
+
+| Byte | Inhalt |
+|---|---|
+| 0 | Magic `0xA6` (0.4.0–0.4.2: `0xA5`, 16 Byte ab `game_sel × 16` — gelten jetzt als leer) |
+| 1–12 | letzte Stände, je Display 3 Byte, linkes Ziffernpaar zuerst, Ziffern roh (Blank = `F`) |
+| 13–15 | Highscore, gleiche Kodierung |
+| 16 | Credits, roh wie im Spiel-RAM |
+
+Ein Slot, der nur wegen der Credits geschrieben wurde, hat bei den Ständen Blank-Ziffern; beim
+Boot werden Stände nur eingeblendet, wenn eine Ziffer 1..9 dabei ist (`has_digit`).
+
+**Nebenbefund DIP-Lesen (0.4.1):** `read_the_dips.vhd` tastete jede Matrixzeile 1 µs nach dem
+Strobe-Wechsel ab. Seit v1.1 sind es 50 µs (`SETTLE_CYCLES`). Ausgelöst durch den Verdacht, DIP 2
+werde über die Rückleitung der Freispiel-Zeile verfälscht — die eigentliche Ursache war dann die
+DIP-2-Bedeutung (s. o.), die Wartezeit ist trotzdem geblieben.
+
+**Ressourcen (SW 0.4.4, pcb):** Comb 5861 / Reg 2180 / Speicher unverändert 202 752 Bit,
+LE 96 % (6013/6272). `score_keeper` inkl. I²C ≈ 930 LEs. Der Chip ist damit praktisch voll.
+
+---
+
+# Vorgeschichte: SW 0.0.8–0.1.0 (nur Airborne)
+
+> **STATUS 2026-07-10 — damals ZURÜCKGESTELLT / I²C deaktiviert.** Die Ausweitung auf alle 5 Spiele
+> scheiterte (empirischer CRED_PROBE unzuverlässig, s. Abschnitt am Ende). Der HW-verifizierte
+> Airborne-Stand (SW 0.0.9, `959ff6b`) liegt in der git-History. Abgelöst durch SW 0.4.x (oben).
 
 Atari Gen1 hat **kein natives NVRAM**: RAM `0x0000–0x01FF` ist single-port und wird beim Boot
 gelöscht (Clear-Loop `0x00–0xD8`). Angezeigt wird immer nur der Score des **letzten Spiels**;

@@ -138,7 +138,7 @@ tbody tr:nth-child(even) { background: #f3f3f3; }
 <p><strong>Version logicielle 0.3.3</strong></p>
 <p><strong>manuel d&#39;utilisation</strong></p>
 <p><a href="mailto:ralf@lisy.dev">ralf@lisy.dev</a></p>
-<p>v1.1 04.09.2026</p>
+<p>v1.2 11.11.2026</p>
 <blockquote>
 <p>Version française de <a href="AtariFA_HWv1_x_user_manual.html">AtariFA_HWv1_x_user_manual.html</a>.
 Deutsche Fassung: <a href="AtariFA_HWv1_x_Bedienungsanleitung.html">AtariFA_HWv1_x_Bedienungsanleitung.html</a>.
@@ -167,8 +167,8 @@ banc de 4 : choix du jeu et partie gratuite</a></li>
 par où sort le son</a></li>
 <li><a href="#422-option-4---laisser-fa-control-prendre-la-main">4.2.2.
 Option 4 -&gt; laisser FA-Control prendre la main</a></li>
-<li><a href="#423-option-1---musique-de-fond-option-2-réservée">4.2.3.
-Option 1 -&gt; musique de fond, option 2 réservée</a></li>
+<li><a href="#423-option-1---musique-de-fond-option-2---sauvegarde-des-crédits-et-du-meilleur-score">4.2.3.
+Option 1 -&gt; musique de fond, option 2 -&gt; sauvegarde des crédits et du meilleur score</a></li>
 <li><a href="#424-options-5-et-6---temps-mort-des-colonnes-de-lampes">4.2.4.
 Options 5 et 6 -&gt; temps mort des colonnes de lampes</a></li>
 <li><a href="#425-si-la-lueur-persiste">4.2.5. Si la lueur
@@ -192,8 +192,8 @@ autotest</a>
 <li><a href="#61-les-bancs-dip-de-programmation-et-le-commutateur-de-replay">6.1.
 Les bancs DIP de programmation et le commutateur de replay</a></li>
 <li><a href="#62-lautotest">6.2. L&#39;autotest</a></li>
-<li><a href="#63-crédits-et-meilleurs-scores-ne-sont-pas-conservés">6.3.
-Crédits et meilleurs scores ne sont pas conservés</a></li>
+<li><a href="#63-crédits-meilleur-score-et-derniers-scores">6.3.
+Crédits, meilleur score et derniers scores</a></li>
 </ul></li>
 <li><a href="#7-partie-gratuite">7. Partie gratuite</a></li>
 <li><a href="#8-son">8. Son</a>
@@ -262,10 +262,11 @@ pile.</p>
 <li><p><strong>Six des dix interrupteurs DIP ne sont lus qu&#39;une fois, au
 démarrage.</strong> Les changer pendant que le jeu tourne n&#39;a aucun
 effet. Voir le chapitre 4.3.</p></li>
-<li><p><strong>Les crédits et les meilleurs scores sont perdus à
-l&#39;extinction du flipper.</strong> Ce n&#39;est pas une limite d&#39;AtariFA - la
-MPU Atari génération 1 d&#39;origine n&#39;a pas non plus de sauvegarde par
-pile. Voir le chapitre 6.3.</p></li>
+<li><p><strong>Les crédits, le meilleur score et les derniers scores ne
+survivent à l&#39;extinction qu&#39;avec l&#39;option 2 sur « ON ».</strong> La MPU
+Atari génération 1 d&#39;origine en est incapable - elle n&#39;a aucune
+mémoire secourue. AtariFA utilise pour cela une puce FRAM, sans pile.
+Voir le chapitre 6.3.</p></li>
 </ul>
 <h2 id="2-démarrage-rapide">2. Démarrage rapide</h2>
 <ol type="1">
@@ -393,7 +394,9 @@ le bon réglage pour un flipper standard.</p>
 </tr>
 <tr>
 <td>Dip2</td>
-<td>réservé</td>
+<td><strong>Sauvegarde des crédits, du meilleur score et des derniers
+scores</strong> - ON = active, OFF = désactivée et mémoire du jeu
+effacée</td>
 <td>au démarrage</td>
 </tr>
 <tr>
@@ -456,8 +459,8 @@ Tout le reste est au chapitre 9.</p></li>
 pendant que FA-Control a la main lui retire le contrôle
 <strong>immédiatement</strong> et redémarre le jeu. C&#39;est l&#39;arrêt
 d&#39;urgence pour un outil de test qui s&#39;est bloqué.</p>
-<h4 id="423-option-1---musique-de-fond-option-2-réservée">4.2.3. Option
-1 -&gt; musique de fond, option 2 réservée</h4>
+<h4 id="423-option-1---musique-de-fond-option-2---sauvegarde-des-crédits-et-du-meilleur-score">4.2.3. Option
+1 -&gt; musique de fond, option 2 -&gt; sauvegarde des crédits et du meilleur score</h4>
 <ul>
 <li><p><strong>Option 1, « ON »</strong> - <strong>la musique de fond
 joue tant qu&#39;une bille est en jeu.</strong> Le lecteur MP3 de la carte
@@ -468,13 +471,19 @@ expliqué au chapitre 8.4.</p></li>
 C&#39;est le réglage par défaut, celui d&#39;un flipper qui doit se comporter
 comme l&#39;original.</p></li>
 </ul>
-<p>L&#39;option 1 servait auparavant à une fonction expérimentale de
-sauvegarde des crédits et des meilleurs scores, actuellement en attente,
-voir le chapitre 13. Depuis le logiciel 0.3.0, c&#39;est l&#39;interrupteur de
-la musique de fond.</p>
-<p><strong>L&#39;option 2</strong> n&#39;est pas utilisée. Laissez-la sur « OFF
-». Elle est câblée, apparaît sur l&#39;affichage d&#39;informations et est
-prévue pour de futures versions du logiciel.</p>
+<ul>
+<li><p><strong>Option 2, « ON »</strong> - <strong>les crédits, le
+meilleur score et les derniers scores sont sauvegardés</strong> et
+survivent à l&#39;extinction. Tout le reste au chapitre 6.3.</p></li>
+<li><p><strong>Option 2, « OFF »</strong> - la fonction est désactivée,
+et la mémoire du jeu choisi est effacée au démarrage. Le flipper se
+comporte comme avec la MPU d&#39;origine. C&#39;est le réglage par
+défaut.</p></li>
+</ul>
+<p>L&#39;option 1 servait jusqu&#39;au logiciel 0.2.x à une sauvegarde
+expérimentale des crédits. Depuis le logiciel 0.3.0, c&#39;est
+l&#39;interrupteur de la musique de fond ; la sauvegarde est passée sur
+l&#39;option 2 avec le logiciel 0.4.0.</p>
 <p>Les deux interrupteurs ne sont lus <strong>qu&#39;au démarrage</strong> -
 voir le chapitre 4.3.</p>
 <h4 id="424-options-5-et-6---temps-mort-des-colonnes-de-lampes">4.2.4.
@@ -639,21 +648,28 @@ droite - <code>1</code> = ON</td>
 </tr>
 <tr>
 <td><strong>Joueur 4</strong></td>
-<td>partie gratuite : <code>1</code> = active, <code>0</code> =
-inactive</td>
+<td>tout à droite la partie gratuite : <code>1</code> = active,
+<code>0</code> = inactive. Tout à gauche la mémoire (chapitre 6.3) :
+premier chiffre <code>1</code> = la puce FRAM répond, <code>0</code> =
+elle ne répond pas ; deuxième chiffre <code>1</code> = valeurs
+sauvegardées lues, <code>0</code> = rien de sauvegardé, <code>2</code> =
+option 2 sur « OFF », mémoire effacée</td>
 </tr>
 <tr>
 <td><strong>Crédit/Bille</strong></td>
-<td>éteint</td>
+<td>à droite les crédits sauvegardés (seulement avec l&#39;option 2 sur «
+ON »), sinon éteint</td>
 </tr>
 </tbody>
 </table>
 <p>Tout est aligné à droite, les chiffres inutilisés restent
 éteints.</p>
-<p>Exemple : joueur 1 affiche <code>033</code>, joueur 2
-<code>02</code>, joueur 3 <code>000000</code>, joueur 4 <code>0</code> -
-c&#39;est le logiciel 0.3.3 sur la carte standard, qui exécute Airborne
-Avenger, sans option ni partie gratuite.</p>
+<p>Exemple : joueur 1 affiche <code>044</code>, joueur 2
+<code>02</code>, joueur 3 <code>010000</code>, joueur 4
+<code>11&#160;&#160;&#160;0</code>, crédit <code>03</code> - c&#39;est le
+logiciel 0.4.4 sur la variante de carte 0, qui exécute Airborne Avenger,
+seule l&#39;option 2 est activée, pas de partie gratuite ; la puce FRAM
+répond, des valeurs étaient sauvegardées, dont 3 crédits.</p>
 <p><strong>Le premier chiffre de la version indique la variante de
 carte</strong>, voir le chapitre 12. <code>0</code> est la carte AtariFA
 standard.</p>
@@ -698,15 +714,43 @@ d&#39;afficheurs en suivant le manuel de votre flipper.</p>
 <p><strong>Exception : The Atarians.</strong> Le premier jeu d&#39;Atari n&#39;a
 pas d&#39;autotest documenté et ne réagit pas à l&#39;interrupteur de test. Ce
 n&#39;est pas un défaut d&#39;AtariFA.</p>
-<h3 id="63-crédits-et-meilleurs-scores-ne-sont-pas-conservés">6.3.
-Crédits et meilleurs scores ne sont pas conservés</h3>
-<p>À l&#39;extinction du flipper, les crédits et les scores sont perdus.
-<strong>La MPU Atari génération 1 d&#39;origine se comporte de la même
-façon</strong> - contrairement aux machines plus récentes, elle n&#39;a
-aucune mémoire secourue par pile.</p>
-<p>La carte porte bien une puce FRAM pour changer cela, mais la fonction
-n&#39;est pas terminée et est désactivée dans cette version du logiciel.
-Voir le chapitre 13.</p>
+<h3 id="63-crédits-meilleur-score-et-derniers-scores">6.3. Crédits,
+meilleur score et derniers scores</h3>
+<p>La MPU Atari génération 1 d&#39;origine n&#39;a aucune mémoire secourue : à
+l&#39;extinction du flipper, les crédits et les scores sont perdus, et les
+jeux ne connaissent pas du tout de meilleur score. AtariFA porte pour
+cela une puce FRAM, qui garde son contenu sans pile. Depuis le logiciel
+0.4.4, elle est utilisée quand <strong>l&#39;option 2 est sur «
+ON »</strong> :</p>
+<ul>
+<li><p><strong>Les crédits</strong> sont sauvegardés à chaque changement
+(pièce, début de partie) et réécrits dans le jeu après la mise sous
+tension. L&#39;afficheur des crédits les montre juste après l&#39;affichage
+d&#39;informations.</p></li>
+<li><p><strong>Derniers scores :</strong> à la fin de chaque partie, les
+scores des quatre joueurs sont sauvegardés. Après la mise sous tension,
+ils restent sur les afficheurs des joueurs jusqu&#39;au début de la
+première partie - y compris pendant le test d&#39;affichage
+<code>888888</code>.</p></li>
+<li><p><strong>Meilleur score :</strong> le score individuel le plus
+élevé de toutes les parties sauvegardées. Tant qu&#39;aucune partie n&#39;est
+en cours, l&#39;affichage alterne : 8 secondes l&#39;affichage normal,
+4 secondes le meilleur score sur les quatre afficheurs des
+joueurs.</p></li>
+</ul>
+<p>Chacun des cinq jeux a sa propre mémoire. Une partie sans un seul
+point n&#39;est pas sauvegardée. Les lampes « player up » et l&#39;afficheur de
+bille restent toujours ceux du jeu.</p>
+<p><strong>Remise à zéro :</strong> mettre l&#39;option 2 sur « OFF » et
+allumer. La fonction est alors désactivée, et la mémoire du jeu choisi -
+crédits, scores et meilleur score - est effacée. Les quatre autres jeux
+gardent la leur. Remettre ensuite l&#39;option 2 sur « ON » si la fonction
+doit de nouveau tourner.</p>
+<p>L&#39;affichage d&#39;informations à la mise sous tension indique si la
+mémoire fonctionne, voir le chapitre 5.2.</p>
+<p><strong>État des essais :</strong> vérifié au banc d&#39;essai avec
+<code>cyclone_10_pcb</code>. Pour les deux variantes « dev_open », c&#39;est
+compilé mais pas encore passé sur le matériel.</p>
 <p>Si vous voulez que le flipper démarre sans pièces, utilisez la partie
 gratuite - chapitre 7.</p>
 <h2 id="7-partie-gratuite">7. Partie gratuite</h2>
@@ -1045,18 +1089,9 @@ sont confirmés, tout le reste dépend du câblage vers le flipper et n&#39;est
 pas testé. <code>cyclone_IV_dev_open</code> a été construite mais n&#39;a
 jamais tourné sur du matériel.</p>
 <h2 id="13-pas-encore-implémenté">13. Pas encore implémenté</h2>
-<p>Ceci est présent sur la carte, câblé, et n&#39;est pas utilisé par cette
-version du logiciel. Cela ne fait rien et ne fait pas de mal - le FPGA
-le maintient dans un état de repos sûr.</p>
-<ul>
-<li><strong>FRAM (crédits et meilleurs scores après une coupure de
-courant).</strong> La puce est montée et le pilote de bas niveau
-fonctionne, mais la rendre fiable pour les cinq jeux s&#39;est révélé
-demander plus de rétro-ingénierie des ROM de jeu que prévu. La fonction
-est désactivée. L&#39;interrupteur d&#39;option 1, qui la commandait auparavant,
-est l&#39;interrupteur de la musique de fond depuis le logiciel 0.3.0,
-chapitre 4.2.3. Voir le chapitre 6.3.</li>
-</ul>
+<p>Rien pour le moment. Depuis le logiciel 0.4.4, la puce FRAM est
+utilisée elle aussi, comme dernière partie de la carte (chapitre
+6.3).</p>
 <h2 id="annexe-a-choix-du-jeu">Annexe A choix du jeu</h2>
 <p>Interrupteurs du <strong>banc de 4</strong>. Le Dip4 de ce banc est
 la partie gratuite et ne fait pas partie du numéro de jeu.</p>
@@ -1181,7 +1216,7 @@ la partie gratuite et ne fait pas partie du numéro de jeu.</p>
 <p><strong>Les dix interrupteurs de configuration</strong></p>
 <pre><code>banc de 4                          banc de 6
  1  choix du jeu bit 0  (+1)        1  musique de fond       lu au démarrage
- 2  choix du jeu bit 1  (+2)        2  réservé               lu au démarrage
+ 2  choix du jeu bit 1  (+2)        2  sauvegarde (FRAM)     lu au démarrage
  3  choix du jeu bit 2  (+4)        3  chemin du son         en continu
  4  partie gratuite, ON = active    4  FA-Control autorisé   en continu
                                     5  temps mort lampes \   en continu
@@ -1189,6 +1224,10 @@ la partie gratuite et ne fait pas partie du numéro de jeu.</p>
 <p><strong>Musique de fond, option 1 :</strong> OFF = désactivée
 (standard) · ON = le lecteur MP3 joue le dossier <code>02</code> tant
 qu&#39;une bille est en jeu (chapitre 8.4)</p>
+<p><strong>Sauvegarde, option 2 :</strong> OFF = désactivée, la mémoire
+du jeu est effacée au démarrage (standard) · ON = les crédits, le
+meilleur score et les derniers scores survivent à l&#39;extinction
+(chapitre 6.3)</p>
 <p><strong>Chemin du son, option 3 :</strong> OFF = carte auxiliaire
 (standard) · ON = amplificateur intégré</p>
 <p><strong>FA-Control, option 4 :</strong> OFF = personne n&#39;intervient
@@ -1240,14 +1279,17 @@ l&#39;original</td>
 éteindre, rallumer.</strong></p>
 <p><strong>L&#39;affichage d&#39;informations, les 5 premières secondes après la
 mise sous tension</strong></p>
-<pre><code>Joueur 1   0 3 3      version, premier chiffre = variante de carte
+<pre><code>Joueur 1   0 4 4      version, premier chiffre = variante de carte
 Joueur 2      0 2     choix du jeu  (annexe A)
-Joueur 3   000000     options 1..6, de gauche à droite, 1 = ON
-Joueur 4        0     partie gratuite, 1 = active
-Crédit     (éteint)</code></pre>
+Joueur 3   010000     options 1..6, de gauche à droite, 1 = ON
+Joueur 4   11   0     gauche : FRAM répond (1) · mémoire 1 = lue,
+                      0 = vide, 2 = effacée · droite : partie gratuite
+Crédit       03       crédits sauvegardés (seulement avec option 2 ON)</code></pre>
 <p><strong>LED :</strong> D1 chien de garde (éteinte = bon) · D2 CPU en
 marche (clignote lentement) · D3 timer NMI (clignote ~0,48 Hz)</p>
-<p><strong>Aucun crédit ni score n&#39;est conservé après une coupure de
-courant</strong> - comme sur la MPU Atari d&#39;origine.</p>
+<p><strong>Les crédits, le meilleur score et les derniers scores ne
+survivent à une coupure de courant qu&#39;avec l&#39;option 2 sur « ON
+»</strong> (chapitre 6.3) - sans elle, le flipper se comporte comme
+avec la MPU Atari d&#39;origine.</p>
 </body>
 </html>

@@ -382,14 +382,15 @@ Vier Entscheidungen, die dahinterstehen:
   gemeinsam freigegeben. Beim Loslassen des Resets stehen alle `sw_state` auf `'0'` (= offen),
   die echten Werte stehen nach ~2 ms — lange bevor `START_DELAY` (2 s) abgelaufen ist.
 * **`start_new => '0'`.** Die Musik läuft weiter, wo sie aufgehört hat (bei GottFA ist das
-  Gottlieb-DIP 16 = OFF). `options(2)` bleibt frei, falls das später ein DIP werden soll.
+  Gottlieb-DIP 16 = OFF). `options(2)` war dafür als Reserve gedacht, ist seit SW 0.4.0 aber die FRAM-Speicherung
+  (Credits, Highscore, letzte Stände; s. `docs/FRAM_Persistence.md`).
 
 ### 3.3 Freigabe per DIP
 
 **Options-DIP 1** = Hintergrundmusik EIN/AUS. Er kommt aus der Boot-Strobe-Matrix
 (`read_the_dips.vhd`) und wird **nur beim Einschalten gelesen** — Umlegen im laufenden
 Betrieb hat keine Wirkung, dazu ist ein Neustart nötig. Die Matrix ist damit voll belegt;
-frei ist nur noch `options(2)`.
+`options(2)` ist seit SW 0.4.0 die FRAM-Speicherung.
 
 ### 3.4 Kosten
 
