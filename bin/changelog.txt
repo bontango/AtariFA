@@ -55,3 +55,9 @@
   cyclone_10_dev_open    1.3.4    AtariFA_v134.jic  sha256:E060DC30F4C5CA73
   cyclone_10_pcb         0.3.4    AtariFA_v034.jic  sha256:7D2AC7F71AF6C1AE
   cyclone_IV_dev_open    2.3.4    AtariFA_v234.jic  sha256:FEB7FAA7EF4829CD
+
+2026-11-11 19:42  version .4.4
+  FRAM active again (SW 0.4.0..0.4.4): option DIP 2 ON saves credits, high score and the last scores of each of the five games in the FRAM, OFF switches it off and erases the selected game at boot. Last scores are shown after power on until the first game, the high score alternates with the normal display in attract mode (8 s / 4 s). Credits: counter addresses found by ROM disassembly (Atarians $CE, Time 2000 $D6, Airborne $D5 binary, Middle Earth $1D, Space Riders $B7); every change is saved at once, after every CPU start the CPU is halted and the counter plus the credit display byte $1D are written back. Boot info: player 4 left = FRAM status, credit display = saved credits. read_the_dips samples 50 us after each strobe change (was 1 us). Memory 202752 unchanged, LE 96 % on all three. HARDWARE 2026-11-11: cyclone_10_pcb (FPGA_board_v4.x) tested OK on the bench (high score 0.4.2, credits 0.4.4). The two dev_open variants built, not tested on hardware.
+  cyclone_10_dev_open    1.4.4    AtariFA_v144.jic  sha256:B14DBDDC7094FF11
+  cyclone_10_pcb         0.4.4    AtariFA_v044.jic  sha256:80E960CFC372575A
+  cyclone_IV_dev_open    2.4.4    AtariFA_v244.jic  sha256:8499BE6815E04C9A
