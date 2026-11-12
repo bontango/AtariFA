@@ -61,8 +61,10 @@
 --     LISY-Host die falsche Spule getroffen und die letzte gar nicht erreicht.
 --   * LAMPEN 0..N_LAMPS-1, weil die AtariFA-Lampennummer aus (Gruppe-1)*4 + Strobe
 --     folgt und dort die 0 die erste Lampe ist.
---   * SCHALTER 0..N_SW-1, weil die Nummer der CPU-Offset (addr - 0x2000) ist und sich
---     damit mit dem deckt, was der Selbsttest des Spiels anzeigt.
+--   * SCHALTER 0..N_SW-1, Nummer = CPU-Offset (addr - 0x2000). Das ist NICHT die
+--     Selbsttest-Nummer: vorn liegen die 16 Prog-DIP-Strobes $2000-$200F, der
+--     Selbsttest zaehlt ab $2010 = 1, also Selbsttest = Offset - 15. FA_Control
+--     rechnet das nur bei der Beschriftung um (SW_LABEL, ab v1.29).
 -- Beim Portieren in ein anderes Projekt also pruefen, was dort die Anwendersicht ist.
 --
 -- ---------------------------------------------------------------------------

@@ -143,8 +143,11 @@ nichts. Anders als der `solenoid_driver`, der sie fest auf AUS hält, lässt FA-
 deshalb sind auch die früher erwarteten Quartus-Warnungen `solenoids[14]/[18] stuck at VCC`
 verschwunden.
 
-**Schalter 0…79** — Nummer = CPU-Offset `addr − 0x2000`, **0-basiert**. Damit deckt sich die
-Nummer mit dem, was der Selbsttest des Spiels anzeigt.
+**Schalter 0…79** — Nummer = CPU-Offset `addr − 0x2000`, **0-basiert**. Das ist **nicht** die
+Nummer des Spiel-Selbsttests: vorn liegen die 16 Prog-DIP-Strobes `$2000–$200F`, der Selbsttest
+zählt ab `$2010` = 1, also **Selbsttest = Offset − 15** (Outhole Middle Earth: `$2038` = 56 → 41).
+FA_Control rechnet das ab v1.29 nur für die Beschriftung der Kacheln um (0–15 als D0–D15);
+über die Leitung geht weiter der Offset.
 
 **Displays 0…4** — LISY-Konvention: **0 = Status/Credit** (4 Stellen), 1…4 = Spieler 1…4
 (je 6 Stellen). Ziffern kommen rechtsbündig und höchstwertig zuerst, Blank ist `0x0F`.
